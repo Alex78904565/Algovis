@@ -244,8 +244,8 @@ identifiable while repeated branches move onto their retained states.
 For a slower explanation, `collapse_to_backbone(kept_nodes)` prunes maximal
 discarded subtrees one at a time. Equal-state nodes travel onto their retained
 counterparts, the edges follow them, and the redundant branch dissolves only
-after the two computations overlap. The kept nodes must form a connected tree
-from the root. Choose
+as the two computations overlap. The kept nodes must form a connected tree
+from the root. Pass `simultaneous=True` for one coordinated collapse, or choose
 `order="top_down"` to follow the recursive choices or `order="bottom_up"` to
 build toward the largest repeated branches.
 

@@ -299,15 +299,15 @@ class RecursiveTree(VGroup):
         *,
         order="top_down",
         merge_run_time=0.52,
-        settle_run_time=0.12,
+        simultaneous=False,
     ):
-        """Merge discarded work into kept states, one subtree at a time.
+        """Merge discarded work into kept states.
 
         Equal-state nodes travel onto their canonical kept nodes, while the
-        branch edges follow their corresponding endpoints. Once the two
-        computations overlap, the redundant copy dissolves. This makes the
-        visual argument "these calls are the same" rather than merely erasing
-        the extra branch.
+        branch edges follow their corresponding endpoints. The redundant copy
+        dissolves as it arrives, so no second fade can send it back toward its
+        original layout. Set ``simultaneous=True`` to collapse every disjoint
+        branch together; otherwise the branches follow ``order``.
         """
         kept_nodes = list(kept_nodes)
         canonical_by_key = {}
@@ -347,12 +347,15 @@ class RecursiveTree(VGroup):
                     self.state_key(current["args"])
                 )
                 if current_target is not None:
+                    node_target = current_target["mobject"].copy()
+                    node_target.set_opacity(0)
                     merge_animations.append(Transform(
-                        current["mobject"], current_target["mobject"].copy(),
+                        current["mobject"], node_target,
                     ))
                 else:
                     merge_animations.append(
-                        current["mobject"].animate.move_to(destination).scale(0.25)
+                        current["mobject"].animate.move_to(destination)
+                        .scale(0.25).set_opacity(0)
                     )
 
                 badge = current.get("cache_badge")
@@ -362,7 +365,8 @@ class RecursiveTree(VGroup):
                         if current_target is not None else destination
                     )
                     merge_animations.append(
-                        badge.animate.move_to(badge_destination).scale(0.35)
+                        badge.animate.move_to(badge_destination)
+                        .scale(0.35).set_opacity(0)
                     )
 
                 if incoming_edge is not None:
@@ -380,25 +384,22 @@ class RecursiveTree(VGroup):
                         ))
                     else:
                         merge_animations.append(
-                            incoming_edge.animate.move_to(destination).scale(0.25)
+                            incoming_edge.animate.move_to(destination)
+                            .scale(0.25).set_opacity(0)
                         )
 
                 for child, edge in zip(current["children"], current["edges"]):
                     merge_node(child, current, edge)
 
             merge_node(step["root"], step["parent"], step["incoming_edge"])
-            subtree = VGroup(step["edges"], step["nodes"])
-            animations.append(Succession(
-                AnimationGroup(
-                    *merge_animations, lag_ratio=0, run_time=merge_run_time,
-                ),
-                # These mobjects remain children of the RecursiveTree. A
-                # FadeOut of this temporary wrapper can remove only the
-                # wrapper and let the tree expose its children again. Persist
-                # zero opacity on the actual branch objects instead.
-                subtree.animate(run_time=settle_run_time).set_opacity(0),
+            animations.append(AnimationGroup(
+                *merge_animations, lag_ratio=0, run_time=merge_run_time,
             ))
-        return Succession(*animations) if animations else Wait(0)
+        if not animations:
+            return Wait(0)
+        if simultaneous:
+            return AnimationGroup(*animations, lag_ratio=0)
+        return Succession(*animations)
 
     def highlight_duplicates(self, colors=None, opacity=0.28):
         """Color every repeated state consistently across the recursion tree."""
