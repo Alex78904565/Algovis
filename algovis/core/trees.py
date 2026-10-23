@@ -302,6 +302,10 @@ class RecursiveTree(VGroup):
                 parent_target["shape"].get_boundary_point(direction),
                 child_target["shape"].get_boundary_point(-direction),
             )
+            # The retained edge is already visible at the destination. Fade
+            # the moving copy during its travel so the two strokes never add
+            # up to a distracting bright line when they meet.
+            target.set_opacity(0)
             return target
 
         animations = []
