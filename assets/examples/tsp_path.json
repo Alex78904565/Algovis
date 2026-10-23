@@ -1,0 +1,30 @@
+{
+  "variant": "shortest Hamiltonian path with a fixed start and no return edge",
+  "cities": ["A", "B", "C", "D", "E"],
+  "start": "A",
+  "return_to_start": false,
+  "distances": {
+    "A-B": 4,
+    "A-C": 2,
+    "A-D": 7,
+    "A-E": 6,
+    "B-C": 1,
+    "B-D": 5,
+    "B-E": 3,
+    "C-D": 4,
+    "C-E": 5,
+    "D-E": 2
+  },
+  "expected": {
+    "minimum_distance": 8,
+    "one_optimal_path": ["A", "C", "B", "E", "D"]
+  },
+  "reuse_example": {
+    "histories": [
+      ["A", "B", "C", "D"],
+      ["A", "C", "B", "D"]
+    ],
+    "shared_state": ["D", 1, 1, 1, 1, 0],
+    "remaining_city": "E"
+  }
+}

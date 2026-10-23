@@ -1,0 +1,13 @@
+{
+  "variant": "ordered cities with fuel purchases",
+  "cities": ["A", "B", "C", "D"],
+  "tank_capacity": 2,
+  "start_fuel": 0,
+  "fuel_per_segment": [1, 1, 1],
+  "price_per_unit": [4, 2, 5],
+  "expected": {
+    "minimum_cost": 8,
+    "purchases": [1, 2, 0],
+    "arrival_fuel": [0, 1, 0]
+  }
+}

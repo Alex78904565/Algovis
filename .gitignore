@@ -1,0 +1,54 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Manim and generated media
+media/
+*.mp4
+*.mov
+*.webm
+*.wav
+*.mp3
+*.ogg
+*.srt
+*.log
+
+# Editors and operating systems
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Local production and QA workspace
+.codex-remote-attachments/
+.qa/
+.tmp_*/
+tmp/
+assets/audio/
+assets/music/
+tools/
+
+# Unreleased lesson source and private reference material
+CS577-DP.pdf
+main.tex
+v3.tex
+full_video_preview.py
+lecture_examples.py
+lecture_examples_script.md
+RECORDING_SCRIPT.md
+VIDEO_PRODUCTION_SPEC.md
+SCRIPT_COMPLETENESS_AUDIT.md
+render_sections.ps1
+manimtest.py
+*.png
+
+# Keep the small, executable example verifier public.
+!tools/
+tools/*
+!tools/verify_dp_examples.py

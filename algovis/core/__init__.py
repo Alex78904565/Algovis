@@ -1,0 +1,1 @@
+"""Core algorithm-visualization components."""

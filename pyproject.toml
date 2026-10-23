@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "algovis"
+version = "0.1.0"
+description = "Reusable Manim components for clear algorithm visualizations"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "manim>=0.19,<0.22",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Education",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Education",
+    "Topic :: Multimedia :: Graphics :: Presentation",
+]
+
+[project.urls]
+Repository = "https://github.com/Alex78904565/Algovis"
+
+[tool.setuptools.packages.find]
+include = ["algovis*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
