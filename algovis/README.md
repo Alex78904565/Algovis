@@ -241,6 +241,11 @@ Use `set_state_colors(color_by_key)` to assign one restrained color to every
 occurrence of the same recursive input. Matching calls then remain visually
 identifiable while repeated branches move onto their retained states.
 
+Pass `level_fn=lambda args: ...` when a teaching scene should align calls by a
+semantic quantity instead of recursion depth. For example, `lambda args: 7 -
+args[0]` places every Fibonacci call with the same input on the same horizontal
+level while preserving the original parent-child edges.
+
 For a slower explanation, `collapse_to_backbone(kept_nodes)` prunes maximal
 discarded subtrees one at a time. Equal-state nodes travel onto their retained
 counterparts, the edges follow them, and the redundant branch dissolves only

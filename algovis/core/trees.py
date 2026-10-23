@@ -16,7 +16,7 @@ class RecursiveTree(VGroup):
     def __init__(self, branching_fn, root_args, depth_limit=5, height=1.15,
                  width=1.15, node_radius=0.34, label_scale=0.58,
                  node_padding=0.12, node_factory=None, node_color=None,
-                 state_key=None, node_shape="circle",
+                 state_key=None, level_fn=None, node_shape="circle",
                  theme=DEFAULT_THEME,
                  **kwargs):
         super().__init__(**kwargs)
@@ -34,6 +34,7 @@ class RecursiveTree(VGroup):
         self.node_color = node_color or theme.node
         self.node_shape = node_shape
         self.state_key = state_key or (lambda args: tuple(args))
+        self.level_fn = level_fn
         self.memoized_graph = None
         self.nodes = VGroup()
         self.edges = VGroup()
@@ -47,8 +48,10 @@ class RecursiveTree(VGroup):
         # layer from the actual rendered node heights.
         level_heights = {}
         def measure_levels(node_data, depth):
-            level_heights[depth] = max(
-                level_heights.get(depth, 0), node_data["mobject"].height,
+            display_level = self._display_level(node_data, depth)
+            level_heights[display_level] = max(
+                level_heights.get(display_level, 0),
+                node_data["mobject"].height,
             )
             for child in node_data["children"]:
                 measure_levels(child, depth + 1)
@@ -121,6 +124,14 @@ class RecursiveTree(VGroup):
 
         return node_data
 
+    def _display_level(self, node_data, recursion_depth):
+        if self.level_fn is None:
+            return recursion_depth
+        level = self.level_fn(node_data["args"])
+        if not isinstance(level, int) or level < 0:
+            raise ValueError("level_fn must return a nonnegative integer")
+        return level
+
     def _get_subtree_width(self, node_data):
         if not node_data["children"]:
             return max(self.sibling_spacing, node_data["mobject"].width + 0.18)
@@ -128,7 +139,10 @@ class RecursiveTree(VGroup):
         return max(children_width, node_data["mobject"].width + 0.18)
 
     def _position_nodes(self, node_data, x, depth):
-        y = self.level_y_positions.get(depth, -depth * self.level_spacing)
+        display_level = self._display_level(node_data, depth)
+        y = self.level_y_positions.get(
+            display_level, -display_level * self.level_spacing,
+        )
         node_data["mobject"].move_to([x, y, 0])
 
         if not node_data["children"]:
