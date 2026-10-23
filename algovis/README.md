@@ -253,7 +253,11 @@ place only after it arrives. The kept nodes must form a connected tree from the
 root. Pass `simultaneous=True` for one coordinated collapse, or choose
 `order="top_down"` to begin near the root or `order="bottom_up"` to merge the
 deepest repeated branches first. `merge_run_time` and `fade_run_time` control
-those two beats independently.
+those two beats independently. Use
+`get_backbone_collapse_animations(kept_nodes)` when each fold should be
+interleaved with another explanation or state update. If moving edges would
+cross important labels, pass `move_edges=False`; each discarded branch's lines
+then dissolve just before its nodes move.
 
 `RecursionMemoComparison` carries that visual argument through an entire
 runtime comparison. Its square recursion nodes reorganize into either a full

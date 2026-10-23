@@ -309,22 +309,27 @@ class RecursiveTree(VGroup):
             raise ValueError("order must be 'top_down' or 'bottom_up'")
         return steps
 
-    def collapse_to_backbone(
+    def get_backbone_collapse_animations(
         self,
         kept_nodes,
         *,
         order="top_down",
         merge_run_time=0.52,
         fade_run_time=0.12,
-        simultaneous=False,
+        move_edges=True,
+        edge_fade_run_time=0.08,
     ):
-        """Merge discarded work into kept states.
+        """Build one merge animation for each discarded subtree.
 
         Equal-state nodes travel onto their canonical kept nodes, while the
-        branch edges follow their corresponding endpoints. Each redundant copy
-        remains visible while it travels, then dissolves in place after it has
-        arrived. Set ``simultaneous=True`` to collapse every disjoint branch
-        together; otherwise the branches follow ``order``.
+        redundant copy remains visible until it arrives, then dissolves in
+        place. By default, branch edges follow their endpoints. Set
+        ``move_edges=False`` to dissolve them immediately before the nodes move,
+        which is clearer when moving branches would cross retained labels.
+
+        The returned list follows ``order`` and can be interleaved with other
+        teaching beats, such as revealing one newly computed value between
+        successive folds.
         """
         kept_nodes = list(kept_nodes)
         canonical_by_key = {}
@@ -345,7 +350,7 @@ class RecursiveTree(VGroup):
             )
             return target
 
-        def fade_in_place(mobjects):
+        def fade_in_place(mobjects, run_time):
             """Fade a moved group without interpolating its geometry again."""
             styled_members = []
             for member in mobjects.family_members_with_points():
@@ -366,7 +371,7 @@ class RecursiveTree(VGroup):
                     )
 
             return UpdateFromAlphaFunc(
-                mobjects, update, run_time=fade_run_time,
+                mobjects, update, run_time=run_time,
             )
 
         animations = []
@@ -405,7 +410,7 @@ class RecursiveTree(VGroup):
                         .scale(0.35)
                     )
 
-                if incoming_edge is not None:
+                if move_edges and incoming_edge is not None:
                     parent_target = canonical_by_key.get(
                         self.state_key(parent["args"])
                     )
@@ -428,14 +433,52 @@ class RecursiveTree(VGroup):
                     merge_node(child, current, edge)
 
             merge_node(step["root"], step["parent"], step["incoming_edge"])
-            branch = VGroup(step["nodes"], step["edges"])
-            animations.append(Succession(
-                AnimationGroup(
-                    *merge_animations, lag_ratio=0,
-                    run_time=merge_run_time,
-                ),
-                fade_in_place(branch),
-            ))
+            merge = AnimationGroup(
+                *merge_animations, lag_ratio=0,
+                run_time=merge_run_time,
+            )
+            if move_edges:
+                animations.append(Succession(
+                    merge,
+                    fade_in_place(
+                        VGroup(step["nodes"], step["edges"]),
+                        fade_run_time,
+                    ),
+                ))
+            else:
+                animations.append(Succession(
+                    fade_in_place(step["edges"], edge_fade_run_time),
+                    merge,
+                    fade_in_place(step["nodes"], fade_run_time),
+                ))
+        return animations
+
+    def collapse_to_backbone(
+        self,
+        kept_nodes,
+        *,
+        order="top_down",
+        merge_run_time=0.52,
+        fade_run_time=0.12,
+        simultaneous=False,
+        move_edges=True,
+        edge_fade_run_time=0.08,
+    ):
+        """Merge discarded work into kept states.
+
+        Set ``simultaneous=True`` to collapse every disjoint branch together;
+        otherwise the branches follow ``order``. See
+        :meth:`get_backbone_collapse_animations` to interleave individual folds
+        with scene-specific explanatory beats.
+        """
+        animations = self.get_backbone_collapse_animations(
+            kept_nodes,
+            order=order,
+            merge_run_time=merge_run_time,
+            fade_run_time=fade_run_time,
+            move_edges=move_edges,
+            edge_fade_run_time=edge_fade_run_time,
+        )
         if not animations:
             return Wait(0)
         if simultaneous:
