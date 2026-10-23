@@ -248,11 +248,12 @@ level while preserving the original parent-child edges.
 
 For a slower explanation, `collapse_to_backbone(kept_nodes)` prunes maximal
 discarded subtrees one at a time. Equal-state nodes travel onto their retained
-counterparts, the edges follow them, and the redundant branch dissolves only
-as the two computations overlap. The kept nodes must form a connected tree
-from the root. Pass `simultaneous=True` for one coordinated collapse, or choose
-`order="top_down"` to follow the recursive choices or `order="bottom_up"` to
-build toward the largest repeated branches.
+counterparts, the edges follow them, and the redundant branch dissolves in
+place only after it arrives. The kept nodes must form a connected tree from the
+root. Pass `simultaneous=True` for one coordinated collapse, or choose
+`order="top_down"` to begin near the root or `order="bottom_up"` to merge the
+deepest repeated branches first. `merge_run_time` and `fade_run_time` control
+those two beats independently.
 
 `RecursionMemoComparison` carries that visual argument through an entire
 runtime comparison. Its square recursion nodes reorganize into either a full

@@ -302,8 +302,10 @@ class RecursiveTree(VGroup):
 
         visit(self.tree_structure)
         if order == "bottom_up":
-            steps.reverse()
-        elif order != "top_down":
+            steps.sort(key=lambda step: step["depth"], reverse=True)
+        elif order == "top_down":
+            steps.sort(key=lambda step: step["depth"])
+        else:
             raise ValueError("order must be 'top_down' or 'bottom_up'")
         return steps
 
@@ -313,15 +315,16 @@ class RecursiveTree(VGroup):
         *,
         order="top_down",
         merge_run_time=0.52,
+        fade_run_time=0.12,
         simultaneous=False,
     ):
         """Merge discarded work into kept states.
 
         Equal-state nodes travel onto their canonical kept nodes, while the
-        branch edges follow their corresponding endpoints. The redundant copy
-        dissolves as it arrives, so no second fade can send it back toward its
-        original layout. Set ``simultaneous=True`` to collapse every disjoint
-        branch together; otherwise the branches follow ``order``.
+        branch edges follow their corresponding endpoints. Each redundant copy
+        remains visible while it travels, then dissolves in place after it has
+        arrived. Set ``simultaneous=True`` to collapse every disjoint branch
+        together; otherwise the branches follow ``order``.
         """
         kept_nodes = list(kept_nodes)
         canonical_by_key = {}
@@ -340,11 +343,31 @@ class RecursiveTree(VGroup):
                 parent_target["shape"].get_boundary_point(direction),
                 child_target["shape"].get_boundary_point(-direction),
             )
-            # The retained edge is already visible at the destination. Fade
-            # the moving copy during its travel so the two strokes never add
-            # up to a distracting bright line when they meet.
-            target.set_opacity(0)
             return target
+
+        def fade_in_place(mobjects):
+            """Fade a moved group without interpolating its geometry again."""
+            styled_members = []
+            for member in mobjects.family_members_with_points():
+                styled_members.append((
+                    member,
+                    member.get_fill_opacity(),
+                    member.get_stroke_opacity(),
+                    member.get_background_stroke_opacity(),
+                ))
+
+            def update(_mobject, alpha):
+                remaining = 1 - alpha
+                for member, fill, stroke, background in styled_members:
+                    member.set_fill(opacity=fill * remaining)
+                    member.set_stroke(opacity=stroke * remaining)
+                    member.set_background_stroke(
+                        opacity=background * remaining,
+                    )
+
+            return UpdateFromAlphaFunc(
+                mobjects, update, run_time=fade_run_time,
+            )
 
         animations = []
         for step in self.get_backbone_collapse_steps(kept_nodes, order=order):
@@ -362,14 +385,13 @@ class RecursiveTree(VGroup):
                 )
                 if current_target is not None:
                     node_target = current_target["mobject"].copy()
-                    node_target.set_opacity(0)
                     merge_animations.append(Transform(
                         current["mobject"], node_target,
                     ))
                 else:
                     merge_animations.append(
                         current["mobject"].animate.move_to(destination)
-                        .scale(0.25).set_opacity(0)
+                        .scale(0.25)
                     )
 
                 badge = current.get("cache_badge")
@@ -380,7 +402,7 @@ class RecursiveTree(VGroup):
                     )
                     merge_animations.append(
                         badge.animate.move_to(badge_destination)
-                        .scale(0.35).set_opacity(0)
+                        .scale(0.35)
                     )
 
                 if incoming_edge is not None:
@@ -399,15 +421,20 @@ class RecursiveTree(VGroup):
                     else:
                         merge_animations.append(
                             incoming_edge.animate.move_to(destination)
-                            .scale(0.25).set_opacity(0)
+                            .scale(0.25)
                         )
 
                 for child, edge in zip(current["children"], current["edges"]):
                     merge_node(child, current, edge)
 
             merge_node(step["root"], step["parent"], step["incoming_edge"])
-            animations.append(AnimationGroup(
-                *merge_animations, lag_ratio=0, run_time=merge_run_time,
+            branch = VGroup(step["nodes"], step["edges"])
+            animations.append(Succession(
+                AnimationGroup(
+                    *merge_animations, lag_ratio=0,
+                    run_time=merge_run_time,
+                ),
+                fade_in_place(branch),
             ))
         if not animations:
             return Wait(0)
