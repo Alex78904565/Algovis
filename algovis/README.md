@@ -238,9 +238,10 @@ Set `node_shape="square"` when calls should read as state cells that can later
 be reorganized into an array.
 
 For a slower explanation, `collapse_to_backbone(kept_nodes)` prunes maximal
-discarded subtrees one at a time. Each step highlights the repeated subtree
-root beside its canonical kept state, then folds the whole branch toward that
-state. The kept nodes must form a connected tree from the root. Choose
+discarded subtrees one at a time. Equal-state nodes travel onto their retained
+counterparts, the edges follow them, and the redundant branch dissolves only
+after the two computations overlap. The kept nodes must form a connected tree
+from the root. Choose
 `order="top_down"` to follow the recursive choices or `order="bottom_up"` to
 build toward the largest repeated branches.
 

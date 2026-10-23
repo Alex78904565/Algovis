@@ -1,5 +1,6 @@
 from manim import *
 import enum
+import numpy as np
 
 from ..theme import DEFAULT_THEME
 
@@ -251,6 +252,8 @@ class RecursiveTree(VGroup):
                 incoming = incoming_edge_by_id[id(child)]
                 steps.append({
                     "root": child,
+                    "parent": current,
+                    "incoming_edge": incoming,
                     "canonical": canonical_by_key.get(
                         self.state_key(child["args"])
                     ),
@@ -271,38 +274,97 @@ class RecursiveTree(VGroup):
         kept_nodes,
         *,
         order="top_down",
-        focus_color=None,
-        kept_color=None,
-        focus_run_time=0.28,
-        collapse_run_time=0.38,
-        pull=0.16,
-        scale_factor=0.82,
+        merge_run_time=0.52,
+        settle_run_time=0.12,
     ):
-        """Fold discarded work into a connected set of kept states, one subtree at a time.
+        """Merge discarded work into kept states, one subtree at a time.
 
-        The animation first points out the discarded subtree root and its
-        canonical kept state. It then shrinks and fades that entire subtree
-        toward the canonical node before proceeding to the next branch.
+        Equal-state nodes travel onto their canonical kept nodes, while the
+        branch edges follow their corresponding endpoints. Once the two
+        computations overlap, the redundant copy dissolves. This makes the
+        visual argument "these calls are the same" rather than merely erasing
+        the extra branch.
         """
-        focus_color = focus_color or self.theme.danger
-        kept_color = kept_color or self.theme.success
+        kept_nodes = list(kept_nodes)
+        canonical_by_key = {}
+        for node in kept_nodes:
+            canonical_by_key.setdefault(self.state_key(node["args"]), node)
+
+        def edge_target(edge, parent_target, child_target):
+            target = edge.copy()
+            direction = (
+                child_target["shape"].get_center()
+                - parent_target["shape"].get_center()
+            )
+            if np.linalg.norm(direction) < 1e-8:
+                return None
+            target.put_start_and_end_on(
+                parent_target["shape"].get_boundary_point(direction),
+                child_target["shape"].get_boundary_point(-direction),
+            )
+            return target
+
         animations = []
         for step in self.get_backbone_collapse_steps(kept_nodes, order=order):
-            root = step["root"]["mobject"]
-            canonical = step["canonical"]
-            focus = [Indicate(root, color=focus_color, scale_factor=1.08)]
-            destination = root.get_center()
-            if canonical is not None:
-                kept = canonical["mobject"]
-                destination = kept.get_center()
-                focus.append(Indicate(kept, color=kept_color, scale_factor=1.08))
+            root_target = step["canonical"]
+            destination = (
+                root_target["mobject"].get_center()
+                if root_target is not None
+                else step["root"]["mobject"].get_center()
+            )
+            merge_animations = []
+
+            def merge_node(current, parent=None, incoming_edge=None):
+                current_target = canonical_by_key.get(
+                    self.state_key(current["args"])
+                )
+                if current_target is not None:
+                    merge_animations.append(Transform(
+                        current["mobject"], current_target["mobject"].copy(),
+                    ))
+                else:
+                    merge_animations.append(
+                        current["mobject"].animate.move_to(destination).scale(0.25)
+                    )
+
+                badge = current.get("cache_badge")
+                if badge is not None:
+                    badge_destination = (
+                        current_target["mobject"].get_center()
+                        if current_target is not None else destination
+                    )
+                    merge_animations.append(
+                        badge.animate.move_to(badge_destination).scale(0.35)
+                    )
+
+                if incoming_edge is not None:
+                    parent_target = canonical_by_key.get(
+                        self.state_key(parent["args"])
+                    )
+                    target_edge = None
+                    if parent_target is not None and current_target is not None:
+                        target_edge = edge_target(
+                            incoming_edge, parent_target, current_target,
+                        )
+                    if target_edge is not None:
+                        merge_animations.append(Transform(
+                            incoming_edge, target_edge,
+                        ))
+                    else:
+                        merge_animations.append(
+                            incoming_edge.animate.move_to(destination).scale(0.25)
+                        )
+
+                for child, edge in zip(current["children"], current["edges"]):
+                    merge_node(child, current, edge)
+
+            merge_node(step["root"], step["parent"], step["incoming_edge"])
             subtree = VGroup(step["edges"], step["nodes"])
-            shift = (destination - root.get_center()) * float(pull)
             animations.append(Succession(
-                AnimationGroup(*focus, lag_ratio=0, run_time=focus_run_time),
-                subtree.animate(run_time=collapse_run_time).scale(
-                    scale_factor, about_point=root.get_center(),
-                ).shift(shift).set_opacity(0),
+                AnimationGroup(
+                    *merge_animations, lag_ratio=0, run_time=merge_run_time,
+                ),
+                FadeOut(subtree, run_time=settle_run_time),
             ))
         return Succession(*animations) if animations else Wait(0)
 
