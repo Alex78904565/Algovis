@@ -237,6 +237,10 @@ transition from a recursive execution tree to one canonical node per state.
 Set `node_shape="square"` when calls should read as state cells that can later
 be reorganized into an array.
 
+Use `set_state_colors(color_by_key)` to assign one restrained color to every
+occurrence of the same recursive input. Matching calls then remain visually
+identifiable while repeated branches move onto their retained states.
+
 For a slower explanation, `collapse_to_backbone(kept_nodes)` prunes maximal
 discarded subtrees one at a time. Equal-state nodes travel onto their retained
 counterparts, the edges follow them, and the redundant branch dissolves only

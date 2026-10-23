@@ -21,6 +21,7 @@ class PublicApiTests(unittest.TestCase):
 
     def test_recursive_tree_supports_subtree_collapse(self):
         self.assertTrue(hasattr(algovis.RecursiveTree, "collapse_to_backbone"))
+        self.assertTrue(hasattr(algovis.RecursiveTree, "set_state_colors"))
 
 
 if __name__ == "__main__":

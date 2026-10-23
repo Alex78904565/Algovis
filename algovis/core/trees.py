@@ -186,6 +186,30 @@ class RecursiveTree(VGroup):
             if include_singletons or len(nodes) > 1
         }
 
+    def set_state_colors(self, color_by_key, fill_opacity=0.18,
+                         label_color=None):
+        """Give every occurrence of the same recursive state the same color.
+
+        ``color_by_key`` may be a mapping keyed by ``state_key(args)`` or a
+        callable receiving that key. Missing mapping entries keep their
+        existing color. This mutates the tree immediately, which makes it
+        useful before a tree reveal as well as before a merge animation.
+        """
+        for node_data, _depth in self.iter_nodes():
+            key = self.state_key(node_data["args"])
+            if callable(color_by_key):
+                color = color_by_key(key)
+            else:
+                color = color_by_key.get(key)
+            if color is None:
+                continue
+            node_data["shape"].set_stroke(color).set_fill(
+                color, opacity=fill_opacity,
+            )
+            if label_color is not None:
+                node_data["label"].set_color(label_color)
+        return self
+
     def _subtree_parts(self, node_data):
         """Return the visible nodes and edges belonging to one subtree."""
         nodes = VGroup()
@@ -368,7 +392,11 @@ class RecursiveTree(VGroup):
                 AnimationGroup(
                     *merge_animations, lag_ratio=0, run_time=merge_run_time,
                 ),
-                FadeOut(subtree, run_time=settle_run_time),
+                # These mobjects remain children of the RecursiveTree. A
+                # FadeOut of this temporary wrapper can remove only the
+                # wrapper and let the tree expose its children again. Persist
+                # zero opacity on the actual branch objects instead.
+                subtree.animate(run_time=settle_run_time).set_opacity(0),
             ))
         return Succession(*animations) if animations else Wait(0)
 
