@@ -185,6 +185,127 @@ class RecursiveTree(VGroup):
             if include_singletons or len(nodes) > 1
         }
 
+    def _subtree_parts(self, node_data):
+        """Return the visible nodes and edges belonging to one subtree."""
+        nodes = VGroup()
+        edges = VGroup()
+
+        def walk(current):
+            nodes.add(current["mobject"])
+            badge = current.get("cache_badge")
+            if badge is not None:
+                nodes.add(badge)
+            for child, edge in zip(current["children"], current["edges"]):
+                edges.add(edge)
+                walk(child)
+
+        walk(node_data)
+        return nodes, edges
+
+    def get_backbone_collapse_steps(self, kept_nodes, order="top_down"):
+        """Describe the maximal subtrees that can be removed around a backbone.
+
+        ``kept_nodes`` must contain the root and every ancestor needed to reach
+        another kept node. Each returned step is a disjoint subtree, so an
+        author can remove repeated work one branch at a time without fading a
+        child twice. When the discarded root has the same state as a kept node,
+        that node is exposed as ``canonical`` for cache-hit highlighting.
+        """
+        kept_nodes = list(kept_nodes)
+        kept_ids = {id(node) for node in kept_nodes}
+        all_nodes = list(self.iter_nodes())
+        node_by_id = {id(node): node for node, _depth in all_nodes}
+        depth_by_id = {id(node): depth for node, depth in all_nodes}
+        parent_by_id = {}
+        incoming_edge_by_id = {}
+        for parent, _depth in all_nodes:
+            for child, edge in zip(parent["children"], parent["edges"]):
+                parent_by_id[id(child)] = parent
+                incoming_edge_by_id[id(child)] = edge
+
+        unknown = kept_ids.difference(node_by_id)
+        if unknown:
+            raise ValueError("Every kept node must belong to this RecursiveTree")
+        if id(self.tree_structure) not in kept_ids:
+            raise ValueError("The root must be included in kept_nodes")
+        for node in kept_nodes:
+            parent = parent_by_id.get(id(node))
+            if parent is not None and id(parent) not in kept_ids:
+                raise ValueError(
+                    "kept_nodes must form a connected backbone from the root"
+                )
+
+        canonical_by_key = {}
+        for node, _depth in all_nodes:
+            if id(node) in kept_ids:
+                canonical_by_key.setdefault(self.state_key(node["args"]), node)
+
+        steps = []
+
+        def visit(current):
+            for child in current["children"]:
+                if id(child) in kept_ids:
+                    visit(child)
+                    continue
+                nodes, internal_edges = self._subtree_parts(child)
+                incoming = incoming_edge_by_id[id(child)]
+                steps.append({
+                    "root": child,
+                    "canonical": canonical_by_key.get(
+                        self.state_key(child["args"])
+                    ),
+                    "nodes": nodes,
+                    "edges": VGroup(incoming, *internal_edges),
+                    "depth": depth_by_id[id(child)],
+                })
+
+        visit(self.tree_structure)
+        if order == "bottom_up":
+            steps.reverse()
+        elif order != "top_down":
+            raise ValueError("order must be 'top_down' or 'bottom_up'")
+        return steps
+
+    def collapse_to_backbone(
+        self,
+        kept_nodes,
+        *,
+        order="top_down",
+        focus_color=None,
+        kept_color=None,
+        focus_run_time=0.28,
+        collapse_run_time=0.38,
+        pull=0.16,
+        scale_factor=0.82,
+    ):
+        """Fold discarded work into a connected set of kept states, one subtree at a time.
+
+        The animation first points out the discarded subtree root and its
+        canonical kept state. It then shrinks and fades that entire subtree
+        toward the canonical node before proceeding to the next branch.
+        """
+        focus_color = focus_color or self.theme.danger
+        kept_color = kept_color or self.theme.success
+        animations = []
+        for step in self.get_backbone_collapse_steps(kept_nodes, order=order):
+            root = step["root"]["mobject"]
+            canonical = step["canonical"]
+            focus = [Indicate(root, color=focus_color, scale_factor=1.08)]
+            destination = root.get_center()
+            if canonical is not None:
+                kept = canonical["mobject"]
+                destination = kept.get_center()
+                focus.append(Indicate(kept, color=kept_color, scale_factor=1.08))
+            subtree = VGroup(step["edges"], step["nodes"])
+            shift = (destination - root.get_center()) * float(pull)
+            animations.append(Succession(
+                AnimationGroup(*focus, lag_ratio=0, run_time=focus_run_time),
+                subtree.animate(run_time=collapse_run_time).scale(
+                    scale_factor, about_point=root.get_center(),
+                ).shift(shift).set_opacity(0),
+            ))
+        return Succession(*animations) if animations else Wait(0)
+
     def highlight_duplicates(self, colors=None, opacity=0.28):
         """Color every repeated state consistently across the recursion tree."""
         # Repeated calls all mean the same thing: wasted work.  A rainbow

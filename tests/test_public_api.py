@@ -19,6 +19,9 @@ class PublicApiTests(unittest.TestCase):
         ):
             self.assertTrue(hasattr(algovis, name), name)
 
+    def test_recursive_tree_supports_subtree_collapse(self):
+        self.assertTrue(hasattr(algovis.RecursiveTree, "collapse_to_backbone"))
+
 
 if __name__ == "__main__":
     unittest.main()

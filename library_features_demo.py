@@ -91,6 +91,11 @@ class TreeMemoizationDemo(Scene):
         self.play(tree.highlight_duplicates(), run_time=1)
         duplicate = next(iter(tree.get_duplicate_groups().values()))[1]
         self.play(tree.show_cache_hit(duplicate))
+        kept = [
+            nodes[0]
+            for nodes in tree.get_duplicate_groups(include_singletons=True).values()
+        ]
+        self.play(tree.collapse_to_backbone(kept), run_time=2.5)
         self.play(tree.collapse_to_state_graph(), run_time=2)
         self.wait(0.3)
 
