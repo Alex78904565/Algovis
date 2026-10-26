@@ -8,6 +8,9 @@ Before changing a lesson, read:
 
 These are accumulated production requirements. Use them to audit the work;
 do not ask the viewer to rediscover the same mistakes in a preliminary render.
+Keep recurring feedback in `docs/RECURRING_REVIEW_FEEDBACK.md` up to date. Use
+its complaint/check reference before returning work, repair underlying shared
+causes where possible, and state the actual scope of visual verification.
 
 Read queued annotations, drafts, and follow-ups across every section. The
 selected section and its approval status do not limit which notes to handle.

@@ -5,6 +5,35 @@ with a useful composition and develop it. Keep useful work visible and move it
 when space is needed. A new spoken clause usually calls for a local change,
 not another slide.
 
+## Quick reference: recurring complaints and required checks
+
+Use this before handing over a preview. These are recurring failures to prevent,
+not suggestions for the author to check again.
+
+| Complaint pattern | What the agent must check |
+|---|---|
+| Random, early, or late pulses and boxes | Every attention effect has a specific spoken referent. Compare its actual rendered start with that word, including time spent in preceding animations. Remove effects without an instructional reason. |
+| The narration names something but the viewer cannot find it | Focus the correct object or term on its reference. Follow the spoken order; retain simultaneous emphasis during an actual comparison. An already clear reveal may provide the attention itself. |
+| Answers, parameters, or labels appear before their explanation | Check the first frame in which the content becomes visible, not only a later pulse. Keep destination cells and new values unpopulated until their own reveal or arrival. |
+| Too many slides, resets, title changes, or disappearing equations | Compare compositions before and after. Keep useful definitions, proof steps, and unchanged equation terms. Move or regroup existing work to make room; clear it only when the explanation has finished using it. |
+| Crowding, overlap, poor alignment, or clipped content | Inspect complete video frames: titles, section markers, labels, formulas, braces, arrows, dividers, and effect outlines. Check spacing and hierarchy as well as intersections. Readability matters even when geometry tests pass. |
+| Pop-ins, leftover edges, duplicate labels, or symbol scrambling | Inspect intermediate frames. Nodes and edges share a lifecycle; each visible object has one owner. Travelling copies stay readable, and substitutions finish without reviving old objects. |
+| Arbitrary colors or a label contradicting its visual state | Keep the established semantic palette. Update a state value and its styling together. A temporary spoken mention does not justify changing the object's meaning or color. |
+| Mathematics changes unexpectedly or a derivation loses its logic | Keep notation, scale, row orientation, braces, and function meaning consistent. Carry definitions to their application. Retain earlier proof work and show where the base case, changing measure, runtime, and requested answer come from. |
+| Spoken examples or actions have no useful visual counterpart | Show the concrete instance and demonstrate the described operation. Count states from parameter ranges; do not make picturing an array's dimensions a prerequisite. |
+| Audio clicks, shuffling, level jumps, or misleading sound-quality claims | Check edits inside takes as well as between takes. Preserve raw audio, protect speech, and distinguish signal checks from actual listening. Identify specific pickups when noise overlaps speech. |
+| Only the selected section is fixed, or notes/replies stay stale | Read notes and follow-ups across every section. Check other uses of the same faulty component. Refresh feedback and transcript data when they change. Agent fixes await review; only the author resolves them. |
+
+When one of these failures occurs, repair the shared component or scheduling
+code where appropriate and inspect its other uses. Add a regression check when
+the failure is mechanically detectable. Keep new recurring feedback in this
+document so it remains available in later sessions.
+
+Record what was actually inspected. An all-section audit, sampled visual review,
+continuous playback, and perceptual audio listening are different scopes. Do not
+call every frame verified when only selected frames were inspected, and do not
+promise that passing checks makes further mistakes impossible.
+
 ## Timing and attention
 
 When the narration names two objects in sequence, focus them in that sequence.
