@@ -959,6 +959,7 @@
       drawing: false,
       drawStart: null,
       revision: null,
+      dataVersion: null,
       reloadTime: 0,
       editingId: null,
       musicConfig: null,
@@ -2262,6 +2263,7 @@
       renderSectionPicker(project.sections);
       document.getElementById("selectButton").textContent = defaultSelectLabel();
       state.revision = project.revision;
+      state.dataVersion = project.approval?.version;
       document.getElementById("sectionTitle").textContent = project.section.title;
       video.src = project.videoUrl;
       if (project.music) {
@@ -2430,6 +2432,10 @@
       try {
         const result = await request("/api/revision");
         const renderChanged = state.revision != null && result.revision !== state.revision;
+        const dataChanged = result.approval?.version !== state.dataVersion;
+        const editing = state.editingId || state.pendingRegion ||
+          document.activeElement?.matches("textarea") ||
+          [...document.querySelectorAll(".annotation textarea")].some(field => field.value.trim());
         if (renderChanged) state.mediaLoading = true;
         updateRenderStatus(result.render);
         updateReviewState(result);
@@ -2437,13 +2443,22 @@
           state.project.audit = result.audit;
           renderAudit(result.audit);
         }
-        if (renderChanged) {
+        if ((renderChanged || dataChanged) && !editing) {
           const refreshed = await request("/api/project");
+          state.project = refreshed;
+          state.cues = refreshed.cues;
+          state.annotations = refreshed.annotations;
+          state.dataVersion = refreshed.approval?.version;
           state.project.objects = refreshed.objects;
           state.animations = refreshed.objects?.animations || [];
           state.project.transitions = refreshed.transitions;
           document.getElementById("selectButton").textContent = defaultSelectLabel();
           updateRenderStatus(refreshed.render);
+          renderAnnotations();
+          if (!renderChanged) {
+            renderCues();
+            return;
+          }
           state.reloadTime = video.currentTime;
           state.revision = result.revision;
           clearSelection();
@@ -2457,7 +2472,7 @@
           }, { once: true });
         }
       } catch (_) { /* The local server may briefly restart. */ }
-      setTimeout(poll, 1400);
+      finally { setTimeout(poll, 1400); }
     }
 
     initialize().then(poll).catch(error => {
