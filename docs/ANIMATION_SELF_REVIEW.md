@@ -57,6 +57,29 @@ self.play(Pulse(fifth_cell, trigger="the fifth", reason="Name the stored value")
 Never infer permission to pulse solely from a cue name. Remove an effect if
 there is no specific spoken referent or it adds nothing beyond an existing reveal.
 
+For new content, prefer one atomic word-timed operation:
+
+```python
+self.play_on_cue("total", FadeIn(total), run_time=0.5,
+                 reason="Reveal the total when its value is spoken")
+```
+
+Set `transcriptWords` in the cue document to the timestamped words file, relative
+to the project root. This method resolves the phrase against those words; the
+cue's numeric time only selects the occurrence. A missing/approximate alignment
+or a missed word fails the render. It does not silently play late or shorten an
+earlier animation. Its timing declaration cannot leak to the next `play`.
+
+The reviewer checks attention and explicitly word-timed content **before**
+publishing the new video. A rejected attempt leaves the last good preview
+available. A correctly timed pulse does not validate an earlier reveal: check
+when the underlying value first becomes visible, not just its emphasis.
+
+Definition transfers carry a rigid, readable copy with a background, then
+replace the application locally after arrival. This prevents mid-flight symbol
+scrambling and keeps text legible when crossing other proof rows. Inspect the
+travelling copy and its cleanup, as well as the final substituted formula.
+
 ## Work through the findings yourself
 
 - **Missing trigger:** remove the effect or supply its specific, justified words.

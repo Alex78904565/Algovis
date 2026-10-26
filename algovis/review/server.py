@@ -942,6 +942,7 @@ class ReviewServer:
             (self.review_dir / "last-render.log").write_text(log + "\n", encoding="utf-8")
             if completed.returncode:
                 raise RuntimeError(log or f"Render exited {completed.returncode}")
+            self._validate_render_timing()
             self._publish_render()
             self._refresh_preflight()
             with self._render_lock:
@@ -971,6 +972,25 @@ class ReviewServer:
                     rerender = True
             if rerender:
                 self.request_render()
+
+    def _validate_render_timing(self) -> None:
+        """Keep a mistimed render out of the reviewer, preserving the last good video."""
+        from .audit import audit_section
+        paths = [self.manifest_path, self.cue_path, self.transcript_path]
+        if any(path is None or not path.is_file() for path in paths):
+            return
+        report = audit_section(*[
+            json.loads(path.read_text(encoding="utf-8")) for path in paths
+        ])
+        problems = [event for event in report["events"] if event["findings"]]
+        content = [change for change in report["changes"] if any(
+            finding.startswith("content_") and finding != "content_erased_then_recreated"
+            for finding in change["findings"]
+        )]
+        if problems or content:
+            details = [f"{item.get('cue')}: {', '.join(item['findings'])}"
+                       for item in problems + content]
+            raise RuntimeError("Word timing rejected before publication: " + "; ".join(details[:8]))
 
     def _refresh_preflight(self) -> None:
         """Regenerate storyboards and static QA after a successful render.

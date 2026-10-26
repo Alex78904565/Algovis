@@ -172,8 +172,29 @@ class PublicApiTests(unittest.TestCase):
         animation._setup_scene(scene)
         animation.begin()
         animation.interpolate(.5)
-        traveller = animation.animations[0].mobject
+        traveller = animation.travelling_formula
         self.assertLess(traveller[0].get_x(), traveller[1].get_x())
+
+    def test_definition_glyphs_travel_rigidly_before_local_substitution(self):
+        import numpy as np
+        source = VGroup(Square(side_length=.3), Square(side_length=.7).shift(RIGHT))
+        destination = Square().shift(4 * RIGHT)
+        scene = Scene()
+        scene.camera.background_color = BLUE
+        scene.add(source)
+        animation = algovis.ApplyDefinition(source, None, destination)
+        original_delta = source[1].get_center() - source[0].get_center()
+        scene.add_mobjects_from_animations([animation])
+        animation._setup_scene(scene)
+        animation.begin()
+        animation.interpolate(.35)
+        travelling = animation.travelling_formula
+        np.testing.assert_allclose(travelling[1].get_center()-travelling[0].get_center(),
+                                   original_delta, atol=1e-7)
+        self.assertEqual(animation.traveller[0].get_fill_opacity(), 1)
+        self.assertEqual(animation.traveller[0].get_fill_color(), BLUE)
+        self.assertEqual(animation.landing[0].get_fill_color(), BLUE)
+        self.assertNotIn(destination, scene.get_mobject_family_members())
 
     def test_definition_destination_is_not_visible_under_the_travelling_copy(self):
         scene = Scene()

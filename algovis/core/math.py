@@ -134,16 +134,36 @@ class ApplyDefinition(AnimationGroup):
             destination.stretch_to_fit_width(result.width)
             destination.stretch_to_fit_height(result.height).move_to(result)
             result.become(destination)
-        animations = [ReplacementTransform(definition.copy(), result, path_arc=path_arc)]
+        # Carry readable glyphs, rather than morphing an entire definition
+        # into different symbols while it flies across other proof rows.
+        # An opaque backing keeps both copies legible during the transfer.
+        self.travelling_formula = definition.copy()
+        backing = BackgroundRectangle(
+            self.travelling_formula, buff=0.055,
+            fill_color=config.background_color, fill_opacity=1, stroke_width=0,
+        )
+        self.traveller = VGroup(backing, self.travelling_formula).set_z_index(30)
+        landing = self.traveller.copy().move_to(result)
+        self.landing = landing
+        cleanup = [FadeOut(self.traveller)]
         if application is not None:
-            animations.append(FadeOut(application))
+            cleanup.append(FadeOut(application))
+        transfer = Succession(
+            Transform(self.traveller, landing, path_arc=path_arc, run_time=0.68),
+            AnimationGroup(*cleanup, run_time=0.12),
+            FadeIn(result, run_time=0.20),
+        )
         super().__init__(
-            *animations,
+            transfer,
             lag_ratio=0,
             **kwargs,
         )
 
     def _setup_scene(self, scene):
+        # Theme backgrounds can differ from Manim's global configuration.
+        # Both ends of the move must match the actual camera background.
+        for chip in (self.traveller, self.landing):
+            chip[0].set_fill(scene.camera.background_color, opacity=1)
         # A pre-laid-out equation may already own the hidden destination.
         # Detach it before the first frame, so it is not visible underneath
         # the travelling copy. Remove descendants too: Manim can dissolve

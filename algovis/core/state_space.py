@@ -9,7 +9,8 @@ class StateParameter(VGroup):
     """A labeled discrete parameter whose displayed value can be animated."""
 
     def __init__(self, name, values, value=None, box_width=0.72,
-                 box_height=0.58, color=None, theme=DEFAULT_THEME, **kwargs):
+                 box_height=0.58, color=None, theme=DEFAULT_THEME,
+                 value_labels=None, **kwargs):
         super().__init__(**kwargs)
         self.theme = theme
         color = color or theme.primary
@@ -18,9 +19,12 @@ class StateParameter(VGroup):
         if not self.values:
             raise ValueError("StateParameter requires at least one value")
         self.value = self.values[0] if value is None else value
+        if self.value not in self.values:
+            raise ValueError(f"{self.value!r} is outside this parameter's domain")
+        self.value_labels = dict(value_labels or {})
         self.box = RoundedRectangle(corner_radius=0.07, width=box_width,
                                     height=box_height, color=color)
-        self.value_mobject = MathTex(str(self.value)).scale(0.55).move_to(self.box)
+        self.value_mobject = MathTex(str(self.value_labels.get(self.value, self.value))).scale(0.55).move_to(self.box)
         self.name_label = MathTex(str(name)).scale(0.48).next_to(self.box, UP, buff=0.10)
         self.bound_label = MathTex(
             str(len(self.values)), color=theme.success,
@@ -32,12 +36,13 @@ class StateParameter(VGroup):
         color = color or self.theme.accent
         if value not in self.values:
             raise ValueError(f"{value!r} is outside this parameter's domain")
-        target = MathTex(str(value), color=color).scale(0.55).move_to(self.box)
+        target = MathTex(str(self.value_labels.get(value, value)), color=color)
+        target.match_height(self.value_mobject).move_to(self.box)
         old = self.value_mobject
-        self.value_mobject = target
         self.value = value
-        self.remove(old).add(target)
-        return ReplacementTransform(old, target)
+        # Keep the visible object in its parent until the animation changes it.
+        # Pre-adding the destination exposed the new value before its trigger.
+        return Transform(old, target)
 
     def show_bound(self):
         """Show the number of possible values beneath the parameter."""
@@ -48,25 +53,45 @@ class StateParameter(VGroup):
 class BinaryStateVector(VGroup):
     """A row of explicit 0/1 state parameters, ideal for introductory TSP."""
 
-    def __init__(self, names, values=None, buff=None,
+    def __init__(self, names, values=None, buff=None, boolean_labels=False,
                  theme=DEFAULT_THEME, **kwargs):
         super().__init__(**kwargs)
         self.theme = theme
         buff = DEFAULT_SPACING.tight if buff is None else buff
         names = list(names)
         values = list(values) if values is not None else [0] * len(names)
+        if len(values) != len(names) or any(value not in (0, 1) for value in values):
+            raise ValueError("Binary state needs one 0/1 value per name")
+        self.boolean_labels = bool(boolean_labels)
+        labels = {0:r"\mathrm{F}",1:r"\mathrm{T}"} if boolean_labels else None
         self.parameters = VGroup(*[
-            StateParameter(name, [0, 1], value=value, theme=theme)
+            StateParameter(name, [0, 1], value=value, theme=theme, value_labels=labels)
             for name, value in zip(names, values)
         ]).arrange(RIGHT, buff=buff)
         self.add(self.parameters)
+        if self.boolean_labels:
+            for parameter in self.parameters:
+                self._style_bit(parameter.box, parameter.value)
+
+    def _style_bit(self, box, value):
+        color = self.theme.success if value else self.theme.node
+        return box.set_stroke(color).set_fill(
+            self.theme.success if value else self.theme.surface,
+            opacity=.30 if value else .95,
+        )
 
     def flip(self, index, color=None):
         parameter = self.parameters[index]
-        return parameter.set_value(1 - parameter.value, color=color)
+        return self.set_bit(index, 1 - parameter.value, color=color)
 
     def set_bit(self, index, value, color=None):
-        return self.parameters[index].set_value(value, color=color)
+        parameter = self.parameters[index]
+        if not self.boolean_labels:
+            return parameter.set_value(value, color=color)
+        label = parameter.set_value(value, color=color or self.theme.foreground)
+        destination = parameter.box.copy()
+        self._style_bit(destination, value)
+        return AnimationGroup(label, Transform(parameter.box, destination))
 
     def show_bounds(self):
         animations = [parameter.show_bound() for parameter in self.parameters]

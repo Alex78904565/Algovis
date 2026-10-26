@@ -14,6 +14,25 @@ from algovis.review.server import ReviewCatalog, ReviewHTTPServer, ReviewServer
 
 
 class ReviewServerTests(unittest.TestCase):
+    def test_bad_content_timing_is_rejected_before_video_publication(self):
+        self.review.manifest_path.parent.mkdir(parents=True, exist_ok=True)
+        self.review.manifest_path.write_text(json.dumps({
+            "frameRate":15,
+            "animations":[{"id":"reveal", "play":0, "kind":"FadeIn",
+                           "start":0, "end":.5, "label":"new total"}],
+            "plays":[{"start":0,"end":.5,"before":[],"after":[],
+                      "wordTiming":{"trigger":"change this","time":1.5}}],
+        }), encoding="utf-8")
+        previous = self.review.video_path
+        with patch.object(self.review, "_render_command", return_value=["fake"]), \
+             patch("algovis.review.server.subprocess.run", return_value=subprocess.CompletedProcess([],0,"","")), \
+             patch.object(self.review, "_publish_render") as publish:
+            self.review._render_worker()
+        publish.assert_not_called()
+        self.assertEqual(self.review.video_path, previous)
+        self.assertEqual(self.review.render_status.state, "error")
+        self.assertIn("content_before_word", self.review.render_status.log_tail)
+
     def test_render_audit_records_words_and_does_not_approve_viewer_checks(self):
         self.review.manifest_path.parent.mkdir(parents=True, exist_ok=True)
         self.review.manifest_path.write_text(json.dumps({

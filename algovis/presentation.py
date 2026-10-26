@@ -444,6 +444,31 @@ class SlideSceneMixin:
             self, name, *animations, minimum=minimum, offset=offset,
         )
 
+    def play_on_cue(self, name, *animations, run_time, reason):
+        """Schedule one content change on verified words, or fail the render.
+
+        Unlike a separate wait/play pair, this operation cannot inherit an
+        unrelated cue or silently arrive after another animation used its time.
+        Supply ``transcriptWords`` in the narration document. Cue times select
+        the occurrence; the recording's word timestamps determine the start.
+        """
+        if self.narration is None:
+            raise RuntimeError("Call begin_narration() before play_on_cue().")
+        if not str(reason).strip():
+            raise ValueError("A word-timed content change needs an instructional reason")
+        anchor = self.narration.wait_for_word(self, name)
+        self._review_active_cue = {
+            "cue": name, "cueTime": anchor["start"], "cueOffset": 0.0,
+            "wordTiming": {"trigger": self.narration.cues[name].phrase,
+                           "time": anchor["start"], "reason": str(reason),
+                           "narrationStart": self.narration.start_time},
+        }
+        try:
+            return self.play(*animations, run_time=float(run_time))
+        finally:
+            # A later play cannot inherit this operation's strict declaration.
+            self._review_active_cue.pop("wordTiming", None)
+
     def spoken_focus(self, target, kind="object", *, source=None, color=None,
                      scale_factor=1.04, buff=0.08, arrow_hold=0.18,
                      trigger=None, reason=None):

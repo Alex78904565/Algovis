@@ -81,13 +81,17 @@ def audit_section(manifest, cue_document, transcript, *, attention_tolerance=Non
         start, end = float(event["start"]), float(event["end"])
         cue = cues.get(event.get("cue"), {})
         metadata = event.get("attention") or {}
-        explicit = metadata.get("trigger")
+        timing = event.get("wordTiming") or {}
+        explicit = metadata.get("trigger") or timing.get("trigger")
         context_phrase = cue.get("phrase", "")
-        anchor = phrase_anchor(explicit or context_phrase, words, start)
+        offset = float(timing.get("narrationStart", 0))
+        anchor = phrase_anchor(explicit or context_phrase, words, start-offset)
+        if anchor and offset:
+            anchor = {**anchor, "start":anchor["start"]+offset, "end":anchor["end"]+offset}
         event.update({"duration": end-start, "contextPhrase": context_phrase,
                       "triggerPhrase": explicit, "anchor": anchor,
                       "wordOffset": start-anchor["start"] if anchor else None,
-                      "spokenDuring": [word for word in words if word["end"]>start and word["start"]<end],
+                      "spokenDuring": [word for word in words if word["end"]+offset>start and word["start"]+offset<end],
                       "findings": []})
         if event.get("kind") in ATTENTION:
             if not explicit:
@@ -137,6 +141,16 @@ def audit_section(manifest, cue_document, transcript, *, attention_tolerance=Non
                 play[side] = semantic_objects(play[side])
         change = {**play, **content_change(play.get("before", []), play.get("after", [])),
                   "id":f"change-{index+1:04d}", "findings": []}
+        timing = play.get("wordTiming")
+        if timing:
+            offset = float(timing.get("narrationStart", 0))
+            anchor = phrase_anchor(timing.get("trigger", ""), words, play["start"]-offset)
+            if anchor is None or anchor["approximate"]:
+                change["findings"].append("content_without_verified_word")
+            elif abs(play["start"]-anchor["start"]-offset) > tolerance:
+                change["findings"].append(
+                    "content_before_word" if play["start"]<anchor["start"]+offset else "content_after_word"
+                )
         if len(change["before"]) >= 4 and change["retainedFraction"] < .45:
             change["findings"].append("large_content_clear")
         candidates = removed_history + [(play["start"], obj) for obj in change["removed"]]

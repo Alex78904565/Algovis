@@ -5,10 +5,53 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from algovis import NarrationTrack
+from algovis import NarrationCue, NarrationTrack, SlideScene
+from types import SimpleNamespace
 
 
 class NarrationTrackTests(unittest.TestCase):
+    def strict_track(self, time=1):
+        track = NarrationTrack("unused.wav", 5,
+                               [NarrationCue("answer", 1, "six")],
+                               words=[{"word":"six", "start":2, "end":2.3}])
+        track.start_time = 0
+        scene = SimpleNamespace(renderer=SimpleNamespace(time=time),
+                                camera=SimpleNamespace(frame_rate=15))
+        scene.wait = lambda seconds: setattr(scene.renderer, "time", scene.renderer.time+seconds)
+        return track, scene
+
+    def test_word_timing_uses_recording_not_outdated_numeric_hint(self):
+        track, scene = self.strict_track()
+        anchor = track.wait_for_word(scene, "answer")
+        self.assertEqual(anchor["start"], 2)
+        self.assertEqual(scene.renderer.time, 2)
+
+    def test_missed_word_fails_instead_of_silently_playing_late(self):
+        track, scene = self.strict_track(2.4)
+        with self.assertRaisesRegex(RuntimeError, "shorten or reschedule"):
+            track.wait_for_word(scene, "answer")
+
+    def test_strict_word_event_rejects_missing_or_approximate_alignment(self):
+        track, scene = self.strict_track()
+        track.words[0]["reviewed_timing"] = "approximate"
+        with self.assertRaisesRegex(ValueError, "verified word"):
+            track.wait_for_word(scene, "answer")
+        track.words = []
+        with self.assertRaisesRegex(ValueError, "timestamped"):
+            track.wait_for_word(scene, "answer")
+
+    def test_atomic_play_records_content_trigger_and_cannot_leak_to_next_play(self):
+        track, state = self.strict_track()
+        scene = object.__new__(SlideScene)
+        scene.narration, scene.renderer = track, state.renderer
+        scene.renderer.camera = state.camera
+        scene.wait = state.wait
+        captured = []
+        scene.play = lambda *animations, **kwargs: captured.append(dict(scene._review_active_cue))
+        scene.play_on_cue("answer", object(), run_time=.5, reason="Reveal the stated total")
+        self.assertEqual(captured[0]["wordTiming"]["time"], 2)
+        self.assertNotIn("wordTiming", scene._review_active_cue)
+
     def write_cues(self, directory: Path, cues: list[dict[str, object]]) -> Path:
         path = directory / "cues.json"
         path.write_text(

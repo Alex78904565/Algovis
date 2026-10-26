@@ -20,12 +20,13 @@ class NarrationCue:
 
 
 class NarrationTrack:
-    def __init__(self, audio_path, duration, cues):
+    def __init__(self, audio_path, duration, cues, *, words=None):
         self.audio_path = Path(audio_path).resolve()
         self.duration = float(duration)
         self.cues = {cue.name: cue for cue in cues}
         self.start_time = None
         self.late_arrivals = []
+        self.words = list(words or [])
 
     @classmethod
     def from_json(cls, cue_path, project_root=None):
@@ -42,7 +43,43 @@ class NarrationTrack:
         times = [cue.time for cue in cues]
         if times != sorted(times):
             raise ValueError(f"Narration cues must be chronological: {cue_path}")
-        return cls(audio, data["duration"], cues)
+        words = None
+        if data.get("transcriptWords"):
+            from .review.audit import timed_words
+            transcript = Path(data["transcriptWords"])
+            if not transcript.is_absolute():
+                transcript = root / transcript
+            words = timed_words(json.loads(transcript.read_text(encoding="utf-8")))
+        return cls(audio, data["duration"], cues, words=words)
+
+    def word_anchor(self, name):
+        """Resolve a strict cue against spoken words; its time only disambiguates."""
+        from .review.audit import phrase_anchor
+        self.cue_time(name)  # Preserve the useful unknown-cue diagnostic.
+        cue = self.cues[name]
+        if not cue.phrase.strip() or not self.words:
+            raise ValueError(f"Word cue {name!r} requires a phrase and timestamped transcriptWords")
+        anchor = phrase_anchor(cue.phrase, self.words, cue.time)
+        if anchor is None or anchor["approximate"]:
+            raise ValueError(f"Word cue {name!r} has no verified word alignment: {cue.phrase!r}")
+        return anchor
+
+    def wait_for_word(self, scene, name):
+        """Fail on a missed word instead of silently playing an animation late."""
+        anchor = self.word_anchor(name)
+        fps = float(scene.camera.frame_rate)
+        tolerance = 1 / fps + 0.015
+        remaining = float(anchor["start"]) - self.elapsed(scene)
+        if remaining < -tolerance:
+            raise RuntimeError(
+                f"Word cue {name!r} missed by {-remaining:.3f}s; "
+                "shorten or reschedule preceding animations"
+            )
+        if remaining > 0:
+            scene.wait(remaining)
+        if abs(self.elapsed(scene) - anchor["start"]) > tolerance:
+            raise RuntimeError(f"Word cue {name!r} did not land within one video frame")
+        return anchor
 
     def start(self, scene, gain=None):
         if not self.audio_path.exists():

@@ -317,3 +317,15 @@ choices, selected transitions, and `min`/`max` merge gates.
 `StateParameter` displays a bounded discrete parameter. `BinaryStateVector`
 groups explicit 0/1 parameters and provides `flip()`, `set_bit()`, and
 `show_bounds()` animations for visit-state explanations.
+
+Use `boolean_labels=True` to display `F`/`T`. In that mode, `set_bit()` changes
+the label and its known/unknown styling together. Updates keep the existing
+visible label and its scale until the animation plays; a destination label is
+never inserted into the parent in advance.
+
+For recorded lessons, `SlideScene.play_on_cue(name, *animations, run_time=...,
+reason=...)` schedules a content change directly from timestamped words. Add
+`transcriptWords` to the narration JSON, pointing to the alignment file relative
+to the project root. Missing/approximate alignment or a missed word fails the
+render. The reviewer rejects bad declared timing before publishing a new video.
+See [the self-review workflow](../docs/ANIMATION_SELF_REVIEW.md) for an example.

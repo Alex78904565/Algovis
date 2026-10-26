@@ -53,6 +53,29 @@ class WordLevelAuditTests(unittest.TestCase):
         words = [{'word':'vi', 'start':2, 'end':2.5}]
         self.assertEqual(phrase_anchor('v i', words, 2)['start'], 2)
 
+    def test_content_reveal_is_checked_independently_of_a_correct_later_pulse(self):
+        manifest = self.manifest(3, 'f of five')
+        manifest['animations'].append({'id':'reveal','play':1,'kind':'FadeIn',
+                                       'start':1,'end':1.5,'label':'value'})
+        manifest['plays'].append({'start':1,'end':1.5,'before':[],'after':[],
+                                 'wordTiming':{'trigger':'f of five','time':3}})
+        report = audit_section(manifest, {'cues':[]},
+                               {'words':[{'word':'f(5)','start':3,'end':3.6}]})
+        self.assertEqual(report['events'][0]['findings'], [])
+        self.assertIn('content_before_word', report['changes'][1]['findings'])
+
+    def test_declared_content_trigger_is_reported_with_its_narration_offset(self):
+        timing={'trigger':'answer', 'time':2, 'narrationStart':5}
+        manifest={'frameRate':15,
+                  'animations':[{'id':'reveal','play':0,'kind':'FadeIn',
+                                 'start':7,'end':7.5,'label':'value','wordTiming':timing}],
+                  'plays':[{'start':7,'end':7.5,'before':[],'after':[],'wordTiming':timing}]}
+        report=audit_section(manifest, {'cues':[]},
+                             {'words':[{'word':'answer','start':2,'end':2.3}]})
+        self.assertEqual(report['events'][0]['triggerPhrase'],'answer')
+        self.assertEqual(report['events'][0]['anchor']['start'],7)
+        self.assertEqual(report['findings'],[])
+
 
 if __name__=='__main__':
     unittest.main()

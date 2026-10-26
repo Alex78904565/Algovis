@@ -19,6 +19,12 @@ rendered start with the timestamped words, including time consumed by preceding
 animations. An inherited cue does not justify a later pulse. Prefer stillness
 over an effect without an instructional purpose.
 
+Use `play_on_cue` for new or repaired spoken content reveals and changes.
+Load timestamped `transcriptWords` in the narration document. Missing or
+approximate word alignment must be repaired from the recording; do not weaken
+the check or substitute a guessed time. A render that misses a declared word
+must fail before publication, leaving the previous good preview available.
+
 Build explanations in place. Keep useful definitions and prior work, move them
 to make room, and apply definitions by carrying a copy to their use. Inspect
 composition changes as well as overlap diagnostics. Render sections separately
