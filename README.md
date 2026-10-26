@@ -144,6 +144,19 @@ per-section preflight checks in the reviewer. Checks cover cues, storyboards,
 density, colors, assets, and open notes. Reports identify review risks; a
 rendered visual and listening pass are still needed.
 
+Each reviewer render also writes `agent-audit.md` and `agent-audit.json` in its
+section's `.review/annotations/` folder. These record actual animation intervals,
+spoken word times, explicit attention triggers, and content retained or erased.
+Generate an all-section index with:
+
+```bash
+python -m algovis.review.audit --catalog your-catalog.json --output .qa/animation-audit
+```
+
+Use [the agent self-review workflow](docs/ANIMATION_SELF_REVIEW.md) before
+requesting a viewer's final pass. Automated findings are the agent's worklist;
+they do not approve the viewer's checks.
+
 Cue instructional motion to the exact word that introduces it. Separate named
 objects should receive separate cues; a continuation such as “and so on” should
 not reveal anything early. When the full equation or diagram is already on
@@ -152,7 +165,8 @@ the surrounding context:
 
 ```python
 self.wait_for_cue("capacity_term")
-self.play(self.spoken_focus(recurrence[2], kind="term"))
+self.play(self.spoken_focus(recurrence[2], kind="term", trigger="capacity",
+                            reason="Name the capacity term"))
 
 self.wait_for_cue("depends_on")
 self.play(self.spoken_focus(child, kind="relationship", source=parent))

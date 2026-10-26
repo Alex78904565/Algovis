@@ -344,11 +344,12 @@ class ValueScan(VGroup):
                 break
         return LaggedStart(*animations, lag_ratio=0.35)
 
-    def reveal_result(self):
+    def reveal_result(self, *, trigger=None):
         """Reveal the maximization after the scan has found a feasible state."""
         animations = [self.result.animate.set_opacity(1)]
         if self.selected_cell is not None:
-            animations.insert(0, Pulse(self.selected_cell))
+            animations.insert(0, Pulse(self.selected_cell, trigger=trigger,
+                                      reason="Identify the selected feasible value"))
         return AnimationGroup(*animations, lag_ratio=0.20)
 
 

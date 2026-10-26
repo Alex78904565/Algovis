@@ -979,6 +979,10 @@ class ReviewServer:
         next manual audit will surface the diagnostic without discarding a good
         Manim render.
         """
+        # The word/composition ledger belongs to every project, not just the
+        # private production's source-to-storyboard adapter. It is an agent
+        # worklist, and does not mark the viewer's checks approved.
+        self._refresh_word_ledger()
         # These legacy adapters belong to the original lesson. Other projects
         # can provide their own audit report without requiring its private files.
         if self.scene_source is not None:
@@ -1000,6 +1004,30 @@ class ReviewServer:
             )
             if completed.returncode:
                 return
+
+    def _refresh_word_ledger(self) -> None:
+        from .audit import audit_section, markdown_report
+        paths = [self.manifest_path, self.cue_path, self.transcript_path]
+        if any(path is None or not path.is_file() for path in paths):
+            return
+        try:
+            report = audit_section(*[
+                json.loads(path.read_text(encoding="utf-8")) for path in paths
+            ])
+            report["inputs"] = {
+                str(path.relative_to(self.workspace)): hashlib.sha256(path.read_bytes()).hexdigest()
+                for path in paths
+            }
+            _atomic_json(self.review_dir / "agent-audit.json", report)
+            (self.review_dir / "agent-audit.md").write_text(
+                markdown_report({"title": self.section_title}, report), encoding="utf-8",
+            )
+        except Exception as exc:
+            # Keep the good render, but leave an explicit failed audit. A stale
+            # older success must never survive as the result for this version.
+            _atomic_json(self.review_dir / "agent-audit.json", {
+                "status": "audit_failed", "error": str(exc),
+            })
 
     def _publish_render(self) -> None:
         source = self.rendered_video_path

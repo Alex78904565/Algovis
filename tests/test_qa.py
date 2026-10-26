@@ -46,11 +46,23 @@ def scene(self):
 def scene(self):
     self.wait_for_cue('start', offset=1.25)
     self.wait(0.5)
+    self.play(Write(title))
 """)
         issues = audit_source_method(tree, "scene", {"start"}, "scene.py")
         messages = [issue.message for issue in issues]
         self.assertTrue(any("Hard-coded wait" in message for message in messages))
         self.assertTrue(any("word-level cue" in message for message in messages))
+
+    def test_still_hold_before_another_named_cue_is_not_a_timing_bypass(self):
+        tree = ast.parse("""
+def scene(self):
+    self.wait_for_cue('start')
+    self.wait(0.5)
+    self.wait_for_cue('next')
+    self.play(Write(title))
+""")
+        issues = audit_source_method(tree, "scene", {"start", "next"}, "scene.py")
+        self.assertFalse(any('Hard-coded wait' in issue.message for issue in issues))
 
     def test_source_findings_keep_their_cue_and_effective_time(self) -> None:
         tree = ast.parse("""

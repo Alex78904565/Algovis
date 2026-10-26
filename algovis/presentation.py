@@ -1,6 +1,7 @@
 """Presentation primitives for authoring educational Manim videos."""
 
 from dataclasses import dataclass
+import inspect
 import json
 import numpy as np
 import os
@@ -15,7 +16,7 @@ from manim import (
 from .theme import DEFAULT_SPACING, DEFAULT_THEME
 from .narration import NarrationTrack
 from .core.math import ApplyDefinition
-from .review.inspection import capture_snapshot
+from .review.inspection import capture_snapshot, semantic_objects
 from .utils.effects import Pulse
 
 
@@ -146,6 +147,8 @@ class SlideSceneMixin:
         self._review_manifest_path = os.environ.get("ALGOVIS_REVIEW_MANIFEST")
         self._review_snapshots = []
         self._review_animations = []
+        self._review_plays = []
+        self._review_initial_labels = {}
         self._review_object_ids = {}
         self._review_next_object_id = 1
         self._review_compiled_animations = None
@@ -166,6 +169,25 @@ class SlideSceneMixin:
             # absent object back to the scene. Keep narration timing intact.
             return self.wait(kwargs.get("run_time", 1.0))
         start = float(self.renderer.time)
+        reviewing = bool(getattr(self, "_review_manifest_path", None))
+        before = None
+        if reviewing:
+            self._capture_review_snapshot()
+            before = self._review_snapshots[-1]
+            frame = inspect.currentframe().f_back
+            library = Path(__file__).resolve().parent
+            while frame is not None:
+                filename = Path(frame.f_code.co_filename).resolve()
+                if filename.suffix == ".py" and not filename.is_relative_to(library):
+                    try:
+                        filename = filename.relative_to(Path.cwd())
+                    except ValueError:
+                        filename = Path(filename.name)
+                    self._review_callsite = {"file": str(filename), "line": frame.f_lineno,
+                                             "method": frame.f_code.co_name}
+                    break
+                frame = frame.f_back
+            del frame
         self._review_compiled_animations = None
         self._review_is_compiling_play = bool(self._review_manifest_path)
         try:
@@ -173,16 +195,61 @@ class SlideSceneMixin:
         finally:
             self._review_is_compiling_play = False
         end = float(self.renderer.time)
+        if reviewing:
+            self._refresh_review_labels(self._review_compiled_animations or ())
         self._capture_review_snapshot()
         self._capture_review_animations(
             self._review_compiled_animations or (), start, end,
         )
+        if reviewing:
+            self._review_plays.append({
+                "start": start, "end": end,
+                "source": getattr(self, "_review_callsite", {}),
+                "before": semantic_objects(before),
+                "after": semantic_objects(self._review_snapshots[-1]),
+                **getattr(self, "_review_active_cue", {}),
+            })
         return result
+
+    @staticmethod
+    def _refresh_review_labels(animations):
+        """Keep selection/audit text current when Transform reuses old objects.
+
+        Manim moves the geometry but retains a MathTex source's tex_string.
+        Preserve source labels separately for event records, while updating
+        review-only semantic labels to describe what the viewer now sees.
+        """
+        def update(source, destination):
+            for attribute in ("_algovis_label", "text", "tex_string"):
+                label = getattr(destination, attribute, None)
+                if isinstance(label, str) and label.strip():
+                    source._algovis_label = label
+                    break
+            for old, new in zip(source.submobjects, destination.submobjects):
+                update(old, new)
+        for animation in animations:
+            destination = getattr(animation, "target_mobject", None)
+            source = getattr(animation, "mobject", None)
+            if source is not None and destination is not None:
+                update(source, destination)
+            for child in getattr(animation, "animations", ()):
+                SlideScene._refresh_review_labels((child,))
 
     def compile_animations(self, *args, **kwargs):
         compiled = super().compile_animations(*args, **kwargs)
         if self._review_is_compiling_play:
             self._review_compiled_animations = list(compiled)
+            def remember(animation):
+                mob = getattr(animation, "mobject", None)
+                target = getattr(animation, "target_mobject", None)
+                self._review_initial_labels[id(animation)] = {
+                    "fromLabel": self._review_object_label(mob) if mob is not None else "",
+                    "toLabel": self._review_object_label(target) if target is not None else "",
+                }
+                for child in getattr(animation, "animations", ()):
+                    remember(child)
+            for animation in compiled:
+                remember(animation)
         return compiled
 
     def wait(self, duration=1, *args, **kwargs):
@@ -238,6 +305,19 @@ class SlideSceneMixin:
             )
 
     def _append_review_animation(self, animation, start, end, play_index, path):
+        focus_target = getattr(animation, "_algovis_focus_target", None)
+        if focus_target is not None:
+            self._review_animations.append({
+                "id": f"play-{play_index + 1:04d}-{path}", "play": play_index,
+                "kind": type(animation).__name__,
+                "label": self._review_object_label(focus_target),
+                "objectId": self._review_object_ids.get(id(focus_target)),
+                "attention": getattr(animation, "_algovis_attention", None),
+                "start": float(start), "end": float(end),
+                "source": getattr(self, "_review_callsite", {}),
+                **getattr(self, "_review_active_cue", {}),
+            })
+            return
         if isinstance(animation, ApplyDefinition):
             source = self._review_object_label(animation.definition)
             destination = self._review_object_label(animation.result)
@@ -249,6 +329,7 @@ class SlideSceneMixin:
                 "objectId": self._review_object_ids.get(id(animation.result)),
                 "sourceObjectId": self._review_object_ids.get(id(animation.definition)),
                 "start": float(start), "end": float(end),
+                "source": getattr(self, "_review_callsite", {}),
                 **getattr(self, "_review_active_cue", {}),
             })
             return
@@ -274,7 +355,8 @@ class SlideSceneMixin:
 
         mobject = getattr(animation, "mobject", None)
         target = getattr(animation, "target_mobject", None)
-        label = self._review_object_label(mobject) if mobject is not None else ""
+        initial = getattr(self, "_review_initial_labels", {}).get(id(animation), {})
+        label = initial.get("fromLabel") or (self._review_object_label(mobject) if mobject is not None else "")
         target_label = (
             self._review_object_label(target) if target is not None else ""
         )
@@ -288,6 +370,10 @@ class SlideSceneMixin:
             "play": play_index,
             "kind": type(animation).__name__.lstrip("_"),
             "label": label or type(animation).__name__.lstrip("_"),
+            "fromLabel": initial.get("fromLabel", label),
+            "toLabel": initial.get("toLabel", target_label),
+            "attention": getattr(animation, "_algovis_attention", None),
+            "source": getattr(self, "_review_callsite", {}),
             "objectId": object_id,
             "start": float(start),
             "end": float(end),
@@ -330,6 +416,7 @@ class SlideSceneMixin:
                 },
                 "snapshots": self._review_snapshots,
                 "animations": self._review_animations,
+                "plays": self._review_plays,
             }, indent=2) + "\n",
             encoding="utf-8",
         )
@@ -358,7 +445,8 @@ class SlideSceneMixin:
         )
 
     def spoken_focus(self, target, kind="object", *, source=None, color=None,
-                     scale_factor=1.04, buff=0.08, arrow_hold=0.18):
+                     scale_factor=1.04, buff=0.08, arrow_hold=0.18,
+                     trigger=None, reason=None):
         """Return a restrained attention cue for the currently spoken idea.
 
         ``object`` pulses an already isolated object. ``term`` boxes one part
@@ -369,9 +457,12 @@ class SlideSceneMixin:
         # operation, success, or error. Blue is the neutral "look here" role.
         color = color or self.theme.role_color("current")
         if kind == "object":
-            return Pulse(target, scale_factor=scale_factor)
+            return Pulse(target, scale_factor=scale_factor, trigger=trigger, reason=reason)
         if kind == "term":
-            return Circumscribe(target, color=color, buff=buff, fade_out=True)
+            animation = Circumscribe(target, color=color, buff=buff, fade_out=True)
+            animation._algovis_attention = {"trigger": trigger, "reason": reason}
+            animation._algovis_focus_target = target
+            return animation
         if kind == "relationship":
             if source is None:
                 raise ValueError("A relationship focus requires source=...")

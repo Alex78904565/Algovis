@@ -4,6 +4,17 @@ from __future__ import annotations
 import numpy as np
 
 
+def semantic_objects(snapshot):
+    """Summarize visible text leaves once, excluding their nested containers."""
+    objects = snapshot.get("objects", [])
+    semantic = {obj["id"] for obj in objects if obj.get("semantic")}
+    containers = {parent for obj in objects if obj["id"] in semantic
+                  for parent in obj.get("parents", [])}
+    return [{key: obj[key] for key in ("id", "label", "kind", "region")}
+            for obj in objects if obj["id"] in semantic and obj["id"] not in containers
+            and obj.get("opacity", 1) > .12]
+
+
 def visible_opacity(mobject, cache=None):
     """Maximum painted opacity, ignoring zero-width strokes and hidden layers."""
     cache = {} if cache is None else cache

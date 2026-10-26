@@ -14,6 +14,7 @@ from pathlib import Path
 import re
 
 from .storyboard import Storyboard, StoryboardSyntaxError
+from .review.audit import tokens as _spoken_tokens, timed_words as _spoken_words
 
 
 @dataclass(frozen=True)
@@ -56,15 +57,14 @@ class SectionAudit:
 
 
 def _tokens(value: str) -> list[str]:
-    return re.findall(r"[a-z0-9]+", value.lower().replace("’", "'"))
+    return _spoken_tokens(value)
 
 
 def _transcript_tokens(path: Path) -> list[str]:
     data = json.loads(path.read_text(encoding="utf-8"))
     tokens = []
-    for segment in data.get("segments", []):
-        for word in segment.get("words", []):
-            tokens.extend(_tokens(str(word.get("word", ""))))
+    for word in _spoken_words(data):
+        tokens.extend(_tokens(str(word.get("word", ""))))
     if not tokens:
         tokens = _tokens(str(data.get("text", "")))
     return tokens
@@ -82,11 +82,7 @@ def _contains_phrase(words: list[str], phrase: str) -> bool:
 def timed_transcript_tokens(path: Path) -> list[tuple[str, float]]:
     """Chronological words, without repeated ASR context at segment joins."""
     data = json.loads(path.read_text(encoding="utf-8"))
-    words = sorted(
-        (word for segment in data.get("segments", [])
-         for word in segment.get("words", [])),
-        key=lambda word: float(word["start"]),
-    )
+    words = _spoken_words(data)
     seen, result = set(), []
     for word in words:
         key = (word["start"], word["end"], word["word"])
@@ -226,6 +222,17 @@ def audit_source_method(
                         semantic_indicates.append((node.lineno, color))
 
     for line in hard_wait_lines:
+        next_control = next((call for call in sorted(
+            (call for call in ast.walk(reachable) if isinstance(call, ast.Call)
+             and call.lineno > line and _call_name(call) in {
+                 "wait_for_cue", "play_to_cue", "play", "transition", "finish_narration",
+             }), key=lambda call: call.lineno)), None)
+        if next_control is None or _call_name(next_control) in {
+            "wait_for_cue", "play_to_cue", "finish_narration",
+        }:
+            # A still hold before another named cue does not move that cue.
+            # The rendered late-arrival check detects an actual overrun.
+            continue
         cue, time = moment(line)
         issues.append(AuditIssue(
             "warning", "timing",

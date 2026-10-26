@@ -141,6 +141,40 @@ class PublicApiTests(unittest.TestCase):
         animation = algovis.ApplyDefinition(definition, None, result)
         self.assertEqual(len(animation.animations), 1)
 
+    def test_review_labels_follow_transformed_content_without_changing_tex(self):
+        from manim import Transform
+        source, target = VGroup(Square()), VGroup(Square())
+        source.tex_string = "old expression"
+        target.tex_string = "new expression"
+        algovis.SlideScene._refresh_review_labels([Transform(source, target)])
+        self.assertEqual(source._algovis_label, "new expression")
+        self.assertEqual(source.tex_string, "old expression")
+
+    def test_identical_formula_keeps_its_symbol_groups_during_transfer(self):
+        # Equivalent text with different grouping used to match the zero in
+        # f(0) to the zero after '='. Use asymmetric stand-ins for the glyphs
+        # so the identity-preserving geometry can be tested without LaTeX.
+        left = VGroup(Square(side_length=.3)).shift(-RIGHT)
+        left.tex_string = "f(0)"
+        right = VGroup(Square(side_length=.5)).shift(RIGHT)
+        right.tex_string = "=0"
+        definition = VGroup(left, right)
+        result = VGroup(Square(side_length=.8)).shift(4 * RIGHT)
+        result.tex_string = "f(0)=0"
+        original = definition.get_all_points().copy()
+        animation = algovis.ApplyDefinition(definition, None, result)
+        self.assertEqual(len(result.submobjects), 2)
+        self.assertLess(result[0].get_x(), result[1].get_x())
+        self.assertTrue((definition.get_all_points() == original).all())
+        scene = Scene()
+        scene.add(definition)
+        scene.add_mobjects_from_animations([animation])
+        animation._setup_scene(scene)
+        animation.begin()
+        animation.interpolate(.5)
+        traveller = animation.animations[0].mobject
+        self.assertLess(traveller[0].get_x(), traveller[1].get_x())
+
     def test_definition_destination_is_not_visible_under_the_travelling_copy(self):
         scene = Scene()
         definition, result = Square(), Square().shift(2 * RIGHT)

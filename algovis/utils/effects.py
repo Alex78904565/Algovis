@@ -3,7 +3,8 @@ from manim import *
 
 class Pulse(ApplyMethod):
     """A small scale-only attention cue that preserves every semantic color."""
-    def __init__(self, mobject, scale_factor=1.04, **kwargs):
+    def __init__(self, mobject, scale_factor=1.04, *, trigger=None, reason=None, **kwargs):
+        self._algovis_attention = {"trigger": trigger, "reason": reason}
         kwargs.setdefault("rate_func", there_and_back)
         super().__init__(mobject.scale, scale_factor, **kwargs)
 

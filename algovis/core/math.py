@@ -119,9 +119,22 @@ class ApplyDefinition(AnimationGroup):
             definition._algovis_label = str(definition_label)
         if result_label:
             result._algovis_label = str(result_label)
-        animations = [
-            ReplacementTransform(definition.copy(), result, path_arc=path_arc),
-        ]
+        def formula_text(mobject):
+            if hasattr(mobject, 'tex_string'):
+                return mobject.tex_string
+            return ''.join(formula_text(child) for child in mobject.submobjects)
+
+        source_text = ''.join(formula_text(definition).split())
+        target_text = ''.join(formula_text(result).split())
+        if source_text and source_text == target_text:
+            # An identical formula must travel as a rigid copy. Manim's
+            # hierarchy matching can otherwise pair the zero in f(0) with
+            # the zero after '=' when a VGroup lands in a MathTex object.
+            destination = definition.copy()
+            destination.stretch_to_fit_width(result.width)
+            destination.stretch_to_fit_height(result.height).move_to(result)
+            result.become(destination)
+        animations = [ReplacementTransform(definition.copy(), result, path_arc=path_arc)]
         if application is not None:
             animations.append(FadeOut(application))
         super().__init__(

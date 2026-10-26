@@ -14,6 +14,22 @@ from algovis.review.server import ReviewCatalog, ReviewHTTPServer, ReviewServer
 
 
 class ReviewServerTests(unittest.TestCase):
+    def test_render_audit_records_words_and_does_not_approve_viewer_checks(self):
+        self.review.manifest_path.parent.mkdir(parents=True, exist_ok=True)
+        self.review.manifest_path.write_text(json.dumps({
+            "frameRate": 15, "animations": [{
+                "id": "effect", "play": 0, "kind": "Pulse", "label": "the value",
+                "start": 1.5, "end": 2, "cue": "change",
+            }], "plays": [{"start": 1.5, "end": 2, "before": [], "after": []}],
+        }), encoding="utf-8")
+        self.review._refresh_word_ledger()
+        report = json.loads((self.review.review_dir / "agent-audit.json").read_text())
+        self.assertEqual(report["status"], "requires_agent_review")
+        self.assertIn("attention_without_declared_trigger", report["events"][0]["findings"])
+        self.assertIn("words.json", report["inputs"])
+        self.assertTrue((self.review.review_dir / "agent-audit.md").exists())
+        self.assertFalse(self.review.finding_reviews_path.exists())
+
     def test_explicit_scene_source_renders_without_a_project_powershell_script(self):
         source = self.workspace / "lesson scenes.py"
         source.write_text("# scene source", encoding="utf-8")

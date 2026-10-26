@@ -8,6 +8,11 @@ into the full video.
 The narration is the timing contract. The storyboard is the visual contract.
 The Manim scene is an implementation of both.
 
+Use [the agent self-review workflow](ANIMATION_SELF_REVIEW.md) to produce and
+inspect the actual word-level timing and composition ledgers before viewer review.
+The [recurring feedback reference](RECURRING_REVIEW_FEEDBACK.md) is the compact
+editorial checklist. An inherited cue is context, not a justification for a pulse.
+
 ## 1. Narration controls the screen
 
 - A visual change begins on the word or phrase that introduces it, never before.

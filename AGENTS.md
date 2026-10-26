@@ -1,0 +1,34 @@
+# Working on Algovis lessons
+
+Before changing a lesson, read:
+
+- `docs/RECURRING_REVIEW_FEEDBACK.md`
+- `docs/ANIMATION_QA_STANDARD.md`
+- `docs/ANIMATION_SELF_REVIEW.md`
+
+These are accumulated production requirements. Use them to audit the work;
+do not ask the viewer to rediscover the same mistakes in a preliminary render.
+
+Read queued annotations, drafts, and follow-ups across every section. The
+selected section and its approval status do not limit which notes to handle.
+Answer questions in their annotation threads. Attempted, verified repairs move
+to `pending_review`; only the viewer marks them `resolved`.
+
+Require a specific spoken trigger for an attention effect. Compare its actual
+rendered start with the timestamped words, including time consumed by preceding
+animations. An inherited cue does not justify a later pulse. Prefer stillness
+over an effect without an instructional purpose.
+
+Build explanations in place. Keep useful definitions and prior work, move them
+to make room, and apply definitions by carrying a copy to their use. Inspect
+composition changes as well as overlap diagnostics. Render sections separately
+and inspect transition frames before assembling the complete preview.
+
+Generate the word-level animation ledgers and work through their findings
+before requesting viewer review. Passing tests or geometry checks alone cannot
+certify timing, clarity, motion, or audio quality. Describe verification limits
+honestly, especially when perceptual audio inspection is unavailable.
+
+Preserve raw recordings. Keep private lesson audio, music, renders, annotations,
+and production sources out of public commits according to the existing ignore
+rules. Publish reusable library, reviewer, examples, tests, and documentation.
