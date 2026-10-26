@@ -1,0 +1,2469 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Algovis Manim Review</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0b0e14;
+      --panel: #111621;
+      --panel-2: #171d2a;
+      --line: #293145;
+      --text: #f3f5fb;
+      --muted: #9ca7bb;
+      --blue: #69a7ff;
+      --blue-soft: #1c3354;
+      --yellow: #f0c96a;
+      --green: #61d49a;
+      --red: #ff7d87;
+      --radius: 12px;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, "Segoe UI", Arial, sans-serif;
+    }
+
+    button, textarea, select { font: inherit; }
+
+    button {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel-2);
+      color: var(--text);
+      cursor: pointer;
+    }
+
+    button:hover { border-color: #46516b; }
+    button:disabled { cursor: default; opacity: .45; }
+
+    .app {
+      display: grid;
+      grid-template-rows: 58px minmax(0, 1fr);
+      height: 100%;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0 16px;
+      border-bottom: 1px solid var(--line);
+      background: #0e131d;
+    }
+
+    .brand {
+      font-weight: 720;
+      letter-spacing: -.02em;
+      white-space: nowrap;
+    }
+
+    .section-title {
+      color: var(--muted);
+      max-width: min(34vw, 420px);
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .section-picker {
+      max-width: min(31vw, 390px);
+      min-width: 190px;
+      padding: 7px 30px 7px 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel-2);
+      color: var(--text);
+    }
+
+    .spacer { flex: 1; }
+
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      color: var(--muted);
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 12px color-mix(in srgb, var(--green) 55%, transparent);
+    }
+
+    .status.rendering .status-dot { background: var(--yellow); }
+    .status.error .status-dot { background: var(--red); }
+
+    .render-button { padding: 8px 12px; flex: none; white-space: nowrap; }
+
+    .audit-button {
+      padding: 8px 11px;
+      flex: none;
+      white-space: nowrap;
+    }
+    .audit-button.ready { border-color: color-mix(in srgb, var(--green) 55%, var(--line)); color: var(--green); }
+    .audit-button.needs_review { border-color: color-mix(in srgb, var(--yellow) 55%, var(--line)); color: var(--yellow); }
+    .audit-button.blocked { border-color: color-mix(in srgb, var(--red) 55%, var(--line)); color: var(--red); }
+
+    .audit-popover {
+      position: fixed;
+      z-index: 80;
+      top: 64px;
+      right: 16px;
+      width: min(460px, calc(100vw - 32px));
+      max-height: min(620px, calc(100vh - 80px));
+      overflow: auto;
+      padding: 14px;
+      border: 1px solid #3b465f;
+      border-radius: 11px;
+      background: #121824;
+      box-shadow: 0 16px 42px rgba(0, 0, 0, .45);
+    }
+    .audit-popover[hidden] { display: none; }
+    .audit-popover h2 { margin: 0 0 5px; font-size: 16px; }
+    .audit-heading { display: flex; align-items: start; gap: 10px; }
+    .audit-heading h2 { flex: 1; }
+    .audit-heading button { padding: 0 6px; font-size: 20px; line-height: 1.2; }
+    .audit-summary { margin: 0 0 12px; color: var(--muted); font-size: 12px; line-height: 1.45; }
+    .audit-list { display: grid; gap: 8px; }
+    .audit-item {
+      padding: 9px 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel-2);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    .audit-item.error { border-left: 3px solid var(--red); }
+    .audit-item.warning { border-left: 3px solid var(--yellow); }
+    button.audit-item { width: 100%; text-align: left; }
+    button.audit-item:hover { background: #202b3e; border-color: var(--blue); }
+    .audit-jump { margin-top: 6px; color: var(--blue); font-size: 11px; }
+    .audit-item .audit-kind { color: var(--muted); text-transform: uppercase; font-size: 10px; letter-spacing: .06em; }
+    .audit-location { margin-top: 3px; color: #78859c; font-size: 10px; overflow-wrap: anywhere; }
+    .audit-nav { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+    .audit-nav span { flex: 1; color: var(--muted); font-size: 12px; text-align: center; }
+    .audit-nav button, .audit-actions button { padding: 7px 10px; font-size: 12px; }
+    .audit-question { margin: 7px 0 10px; font-size: 17px; font-weight: 600; line-height: 1.4; }
+    .audit-phrase { margin: 0 0 10px; color: var(--blue); font-size: 12px; line-height: 1.4; }
+    .audit-details { margin: 10px 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
+    .audit-details summary { cursor: pointer; }
+    .audit-details p { margin: 7px 0 3px; }
+    .audit-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
+    .audit-actions .audit-watch { color: var(--blue); border-color: #36577d; }
+    .audit-actions .audit-check { color: #b1edc9; border-color: #317c59; background: #173726; }
+    .audit-note { width: 100%; min-height: 48px; margin-top: 8px; padding: 8px; resize: vertical; color: var(--text); background: var(--panel-2); border: 1px solid var(--line); border-radius: 7px; font-size: 12px; }
+    .audit-review-status { color: var(--green); font-size: 12px; margin: 8px 0; }
+    .audit-review-status.needs_change, .audit-review-status.deferred { color: var(--yellow); }
+
+    .workspace {
+      min-height: 0;
+      display: grid;
+      grid-template-columns: minmax(230px, 310px) minmax(480px, 1fr) minmax(260px, 350px);
+    }
+
+    aside {
+      min-width: 0;
+      min-height: 0;
+      background: var(--panel);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .transcript-panel { border-right: 1px solid var(--line); }
+    .notes-panel { border-left: 1px solid var(--line); }
+
+    .panel-heading {
+      padding: 14px 14px 11px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .panel-heading h2 {
+      margin: 0 0 4px;
+      font-size: 14px;
+      letter-spacing: .02em;
+    }
+
+    .panel-heading p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
+    .cue-list, .annotation-list {
+      overflow: auto;
+      min-height: 0;
+    }
+
+    .cue {
+      width: 100%;
+      display: grid;
+      grid-template-columns: 48px minmax(0, 1fr);
+      gap: 9px;
+      padding: 10px 12px;
+      border: 0;
+      border-bottom: 1px solid #1c2331;
+      border-radius: 0;
+      background: transparent;
+      text-align: left;
+    }
+
+    .cue:hover { background: #171e2b; }
+    .cue.active {
+      background: var(--blue-soft);
+      box-shadow: inset 3px 0 0 var(--blue);
+    }
+
+    .cue-time {
+      color: var(--muted);
+      font-size: 11px;
+      font-variant-numeric: tabular-nums;
+      padding-top: 2px;
+    }
+
+    .cue-phrase {
+      font-size: 13px;
+      line-height: 1.38;
+      color: #dfe5f2;
+    }
+
+    .transcript-flow {
+      padding: 13px 13px 28px;
+      color: #c9d1df;
+      font-size: 13px;
+      line-height: 2.08;
+    }
+
+    .transcript-paragraph { margin: 0 0 12px; }
+
+    .transcript-word {
+      position: relative;
+      border-radius: 3px;
+      transition: color .12s ease, background .12s ease, box-shadow .12s ease;
+    }
+
+    .transcript-word.cue-context {
+      cursor: pointer;
+    }
+
+    .transcript-word.cue-context:hover {
+      background: rgba(240, 201, 106, .08);
+    }
+
+    .transcript-word.cue-context.active {
+      color: #edf3ff;
+    }
+
+    .transcript-word.spoken-context {
+      background: rgba(105, 167, 255, .10);
+      color: #e4ebf8;
+    }
+
+    .transcript-word.spoken-current {
+      background: rgba(105, 167, 255, .30);
+      color: #ffffff;
+      box-shadow: 0 0 0 2px rgba(105, 167, 255, .14);
+    }
+
+    .cue-tick {
+      position: absolute;
+      left: 0;
+      top: .19em;
+      bottom: .26em;
+      width: 2px;
+      border-radius: 2px;
+      background: var(--yellow);
+      box-shadow: 0 0 6px rgba(240, 201, 106, .48);
+      pointer-events: none;
+    }
+
+    .transcript-word.active .cue-tick {
+      width: 3px;
+      background: var(--blue);
+      box-shadow: 0 0 7px rgba(105, 167, 255, .56);
+    }
+
+    .animation-bar {
+      position: absolute;
+      z-index: 2;
+      height: 2px;
+      min-width: 2px;
+      border-radius: 2px;
+      opacity: .72;
+      cursor: pointer;
+      pointer-events: auto;
+      box-shadow: 0 0 4px rgba(0, 0, 0, .42);
+    }
+
+    .animation-bar:hover,
+    .animation-bar.active {
+      height: 3px;
+      opacity: 1;
+      box-shadow: 0 0 7px currentColor;
+    }
+
+    .animation-color-0 { color: #69a7ff; background: #69a7ff; }
+    .animation-color-1 { color: #61d49a; background: #61d49a; }
+    .animation-color-2 { color: #d98fff; background: #d98fff; }
+    .animation-color-3 { color: #ff9b73; background: #ff9b73; }
+    .animation-color-4 { color: #f0c96a; background: #f0c96a; }
+    .animation-color-5 { color: #74d4dd; background: #74d4dd; }
+
+    .timeline-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px 10px;
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .legend-key { display: inline-flex; align-items: center; gap: 5px; }
+    .legend-tick { width: 2px; height: 11px; background: var(--yellow); }
+    .legend-bar { width: 22px; height: 2px; background: var(--blue); }
+    main {
+      min-width: 0;
+      min-height: 0;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      overflow-y: auto;
+      background:
+        radial-gradient(circle at 50% 30%, rgba(38, 48, 71, .38), transparent 54%),
+        var(--bg);
+    }
+
+    .viewer-shell {
+      position: relative;
+      flex: none;
+      width: 100%;
+      max-width: 1280px;
+      margin: auto auto 0;
+      aspect-ratio: 16 / 9;
+      background: #000;
+      border: 1px solid #343d52;
+      border-radius: var(--radius);
+      overflow: hidden;
+      box-shadow: 0 22px 65px rgba(0, 0, 0, .38);
+    }
+
+    .review-approval {
+      flex: none;
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px 12px;
+      width: 100%;
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 11px 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+    }
+    .approval-info { flex: 1; min-width: 180px; }
+    .approval-info strong { font-size: 13px; }
+    .approval-progress { margin-left: 7px; color: var(--muted); font-size: 11px; }
+    .approval-message { margin: 4px 0 0; color: var(--muted); font-size: 11px; line-height: 1.4; }
+    .approval-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+    .approval-actions button { padding: 7px 10px; font-size: 12px; }
+    .approve-section { border-color: #317c59; color: #b1edc9; background: #173726; }
+    .review-approval.approved { border-color: #317c59; }
+    .review-approval.approved strong { color: var(--green); }
+
+    .transition-panel {
+      flex: none;
+      width: 100%;
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(17, 22, 33, .94);
+    }
+    .transition-panel summary { cursor: pointer; font-size: 13px; font-weight: 600; }
+    .transition-controls { display: flex; gap: 6px; align-items: center; margin: 10px 0 6px; }
+    .transition-controls button { padding: 5px 8px; white-space: nowrap; }
+    .transition-controls select {
+      min-width: 0;
+      flex: 1;
+      padding: 5px;
+      color: var(--text);
+      background: var(--panel-2);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      font-size: 12px;
+    }
+    .transition-description { color: var(--muted); font-size: 11px; line-height: 1.45; margin-bottom: 8px; }
+    .transition-frames { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+    .frame-preview { overflow: hidden; padding: 0; text-align: left; min-width: 0; }
+    .frame-preview img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: contain; background: #070a10; }
+    .frame-preview img[hidden] { display: none; }
+    .frame-caption { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 2px; padding: 5px 7px; font-size: 11px; }
+    .frame-caption time { color: var(--muted); font-variant-numeric: tabular-nums; }
+    .frame-preview.active { border-color: var(--blue); box-shadow: 0 0 0 1px var(--blue); }
+    .frame-error { padding: 12px 7px; color: var(--muted); font-size: 11px; }
+
+    video {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      background: #000;
+    }
+
+    .draw-layer {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    .draw-layer.drawing {
+      pointer-events: auto;
+      cursor: crosshair;
+      background: rgba(13, 19, 30, .08);
+    }
+
+    .selection, .saved-box {
+      position: absolute;
+      border: 2px solid var(--yellow);
+      background: rgba(240, 201, 106, .10);
+      box-shadow: 0 0 0 1px rgba(0, 0, 0, .65), 0 0 20px rgba(240, 201, 106, .22);
+      pointer-events: none;
+    }
+
+    .selection.object-target {
+      border-color: var(--green);
+      background: rgba(97, 212, 154, .12);
+      box-shadow: 0 0 0 1px rgba(0, 0, 0, .65), 0 0 22px rgba(97, 212, 154, .28);
+    }
+
+    .object-hit-target {
+      position: absolute;
+      border: 1px solid transparent;
+      border-radius: 3px;
+      background: transparent;
+      cursor: pointer;
+      pointer-events: auto;
+    }
+
+    .object-hit-target:hover,
+    .object-hit-target:focus-visible {
+      border-color: var(--green);
+      background: rgba(97, 212, 154, .12);
+      box-shadow: 0 0 16px rgba(97, 212, 154, .25);
+      outline: none;
+    }
+
+    .saved-box {
+      border-color: var(--blue);
+      background: rgba(105, 167, 255, .10);
+    }
+
+    .box-number {
+      position: absolute;
+      top: -13px;
+      left: -13px;
+      display: grid;
+      place-items: center;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: var(--blue);
+      color: #07101e;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .viewer-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      width: 100%;
+      max-width: 1280px;
+      margin: 0 auto auto;
+    }
+
+    .viewer-toolbar button { padding: 9px 13px; }
+    .viewer-toolbar .primary {
+      background: var(--blue);
+      border-color: var(--blue);
+      color: #07101e;
+      font-weight: 720;
+    }
+
+    .current-cue {
+      min-width: 0;
+      margin-left: 6px;
+      color: var(--muted);
+      font-size: 13px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .hint {
+      margin-left: auto;
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .mix-toolbar {
+      display: grid;
+      grid-template-columns: auto minmax(130px, 1fr) auto auto;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      max-width: 1280px;
+      margin: -2px auto auto;
+      padding: 9px 11px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: rgba(17, 22, 33, .92);
+    }
+
+    .mix-toolbar[hidden] { display: none; }
+    .mix-toolbar button { padding: 8px 11px; }
+    .music-info { min-width: 0; }
+    .music-title {
+      overflow: hidden;
+      color: #dfe5f2;
+      font-size: 12px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .music-notice {
+      margin-top: 2px;
+      color: var(--yellow);
+      font-size: 10px;
+    }
+    .mix-control {
+      display: grid;
+      grid-template-columns: auto 105px 48px;
+      align-items: center;
+      gap: 7px;
+      color: var(--muted);
+      font-size: 11px;
+      white-space: nowrap;
+    }
+    .mix-control input { accent-color: var(--blue); }
+    .mix-control output {
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
+      text-align: right;
+    }
+
+    .composer {
+      margin: 12px;
+      padding: 12px;
+      border: 1px solid #3e4961;
+      border-radius: 10px;
+      background: #161d2a;
+    }
+
+    .composer[hidden] { display: none; }
+
+    .composer-meta {
+      color: var(--yellow);
+      font-size: 12px;
+      margin-bottom: 8px;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 108px;
+      resize: vertical;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      outline: none;
+      background: #0f141e;
+      color: var(--text);
+      line-height: 1.4;
+    }
+
+    textarea:focus { border-color: var(--blue); }
+
+    .composer-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 9px;
+    }
+
+    .composer-actions button { padding: 8px 11px; }
+    .save-button {
+      background: var(--blue);
+      border-color: var(--blue);
+      color: #07101e;
+      font-weight: 720;
+    }
+
+    .annotation-list { flex: 1; }
+
+    .empty-notes {
+      padding: 20px 15px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .annotation {
+      position: relative;
+      margin: 10px 12px;
+      padding: 11px 61px 11px 12px;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      background: var(--panel-2);
+      cursor: pointer;
+    }
+
+    .annotation:hover, .annotation.active { border-color: var(--blue); }
+    .annotation.status-pending_review { border-color: rgba(74, 222, 128, .55); }
+    .annotation-meta {
+      color: var(--blue);
+      font-size: 11px;
+      margin-bottom: 6px;
+    }
+
+    .annotation-status {
+      display: inline-block;
+      margin-bottom: 7px;
+      padding: 2px 7px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--muted);
+      font-size: 10px;
+      letter-spacing: .02em;
+    }
+
+    .status-pending_review .annotation-status {
+      border-color: rgba(74, 222, 128, .55);
+      color: #86efac;
+    }
+
+    .annotation-comment {
+      font-size: 13px;
+      line-height: 1.42;
+      white-space: pre-wrap;
+    }
+
+    .annotation-thread {
+      display: none;
+      margin-top: 11px;
+      padding-top: 10px;
+      border-top: 1px solid var(--line);
+      cursor: default;
+    }
+
+    .annotation.active .annotation-thread { display: block; }
+
+    .thread-heading {
+      margin-bottom: 7px;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    .thread-message {
+      margin: 7px 0;
+      padding: 8px 9px;
+      border-left: 2px solid var(--line);
+      border-radius: 0 6px 6px 0;
+      background: rgba(255, 255, 255, .025);
+      color: var(--text);
+      font-size: 12px;
+      line-height: 1.45;
+      white-space: pre-wrap;
+    }
+
+    .thread-message.codex { border-left-color: var(--green); }
+    .thread-author {
+      display: block;
+      margin-bottom: 3px;
+      color: var(--green);
+      font-size: 10px;
+      font-weight: 750;
+      text-transform: uppercase;
+    }
+    .thread-message.user .thread-author { color: var(--blue); }
+
+    .thread-empty {
+      margin-bottom: 8px;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .follow-up {
+      min-height: 62px;
+      margin-top: 7px;
+      font-size: 12px;
+    }
+
+    .follow-up-actions {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 7px;
+    }
+
+    .send-follow-up {
+      padding: 7px 9px;
+      color: var(--blue);
+      font-size: 11px;
+    }
+
+    .delete-note {
+      position: absolute;
+      top: 7px;
+      right: 7px;
+      width: 25px;
+      height: 25px;
+      border: 0;
+      background: transparent;
+      color: var(--muted);
+    }
+
+    .edit-note {
+      position: absolute;
+      top: 7px;
+      right: 34px;
+      width: 25px;
+      height: 25px;
+      border: 0;
+      background: transparent;
+      color: var(--muted);
+    }
+
+    .edit-note:hover { color: var(--blue); }
+
+    .resolve-note {
+      margin-top: 9px;
+      border-color: rgba(74, 222, 128, .55);
+      color: #86efac;
+      font-size: 11px;
+    }
+
+    .delete-note:hover { color: var(--red); }
+
+    .queue-area {
+      padding: 12px;
+      border-top: 1px solid var(--line);
+    }
+
+    .queue-area button {
+      width: 100%;
+      padding: 10px;
+      background: #263147;
+      font-weight: 680;
+    }
+
+    .queue-result {
+      margin-top: 8px;
+      min-height: 17px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.4;
+    }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 24px;
+      z-index: 20;
+      transform: translate(-50%, 14px);
+      padding: 10px 14px;
+      border: 1px solid #44516b;
+      border-radius: 9px;
+      background: #192131;
+      color: var(--text);
+      opacity: 0;
+      pointer-events: none;
+      transition: .18s ease;
+      box-shadow: 0 10px 35px rgba(0, 0, 0, .38);
+      font-size: 13px;
+    }
+
+    .toast.visible { opacity: 1; transform: translate(-50%, 0); }
+
+    @media (max-width: 1050px) {
+      .workspace {
+        grid-template-columns: minmax(170px, .65fr) minmax(350px, 1.6fr) minmax(210px, .8fr);
+      }
+      main { padding: 8px; }
+      .hint { display: none; }
+      .cue { grid-template-columns: 43px minmax(0, 1fr); padding: 9px 8px; }
+      .section-title { max-width: 26vw; }
+      .mix-toolbar {
+        grid-template-columns: auto minmax(90px, 1fr);
+        gap: 8px;
+      }
+      .mix-control {
+        grid-column: span 2;
+        grid-template-columns: 46px minmax(90px, 1fr) 48px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div class="brand">Algovis Review</div>
+      <select class="section-picker" id="sectionPicker" aria-label="Video section" hidden></select>
+      <div class="section-title" id="sectionTitle">Loading Manim render…</div>
+      <div class="spacer"></div>
+      <div class="status" id="status"><span class="status-dot"></span><span id="statusText">Loading</span></div>
+      <button class="audit-button" id="auditButton" hidden>Preflight</button>
+      <button class="render-button" id="renderButton">Render section</button>
+    </header>
+
+    <section class="audit-popover" id="auditPopover" hidden>
+      <div class="audit-heading">
+        <h2 id="auditTitle">Section preflight</h2>
+        <button id="closeAuditButton" aria-label="Close preflight">×</button>
+      </div>
+      <p class="audit-summary" id="auditSummary"></p>
+      <div class="audit-list" id="auditList"></div>
+    </section>
+
+    <div class="workspace">
+      <aside class="transcript-panel">
+        <div class="panel-heading">
+          <h2>Transcript timeline</h2>
+          <p>The full transcript stays visible. Animation timing is drawn over the words.</p>
+          <div class="timeline-legend">
+            <span class="legend-key"><span class="legend-tick"></span>spoken trigger</span>
+            <span class="legend-key"><span class="legend-bar"></span>animation duration</span>
+          </div>
+        </div>
+        <div class="cue-list" id="cueList"></div>
+      </aside>
+
+      <main>
+        <div class="review-approval" id="approvalBar">
+          <div class="approval-info" aria-live="polite">
+            <strong id="approvalStatus">Not reviewed</strong>
+            <span class="approval-progress" id="approvalProgress"></span>
+            <p class="approval-message" id="approvalMessage">Review any section and leave notes. Approve when you are happy with the lesson in context.</p>
+          </div>
+          <div class="approval-actions">
+            <button class="approve-section" id="approveSectionButton" disabled>Approve section</button>
+            <button id="reopenSectionButton" hidden>Reopen review</button>
+            <button id="nextSectionButton" hidden>Next section →</button>
+          </div>
+        </div>
+        <div class="viewer-shell" id="viewerShell">
+          <video id="video" controls preload="metadata"></video>
+          <audio id="music" preload="auto"></audio>
+          <div class="draw-layer" id="drawLayer"></div>
+        </div>
+        <div class="viewer-toolbar">
+          <button class="primary" id="selectButton">Select something to change</button>
+          <button id="timeNoteButton">Add audio/timing note</button>
+          <button id="clearButton" disabled>Clear selection</button>
+          <div class="current-cue" id="currentCue">Choose a transcript cue or scrub the video.</div>
+          <div class="hint">Space: play/pause · ←/→: 1 second</div>
+        </div>
+        <div class="mix-toolbar" id="musicToolbar" hidden>
+          <button id="musicToggle">Music on</button>
+          <div class="music-info">
+            <div class="music-title" id="musicTitle"></div>
+            <div class="music-notice" id="musicNotice"></div>
+          </div>
+          <label class="mix-control">
+            <span>Level</span>
+            <input id="musicLevel" type="range" min="-24" max="0" step="0.5">
+            <output id="musicLevelValue"></output>
+          </label>
+          <label class="mix-control" title="Positive values start the music later">
+            <span>Timing</span>
+            <input id="musicOffset" type="range" min="-8" max="8" step="0.1">
+            <output id="musicOffsetValue"></output>
+          </label>
+        </div>
+        <details class="transition-panel" id="transitionPanel" open>
+          <summary>Animation frames</summary>
+          <div class="transition-controls">
+            <button id="previousTransition" aria-label="Previous animation change">←</button>
+            <select id="transitionPicker" aria-label="Animation change"></select>
+            <button id="nextTransition" aria-label="Next animation change">→</button>
+            <button id="followTransitions">Follow playback</button>
+          </div>
+          <div class="transition-description" id="transitionDescription"></div>
+          <div class="transition-frames" id="transitionFrames"></div>
+        </details>
+      </main>
+
+      <aside class="notes-panel">
+        <div class="panel-heading">
+          <h2>Requested changes</h2>
+          <p>Each note remembers the phrase, time, and exact part of the frame.</p>
+        </div>
+        <div class="composer" id="composer" hidden>
+          <div class="composer-meta" id="composerMeta"></div>
+          <textarea id="comment" placeholder="What should change here?"></textarea>
+          <div class="composer-actions">
+            <button id="cancelButton">Cancel</button>
+            <button class="save-button" id="saveButton">Save note</button>
+          </div>
+        </div>
+        <div class="annotation-list" id="annotationList"></div>
+        <div class="queue-area">
+          <button id="queueButton">Queue notes for Codex</button>
+          <div class="queue-result" id="queueResult"></div>
+        </div>
+      </aside>
+    </div>
+  </div>
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const pageParams = new URLSearchParams(location.search);
+    const token = pageParams.get("token") || "";
+    const requestedSection = pageParams.get("section") || "";
+    const api = path => {
+      const separator = path.includes("?") ? "&" : "?";
+      const section = state.project?.activeSection || requestedSection;
+      const sectionPart = section ? `&section=${encodeURIComponent(section)}` : "";
+      return `${path}${separator}token=${encodeURIComponent(token)}${sectionPart}`;
+    };
+
+    const state = {
+      project: null,
+      cues: [],
+      animations: [],
+      animationLanes: new Map(),
+      annotations: [],
+      activeCue: null,
+      activeAnnotation: null,
+      pendingRegion: null,
+      pendingTarget: null,
+      drawing: false,
+      drawStart: null,
+      revision: null,
+      reloadTime: 0,
+      editingId: null,
+      musicConfig: null,
+      musicEnabled: true,
+      musicGainDb: -12,
+      musicOffset: 0,
+      musicSyncRunning: false,
+      audioGraph: null,
+      transcriptWordElements: [],
+      spokenWordIndex: -1,
+      transitions: [],
+      activeTransitionId: null,
+      transitionPinned: false,
+      auditSignature: null,
+      approvalBusy: false,
+      mediaLoading: true,
+      musicSavePending: false,
+      auditIssueId: null,
+      auditFinished: false,
+      auditBusy: false,
+      auditPlayback: null,
+      auditNoteDrafts: {},
+      auditReviewVersion: null,
+    };
+
+    const video = document.getElementById("video");
+    const music = document.getElementById("music");
+    const drawLayer = document.getElementById("drawLayer");
+    const cueList = document.getElementById("cueList");
+    const annotationList = document.getElementById("annotationList");
+    const composer = document.getElementById("composer");
+    const comment = document.getElementById("comment");
+
+    function formatTime(seconds) {
+      const minutes = Math.floor(seconds / 60);
+      const remainder = Math.max(0, seconds - minutes * 60);
+      return `${minutes}:${remainder.toFixed(1).padStart(4, "0")}`;
+    }
+
+    async function request(path, options = {}) {
+      const response = await fetch(api(path), {
+        ...options,
+        headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+      });
+      const value = await response.json();
+      if (!response.ok) throw new Error(value.error || `Request failed: ${response.status}`);
+      return value;
+    }
+
+    function showToast(message) {
+      const toast = document.getElementById("toast");
+      toast.textContent = message;
+      toast.classList.add("visible");
+      clearTimeout(showToast.timer);
+      showToast.timer = setTimeout(() => toast.classList.remove("visible"), 2200);
+    }
+
+    function dbToGain(db) {
+      return Math.pow(10, db / 20);
+    }
+
+    function updateMusicLabels() {
+      document.getElementById("musicLevelValue").textContent = `${state.musicGainDb.toFixed(1)} dB`;
+      const sign = state.musicOffset >= 0 ? "+" : "";
+      document.getElementById("musicOffsetValue").textContent = `${sign}${state.musicOffset.toFixed(1)} s`;
+      document.getElementById("musicToggle").textContent = state.musicEnabled ? "Music on" : "Music off";
+    }
+
+    function defaultSelectLabel() {
+      return state.project?.objects
+        ? "Select a Manim object"
+        : "Enable object selection";
+    }
+
+    async function startRender({ preparingObjects = false } = {}) {
+      const result = await request("/api/render", { method: "POST", body: "{}" });
+      const activeMessage = preparingObjects
+        ? "Preparing selectable Manim objects…"
+        : "Rendering with Manim…";
+      updateRenderStatus({
+        state: "rendering",
+        message: result.started ? activeMessage : "Render already queued",
+      });
+      if (preparingObjects) {
+        showToast(
+          result.started
+            ? "Preparing this older section for object selection. The current preview remains playable."
+            : "This section is already being prepared.",
+        );
+      }
+      return result;
+    }
+
+    function targetMusicTime() {
+      return video.currentTime - state.musicOffset;
+    }
+
+    async function ensureAudioGraph() {
+      if (!state.musicConfig || state.audioGraph) return;
+      const AudioContextType = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContextType) return;
+      const context = new AudioContextType();
+      const voiceSource = context.createMediaElementSource(video);
+      const musicSource = context.createMediaElementSource(music);
+      const voiceGain = context.createGain();
+      const musicGain = context.createGain();
+      musicGain.gain.setValueAtTime(0, context.currentTime);
+      const analyser = context.createAnalyser();
+      analyser.fftSize = 1024;
+      voiceSource.connect(voiceGain).connect(context.destination);
+      voiceSource.connect(analyser);
+      musicSource.connect(musicGain).connect(context.destination);
+      state.audioGraph = {
+        context,
+        musicGain,
+        analyser,
+        samples: new Float32Array(analyser.fftSize),
+        currentGain: 0,
+        lastUpdate: performance.now(),
+      };
+      await context.resume();
+      requestAnimationFrame(updateDucking);
+    }
+
+    function updateDucking(now) {
+      const graph = state.audioGraph;
+      if (!graph || !state.musicConfig) return;
+      graph.analyser.getFloatTimeDomainData(graph.samples);
+      let sum = 0;
+      for (const sample of graph.samples) sum += sample * sample;
+      const rms = Math.sqrt(sum / graph.samples.length);
+      const duck = state.musicConfig.duck;
+      let reductionDb = 0;
+      if (rms > duck.threshold) {
+        const overDb = 20 * Math.log10(rms / duck.threshold);
+        reductionDb = Math.min(15, overDb * (1 - 1 / duck.ratio));
+      }
+      let fade = 1;
+      if (video.currentTime < 1.2) fade = Math.max(0, video.currentTime / 1.2);
+      if (Number.isFinite(video.duration) && video.duration - video.currentTime < 2.5) {
+        fade *= Math.max(0, (video.duration - video.currentTime) / 2.5);
+      }
+      const target = state.musicEnabled
+        ? dbToGain(state.musicGainDb - reductionDb) * fade
+        : 0;
+      const elapsed = Math.max(1, now - graph.lastUpdate);
+      const movingDown = target < graph.currentGain;
+      const timeConstant = movingDown ? duck.attackMs : duck.releaseMs;
+      const amount = 1 - Math.exp(-elapsed / Math.max(1, timeConstant));
+      graph.currentGain += (target - graph.currentGain) * amount;
+      // A gain step on each animation frame can itself create a faint click.
+      // Keep the existing slow ducking curve, with a continuous audio-rate
+      // approach to each new target instead of a staircase at screen rate.
+      graph.musicGain.gain.setTargetAtTime(
+        graph.currentGain, graph.context.currentTime, .010,
+      );
+      graph.lastUpdate = now;
+      requestAnimationFrame(updateDucking);
+    }
+
+    async function syncMusic(force = false) {
+      if (!state.musicConfig) return;
+      await ensureAudioGraph();
+      if (state.audioGraph?.context.state === "suspended") {
+        await state.audioGraph.context.resume();
+      }
+      const rawTarget = targetMusicTime();
+      const target = Math.max(0, rawTarget);
+      const error = target - music.currentTime;
+      if (force || Math.abs(error) > .10) music.currentTime = target;
+      const correction = Math.max(-.02, Math.min(.02, error * .12));
+      music.playbackRate = video.playbackRate * (1 + correction);
+      if (rawTarget < 0) {
+        music.pause();
+      } else if (!video.paused && music.paused) {
+        music.play().catch(() => {});
+      }
+    }
+
+    function startMusicClock() {
+      if (state.musicSyncRunning || !state.musicConfig) return;
+      state.musicSyncRunning = true;
+      const tick = () => {
+        if (video.paused || video.ended || !state.musicConfig) {
+          state.musicSyncRunning = false;
+          music.playbackRate = video.playbackRate;
+          return;
+        }
+        syncMusic(false).catch(() => {});
+        if (typeof video.requestVideoFrameCallback === "function") {
+          video.requestVideoFrameCallback(tick);
+        } else {
+          requestAnimationFrame(tick);
+        }
+      };
+      tick();
+    }
+
+    function saveMusicSettings() {
+      state.musicSavePending = true;
+      renderApproval(state.project?.approval);
+      clearTimeout(saveMusicSettings.timer);
+      saveMusicSettings.timer = setTimeout(async () => {
+        try {
+          await request("/api/music", {
+          method: "PATCH",
+          body: JSON.stringify({
+            enabled: state.musicEnabled,
+            gainDb: state.musicGainDb,
+            offsetSeconds: state.musicOffset,
+          }),
+          });
+          const refreshed = await request("/api/revision");
+          updateReviewState(refreshed);
+        } catch (error) {
+          showToast(error.message);
+        } finally {
+          state.musicSavePending = false;
+          renderApproval(state.project?.approval);
+        }
+      }, 180);
+    }
+
+    function cueAt(time) {
+      let match = state.cues[0] || null;
+      for (const cue of state.cues) {
+        if (cue.time <= time + .03) match = cue;
+        else break;
+      }
+      return match;
+    }
+
+    function setCue(cue, seek = false) {
+      if (!cue) return;
+      state.activeCue = cue;
+      if (seek) {
+        video.currentTime = cue.time;
+        video.pause();
+      }
+      document.querySelectorAll(".cue").forEach(element => {
+        element.classList.toggle("active", element.dataset.name === cue.name);
+      });
+      document.querySelectorAll(".transcript-word.cue-context").forEach(element => {
+        element.classList.toggle("active", element._cueNames?.includes(cue.name));
+      });
+      document.getElementById("currentCue").textContent = `“${cue.phrase}” · ${formatTime(video.currentTime || cue.time)}`;
+    }
+
+    function seekReview(time, cueName = null) {
+      clearSelection();
+      video.pause();
+      const destination = Math.max(0, Math.min(Number(time), video.duration || state.project.section.duration));
+      const apply = () => {
+        video.currentTime = destination;
+        setCue(state.cues.find(cue => cue.name === cueName) || cueAt(destination));
+        updateTranscriptPlayback(true);
+      };
+      if (video.readyState >= 1) apply();
+      else video.addEventListener("loadedmetadata", apply, { once: true });
+    }
+
+    function transitionAt(time) {
+      let match = state.transitions[0] || null;
+      for (const transition of state.transitions) {
+        if (transition.start <= time + .02) match = transition;
+        else break;
+      }
+      return match;
+    }
+
+    function showTransition(identifier, { pin = false, force = false } = {}) {
+      const transition = state.transitions.find(item => item.id === identifier);
+      if (!transition) return;
+      const changed = state.activeTransitionId !== identifier;
+      state.activeTransitionId = identifier;
+      if (pin) state.transitionPinned = true;
+      document.getElementById("transitionPicker").value = identifier;
+      const index = state.transitions.indexOf(transition);
+      document.getElementById("previousTransition").disabled = index === 0;
+      document.getElementById("nextTransition").disabled = index === state.transitions.length - 1;
+      document.getElementById("followTransitions").disabled = !state.transitionPinned;
+      const interval = `${formatTime(transition.start)}–${formatTime(transition.end)}`;
+      const phrase = transition.phrase ? `“${transition.phrase}” · ` : "";
+      document.getElementById("transitionDescription").textContent =
+        `${phrase}${interval}. Click a frame to inspect it. ${state.transitionPinned ? "Pinned to this change." : "Follows playback."}`;
+      if (!document.getElementById("transitionPanel").open || (!changed && !force)) return;
+      const frames = document.getElementById("transitionFrames");
+      frames.replaceChildren();
+      const labels = { before: "Before", middle: "During", after: "After" };
+      for (const frame of transition.frames) {
+        const button = document.createElement("button");
+        button.className = "frame-preview";
+        button.dataset.time = frame.time;
+        button.setAttribute("aria-label", `${labels[frame.position]} change at ${formatTime(frame.time)}`);
+        const image = document.createElement("img");
+        image.alt = `${labels[frame.position]}: ${transition.label}`;
+        image.loading = "lazy";
+        image.src = frame.url;
+        image.addEventListener("error", () => {
+          image.hidden = true;
+          const error = document.createElement("div");
+          error.className = "frame-error";
+          error.textContent = "Frame unavailable. Click to inspect in the video.";
+          button.prepend(error);
+        }, { once: true });
+        const caption = document.createElement("span");
+        caption.className = "frame-caption";
+        const label = document.createElement("span");
+        label.textContent = labels[frame.position];
+        const time = document.createElement("time");
+        time.textContent = formatTime(frame.time);
+        caption.append(label, time);
+        button.append(image, caption);
+        button.addEventListener("click", () => {
+          showTransition(identifier, { pin: true });
+          seekReview(frame.time);
+          updateTransitionFrameFocus(frame.time);
+        });
+        frames.append(button);
+      }
+    }
+
+    function updateTransitionFrameFocus(time) {
+      document.querySelectorAll(".frame-preview").forEach(button => {
+        button.classList.toggle("active", Math.abs(Number(button.dataset.time) - time) < .045);
+      });
+    }
+
+    function followTransition(time) {
+      if (!state.transitionPinned) {
+        const transition = transitionAt(time);
+        if (transition) showTransition(transition.id);
+      }
+      updateTransitionFrameFocus(time);
+    }
+
+    function renderTransitions(transitions) {
+      state.transitions = transitions || [];
+      state.activeTransitionId = null;
+      state.transitionPinned = false;
+      const picker = document.getElementById("transitionPicker");
+      picker.replaceChildren();
+      document.getElementById("transitionFrames").replaceChildren();
+      for (const [index, transition] of state.transitions.entries()) {
+        const option = document.createElement("option");
+        option.value = transition.id;
+        option.textContent = `${index + 1}/${state.transitions.length} · ${formatTime(transition.start)} · ${transition.phrase || transition.label}`;
+        picker.append(option);
+      }
+      document.querySelectorAll(".transition-controls button, .transition-controls select").forEach(control => {
+        control.disabled = !state.transitions.length;
+      });
+      if (state.transitions.length) followTransition(video.currentTime);
+      else document.getElementById("transitionDescription").textContent =
+        "Render this section once to prepare frames from its actual animations.";
+    }
+
+    function assignAnimationLanes(animations) {
+      const laneEnds = [];
+      const lanes = new Map();
+      const sorted = [...animations].sort((left, right) =>
+        left.start - right.start || left.end - right.end || left.id.localeCompare(right.id)
+      );
+      for (const animation of sorted) {
+        let lane = laneEnds.findIndex(end => end <= animation.start + .015);
+        if (lane < 0) lane = laneEnds.length;
+        laneEnds[lane] = animation.end;
+        lanes.set(animation.id, lane);
+      }
+      return lanes;
+    }
+
+    function updateActiveAnimationBars() {
+      const time = video.currentTime;
+      document.querySelectorAll(".animation-bar").forEach(element => {
+        const animation = element._animation;
+        element.classList.toggle(
+          "active",
+          animation.start <= time + .02 && animation.end >= time - .02,
+        );
+      });
+    }
+
+    function updateTranscriptPlayback(forceScroll = false) {
+      const transcript = state.project?.transcript;
+      const elements = state.transcriptWordElements;
+      if (!transcript?.words?.length || !elements.length) return;
+      const time = video.currentTime;
+      let index = transcript.words.findIndex(word =>
+        word.start <= time + .03 && word.end >= time - .03
+      );
+      if (index < 0) {
+        for (let candidate = 0; candidate < transcript.words.length; candidate += 1) {
+          if (transcript.words[candidate].start <= time + .03) index = candidate;
+          else break;
+        }
+      }
+      if (index < 0) index = 0;
+      const segment = transcript.words[index].segment;
+      elements.forEach((element, wordIndex) => {
+        const inSnippet = transcript.words[wordIndex].segment === segment
+          && Math.abs(wordIndex - index) <= 4;
+        element.classList.toggle("spoken-context", inSnippet);
+        element.classList.toggle("spoken-current", wordIndex === index);
+      });
+      if (forceScroll || index !== state.spokenWordIndex) {
+        const current = elements[index];
+        const panelBounds = cueList.getBoundingClientRect();
+        const wordBounds = current.getBoundingClientRect();
+        const outsideComfortZone = wordBounds.top < panelBounds.top + 54
+          || wordBounds.bottom > panelBounds.bottom - 54;
+        if (forceScroll || outsideComfortZone) {
+          current.scrollIntoView({ block: "center", behavior: video.paused ? "auto" : "smooth" });
+        }
+      }
+      state.spokenWordIndex = index;
+    }
+
+    function renderCues() {
+      cueList.replaceChildren();
+      const transcript = state.project?.transcript;
+      if (transcript?.words?.length) {
+        state.transcriptWordElements = [];
+        state.spokenWordIndex = -1;
+        cueList.className = "cue-list transcript-flow";
+        const cueNamesByWord = transcript.words.map(() => []);
+        const cueAnchorsByWord = transcript.words.map(() => []);
+        for (const trigger of transcript.triggers) {
+          for (let index = trigger.startWord; index < trigger.endWord; index += 1) {
+            if (cueNamesByWord[index]) cueNamesByWord[index].push(trigger.cue);
+          }
+          if (cueAnchorsByWord[trigger.anchorWord]) {
+            cueAnchorsByWord[trigger.anchorWord].push(trigger.cue);
+          }
+        }
+        state.animationLanes = assignAnimationLanes(state.animations);
+        let paragraph = null;
+        let segment = null;
+        transcript.words.forEach((word, index) => {
+          if (word.segment !== segment) {
+            segment = word.segment;
+            paragraph = document.createElement("p");
+            paragraph.className = "transcript-paragraph";
+            cueList.append(paragraph);
+          }
+          const element = document.createElement("span");
+          const cueNames = cueNamesByWord[index];
+          const anchorNames = cueAnchorsByWord[index];
+          element.className = `transcript-word${cueNames.length ? " cue-context" : ""}`;
+          element.textContent = paragraph.childNodes.length ? word.text : word.text.trimStart();
+          element._cueNames = cueNames;
+          state.transcriptWordElements.push(element);
+          for (const name of anchorNames) {
+            const tick = document.createElement("span");
+            tick.className = "cue-tick";
+            tick.dataset.cue = name;
+            element.append(tick);
+          }
+          const spanningAnimations = state.animations.filter(animation =>
+            animation.start < word.end && animation.end > word.start
+          );
+          for (const animation of spanningAnimations) {
+            const lane = state.animationLanes.get(animation.id) || 0;
+            const duration = Math.max(.001, word.end - word.start);
+            const left = Math.max(0, Math.min(1, (animation.start - word.start) / duration));
+            const right = Math.max(0, Math.min(1, (word.end - animation.end) / duration));
+            const bar = document.createElement("span");
+            bar.className = `animation-bar animation-color-${lane % 6}`;
+            bar.style.left = `${left * 100}%`;
+            bar.style.right = `${right * 100}%`;
+            bar.style.bottom = `${-1 - lane * 3}px`;
+            bar.title = `${animation.kind}: ${animation.label}\n${formatTime(animation.start)}–${formatTime(animation.end)}`;
+            bar._animation = animation;
+            bar.tabIndex = 0;
+            bar.setAttribute("role", "button");
+            bar.setAttribute(
+              "aria-label",
+              `${animation.kind} ${animation.label}, ${formatTime(animation.start)} to ${formatTime(animation.end)}`,
+            );
+            const activateBar = event => {
+              event.stopPropagation();
+              clearSelection();
+              video.currentTime = animation.start;
+              video.pause();
+              updateActiveAnimationBars();
+            };
+            bar.addEventListener("click", activateBar);
+            bar.addEventListener("keydown", event => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                activateBar(event);
+              }
+            });
+            element.append(bar);
+          }
+          if (cueNames.length) {
+            element.dataset.cues = cueNames.join(" ");
+            const cues = cueNames.map(name => state.cues.find(cue => cue.name === name)).filter(Boolean);
+            element.tabIndex = 0;
+            element.setAttribute("role", "button");
+            element.title = cues.map(cue =>
+              `${formatTime(cue.time)} trigger · ${cue.phrase}\nThe phrase is context, not a stop time.`
+            ).join("\n");
+            const activate = () => {
+              const cue = cues[0];
+              if (!cue) return;
+              clearSelection();
+              setCue(cue, true);
+              element.scrollIntoView({ block: "nearest" });
+            };
+            element.addEventListener("click", activate);
+            element.addEventListener("keydown", event => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                activate();
+              }
+            });
+          }
+          paragraph.append(element);
+        });
+        updateActiveAnimationBars();
+        updateTranscriptPlayback(true);
+        return;
+      }
+      for (const cue of state.cues) {
+        const button = document.createElement("button");
+        button.className = "cue";
+        button.dataset.name = cue.name;
+        button.innerHTML = `<span class="cue-time">${formatTime(cue.time)}</span><span class="cue-phrase"></span>`;
+        button.querySelector(".cue-phrase").textContent = cue.phrase;
+        button.addEventListener("click", () => {
+          clearSelection();
+          setCue(cue, true);
+          button.scrollIntoView({ block: "nearest" });
+        });
+        cueList.append(button);
+      }
+    }
+
+    function regionStyle(region) {
+      return `left:${region.x * 100}%;top:${region.y * 100}%;width:${region.width * 100}%;height:${region.height * 100}%`;
+    }
+
+    function drawRegion(region, kind = "selection", number = null) {
+      drawLayer.replaceChildren();
+      if (!region) return;
+      const box = document.createElement("div");
+      box.className = kind;
+      box.setAttribute("style", regionStyle(region));
+      if (number != null) {
+        const badge = document.createElement("span");
+        badge.className = "box-number";
+        badge.textContent = number;
+        box.append(badge);
+      }
+      drawLayer.append(box);
+    }
+
+    function currentObjectSnapshot() {
+      const snapshots = state.project?.objects?.snapshots || [];
+      if (!snapshots.length) return null;
+      let snapshot = snapshots[0];
+      for (const candidate of snapshots) {
+        if (candidate.time <= video.currentTime + .08) snapshot = candidate;
+        else break;
+      }
+      return snapshot;
+    }
+
+    function objectAtPoint(point) {
+      const snapshot = currentObjectSnapshot();
+      if (!snapshot) return null;
+      const candidates = snapshot.objects.filter(object => {
+        const region = object.region;
+        return point.x >= region.x && point.x <= region.x + region.width
+          && point.y >= region.y && point.y <= region.y + region.height;
+      });
+      const readable = candidates.filter(object => object.label && object.label !== object.kind);
+      const pool = readable.length ? readable : candidates;
+      pool.sort((left, right) => {
+        const leftArea = left.region.width * left.region.height;
+        const rightArea = right.region.width * right.region.height;
+        return leftArea - rightArea;
+      });
+      return pool[0] || null;
+    }
+
+    function showObjectTargets() {
+      const snapshot = currentObjectSnapshot();
+      if (!snapshot) return;
+      const unique = new Map();
+      for (const object of snapshot.objects) {
+        if (!object.label || object.label === object.kind) continue;
+        const region = object.region;
+        const key = [
+          object.label,
+          region.x.toFixed(4), region.y.toFixed(4),
+          region.width.toFixed(4), region.height.toFixed(4),
+        ].join("|");
+        if (!unique.has(key)) unique.set(key, object);
+      }
+      const objects = [...unique.values()].sort((left, right) => {
+        const leftArea = left.region.width * left.region.height;
+        const rightArea = right.region.width * right.region.height;
+        return rightArea - leftArea;
+      });
+      for (const object of objects) {
+        const hit = document.createElement("div");
+        hit.className = "object-hit-target";
+        hit.setAttribute("style", regionStyle(object.region));
+        hit.title = `Select Manim object: ${object.label}`;
+        hit.tabIndex = 0;
+        hit.setAttribute("role", "button");
+        const select = event => {
+          event.stopPropagation();
+          event.preventDefault();
+          completeSelection(object.region, {
+            id: object.id,
+            label: object.label,
+            kind: object.kind,
+          });
+        };
+        hit.addEventListener("pointerdown", select);
+        hit.addEventListener("keydown", event => {
+          if (event.key === "Enter" || event.key === " ") select(event);
+        });
+        drawLayer.append(hit);
+      }
+    }
+
+    function clearSelection() {
+      state.pendingRegion = null;
+      state.pendingTarget = null;
+      state.activeAnnotation = null;
+      state.editingId = null;
+      state.drawing = false;
+      state.drawStart = null;
+      drawLayer.classList.remove("drawing");
+      drawLayer.replaceChildren();
+      composer.hidden = true;
+      comment.value = "";
+      document.getElementById("clearButton").disabled = true;
+      document.getElementById("selectButton").textContent = defaultSelectLabel();
+      document.querySelectorAll(".annotation").forEach(item => item.classList.remove("active"));
+    }
+
+    function beginSelection() {
+      clearSelection();
+      video.pause();
+      setCue(cueAt(video.currentTime));
+      state.drawing = true;
+      drawLayer.classList.add("drawing");
+      document.getElementById("selectButton").textContent = "Cancel selection";
+      showObjectTargets();
+      showToast(
+        state.project?.objects
+          ? "Click a Manim object. Drag only when you want a freeform region. Esc cancels."
+          : "Click an element, drag around a group, or press Esc to cancel",
+      );
+    }
+
+    function beginTimeNote() {
+      clearSelection();
+      video.pause();
+      setCue(cueAt(video.currentTime));
+      state.pendingRegion = { x: 0, y: 0, width: 0, height: 0 };
+      state.pendingTarget = null;
+      document.getElementById("clearButton").disabled = false;
+      const cue = state.activeCue || cueAt(video.currentTime);
+      document.getElementById("composerMeta").textContent = `${formatTime(video.currentTime)} · “${cue ? cue.phrase : "current time"}” · audio/timing note`;
+      composer.hidden = false;
+      comment.focus();
+    }
+
+    function localPoint(event) {
+      const bounds = drawLayer.getBoundingClientRect();
+      return {
+        x: Math.min(1, Math.max(0, (event.clientX - bounds.left) / bounds.width)),
+        y: Math.min(1, Math.max(0, (event.clientY - bounds.top) / bounds.height)),
+      };
+    }
+
+    drawLayer.addEventListener("pointerdown", event => {
+      if (!state.drawing) return;
+      state.drawStart = localPoint(event);
+      drawLayer.setPointerCapture(event.pointerId);
+      event.preventDefault();
+    });
+
+    drawLayer.addEventListener("pointermove", event => {
+      if (!state.drawing || !state.drawStart) return;
+      const current = localPoint(event);
+      const region = {
+        x: Math.min(state.drawStart.x, current.x),
+        y: Math.min(state.drawStart.y, current.y),
+        width: Math.abs(current.x - state.drawStart.x),
+        height: Math.abs(current.y - state.drawStart.y),
+      };
+      drawRegion(region);
+    });
+
+    drawLayer.addEventListener("pointerup", event => {
+      if (!state.drawing || !state.drawStart) return;
+      const current = localPoint(event);
+      let x = Math.min(state.drawStart.x, current.x);
+      let y = Math.min(state.drawStart.y, current.y);
+      let width = Math.abs(current.x - state.drawStart.x);
+      let height = Math.abs(current.y - state.drawStart.y);
+      if (width < .025 && height < .025) {
+        const target = objectAtPoint(current);
+        if (target) {
+          state.pendingTarget = {
+            id: target.id,
+            label: target.label,
+            kind: target.kind,
+          };
+          ({ x, y, width, height } = target.region);
+        } else {
+          width = .08;
+          height = .08;
+          x = Math.min(.92, Math.max(0, current.x - .04));
+          y = Math.min(.92, Math.max(0, current.y - .04));
+        }
+      }
+      completeSelection({ x, y, width, height }, state.pendingTarget);
+    });
+
+    function completeSelection(region, target = null) {
+      state.pendingRegion = region;
+      state.pendingTarget = target;
+      state.drawing = false;
+      state.drawStart = null;
+      drawLayer.classList.remove("drawing");
+      drawRegion(
+        state.pendingRegion,
+        state.pendingTarget ? "selection object-target" : "selection",
+      );
+      document.getElementById("clearButton").disabled = false;
+      document.getElementById("selectButton").textContent = "Select something else";
+      const cue = state.activeCue || cueAt(video.currentTime);
+      const targetText = state.pendingTarget
+        ? ` · Manim object: ${state.pendingTarget.label}`
+        : " · selected frame region";
+      document.getElementById("composerMeta").textContent = `${formatTime(video.currentTime)} · “${cue ? cue.phrase : "current frame"}”${targetText}`;
+      composer.hidden = false;
+      comment.focus();
+    }
+
+    function captureFrame(region) {
+      if (!video.videoWidth || !video.videoHeight) return null;
+      const width = 960;
+      const height = Math.round(width * video.videoHeight / video.videoWidth);
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const context = canvas.getContext("2d");
+      context.drawImage(video, 0, 0, width, height);
+      context.strokeStyle = "#f0c96a";
+      context.lineWidth = 4;
+      context.strokeRect(region.x * width, region.y * height, region.width * width, region.height * height);
+      return canvas.toDataURL("image/jpeg", .84);
+    }
+
+    async function saveAnnotation() {
+      const cue = state.activeCue || cueAt(video.currentTime);
+      if (!state.pendingRegion || !cue || !comment.value.trim()) {
+        showToast("Select a region and describe the change first");
+        return;
+      }
+      const editingId = state.editingId;
+      const saved = await request(editingId ? `/api/annotations/${encodeURIComponent(editingId)}` : "/api/annotations", {
+        method: editingId ? "PATCH" : "POST",
+        body: JSON.stringify({
+          cue: cue.name,
+          phrase: cue.phrase,
+          timestamp: video.currentTime,
+          region: state.pendingRegion,
+          target: state.pendingTarget,
+          comment: comment.value.trim(),
+          screenshot: state.pendingRegion.width && state.pendingRegion.height
+            ? captureFrame(state.pendingRegion)
+            : null,
+        }),
+      });
+      if (editingId) {
+        state.annotations = state.annotations.map(value => value.id === editingId ? saved : value);
+      } else {
+        state.annotations.push(saved);
+      }
+      clearSelection();
+      renderAnnotations();
+      showToast(editingId ? "Change request updated" : "Change request saved");
+    }
+
+    function renderAnnotations() {
+      annotationList.replaceChildren();
+      if (state.project?.audit) renderAudit(state.project.audit);
+      renderApproval(state.project?.approval);
+      const visibleAnnotations = state.annotations.filter(
+        annotation => annotation.status !== "resolved",
+      );
+      if (!visibleAnnotations.length) {
+        const empty = document.createElement("div");
+        empty.className = "empty-notes";
+        empty.textContent = state.annotations.length
+          ? "All notes in this section are resolved."
+          : "No notes yet. Pause the real Manim render, select the exact element, and describe what should change.";
+        annotationList.append(empty);
+        return;
+      }
+      visibleAnnotations.forEach((annotation, index) => {
+        const item = document.createElement("div");
+        item.className = `annotation status-${annotation.status || "draft"}`;
+        item.dataset.id = annotation.id;
+        item.innerHTML = `<div class="annotation-meta"></div><div class="annotation-status"></div><div class="annotation-comment"></div><div class="annotation-thread"><div class="thread-heading">Discussion</div><div class="thread-messages"></div><textarea class="follow-up" placeholder="Ask a follow-up or explain what still feels wrong…"></textarea><div class="follow-up-actions"><button class="send-follow-up">Send follow-up</button></div></div><button class="resolve-note" hidden>Mark resolved</button><button class="edit-note" title="Edit note">✎</button><button class="delete-note" title="Delete note">×</button>`;
+        const targetLabel = annotation.target?.label ? ` · ${annotation.target.label}` : "";
+        item.querySelector(".annotation-meta").textContent = `${index + 1} · ${formatTime(annotation.timestamp)} · ${annotation.phrase}${targetLabel}`;
+        const statusLabels = {
+          draft: "not queued",
+          pending: "queued for Codex",
+          pending_review: "ready for your review",
+        };
+        item.querySelector(".annotation-status").textContent = statusLabels[annotation.status] || annotation.status;
+        item.querySelector(".annotation-comment").textContent = annotation.comment;
+        const messages = item.querySelector(".thread-messages");
+        const responses = annotation.responses || [];
+        if (!responses.length) {
+          const empty = document.createElement("div");
+          empty.className = "thread-empty";
+          empty.textContent = annotation.status === "pending_review"
+            ? "No written explanation was attached to this fix yet."
+            : "Codex has not responded yet.";
+          messages.append(empty);
+        } else {
+          responses.forEach(response => {
+            const message = document.createElement("div");
+            message.className = `thread-message ${response.author || "user"}`;
+            const author = document.createElement("span");
+            author.className = "thread-author";
+            author.textContent = response.author === "codex" ? "Codex" : "You";
+            message.append(author, document.createTextNode(response.body || ""));
+            messages.append(message);
+          });
+        }
+        item.addEventListener("click", event => {
+          if (event.target.closest(".delete-note, .edit-note, .resolve-note, .send-follow-up, .follow-up")) return;
+          if (state.activeAnnotation?.id === annotation.id) {
+            clearSelection();
+            return;
+          }
+          clearSelection();
+          state.activeAnnotation = annotation;
+          video.currentTime = annotation.timestamp;
+          video.pause();
+          const cue = state.cues.find(value => value.name === annotation.cue) || cueAt(annotation.timestamp);
+          setCue(cue);
+          document.querySelectorAll(".annotation").forEach(note => note.classList.remove("active"));
+          item.classList.add("active");
+          drawRegion(annotation.region, "saved-box", index + 1);
+        });
+        item.querySelector(".send-follow-up").addEventListener("click", async event => {
+          event.stopPropagation();
+          const field = item.querySelector(".follow-up");
+          const body = field.value.trim();
+          if (!body) {
+            showToast("Write a follow-up first");
+            return;
+          }
+          const updated = await request(
+            `/api/annotations/${encodeURIComponent(annotation.id)}/responses`,
+            {
+              method: "POST",
+              body: JSON.stringify({ author: "user", body }),
+            },
+          );
+          state.annotations = state.annotations.map(
+            value => value.id === annotation.id ? updated : value,
+          );
+          renderAnnotations();
+          const refreshed = annotationList.querySelector(`[data-id="${annotation.id}"]`);
+          if (refreshed) refreshed.classList.add("active");
+          showToast("Follow-up queued for Codex");
+        });
+        item.querySelector(".edit-note").addEventListener("click", () => {
+          clearSelection();
+          state.editingId = annotation.id;
+          state.activeAnnotation = annotation;
+          state.pendingRegion = annotation.region;
+          state.pendingTarget = annotation.target || null;
+          video.currentTime = annotation.timestamp;
+          video.pause();
+          const cue = state.cues.find(value => value.name === annotation.cue) || cueAt(annotation.timestamp);
+          setCue(cue);
+          drawRegion(
+            annotation.region,
+            annotation.target ? "selection object-target" : "selection",
+          );
+          comment.value = annotation.comment;
+          document.getElementById("composerMeta").textContent = `Editing · ${formatTime(annotation.timestamp)} · “${annotation.phrase}”`;
+          composer.hidden = false;
+          document.getElementById("clearButton").disabled = false;
+          comment.focus();
+        });
+        item.querySelector(".delete-note").addEventListener("click", async () => {
+          await request(`/api/annotations/${encodeURIComponent(annotation.id)}`, { method: "DELETE" });
+          state.annotations = state.annotations.filter(value => value.id !== annotation.id);
+          if (state.activeAnnotation === annotation) clearSelection();
+          renderAnnotations();
+          showToast("Note removed");
+        });
+        const resolveButton = item.querySelector(".resolve-note");
+        if (annotation.status === "pending_review") {
+          resolveButton.hidden = false;
+          resolveButton.addEventListener("click", async () => {
+            const updated = await request(
+              `/api/annotations/${encodeURIComponent(annotation.id)}/status`,
+              { method: "PATCH", body: JSON.stringify({ status: "resolved" }) },
+            );
+            state.annotations = state.annotations.map(
+              value => value.id === annotation.id ? updated : value,
+            );
+            if (state.activeAnnotation === annotation) clearSelection();
+            renderAnnotations();
+            showToast("Marked resolved");
+          });
+        }
+        annotationList.append(item);
+      });
+    }
+
+    function updateRenderStatus(render) {
+      if (state.project) state.project.render = render;
+      const element = document.getElementById("status");
+      const text = document.getElementById("statusText");
+      const button = document.getElementById("renderButton");
+      element.className = `status ${render.state || "idle"}`;
+      text.textContent = render.message || "Ready";
+      button.disabled = render.state === "rendering";
+      button.textContent = render.state === "rendering"
+        ? "Preparing…"
+        : (state.project?.objects ? "Render section" : "Prepare timing & objects");
+      renderApproval(state.project?.approval);
+    }
+
+    function renderSectionPicker(sections) {
+      if (!sections) return;
+      state.project.sections = sections;
+      const picker = document.getElementById("sectionPicker");
+      const labels = { approved: "✓ Approved", needs_review: "Needs review", not_reviewed: "Not reviewed" };
+      sections.forEach((section, index) => {
+        let option = [...picker.options].find(value => value.value === section.id);
+        if (!option) {
+          option = document.createElement("option");
+          option.value = section.id;
+          picker.append(option);
+        }
+        const text = `${index + 1}. ${section.title} — ${labels[section.reviewStatus] || "Not reviewed"}`;
+        if (option.textContent !== text) option.textContent = text;
+        option.selected = section.id === state.project.activeSection;
+      });
+      picker.hidden = sections.length < 2;
+      document.getElementById("sectionTitle").hidden = sections.length > 1;
+    }
+
+    function renderApproval(approval) {
+      if (!approval) return;
+      const openNotes = Math.max(approval.openNotes || 0, state.annotations.filter(note => note.status !== "resolved").length);
+      const approved = approval.status === "approved" && openNotes === 0;
+      const bar = document.getElementById("approvalBar");
+      bar.classList.toggle("approved", approved);
+      const status = approved ? "✓ Approved" : approval.status === "not_reviewed" ? "Not reviewed" : "Needs review";
+      document.getElementById("approvalStatus").textContent = status;
+      const sections = state.project?.sections || [];
+      const completed = sections.filter(section => section.reviewStatus === "approved").length;
+      document.getElementById("approvalProgress").textContent = sections.length ? `${completed} of ${sections.length} approved` : "";
+      const rendering = state.project?.render?.state === "rendering";
+      let message = approval.message;
+      if (openNotes) message = `Resolve ${openNotes} open note${openNotes === 1 ? "" : "s"} before approving.`;
+      else if (state.musicSavePending) message = "Saving soundtrack settings…";
+      else if (state.mediaLoading) message = "Loading the preview…";
+      else if (rendering) message = "An updated preview is rendering. Review it before approving.";
+      else if (approved && completed === sections.length) message = "Every section is approved for its current version.";
+      document.getElementById("approvalMessage").textContent = message;
+      const approve = document.getElementById("approveSectionButton");
+      approve.hidden = approved;
+      approve.disabled = !approval.canApprove || openNotes > 0 || state.approvalBusy
+        || state.mediaLoading || state.musicSavePending || rendering;
+      approve.textContent = state.approvalBusy ? "Saving…" : "Approve section";
+      const reopen = document.getElementById("reopenSectionButton");
+      reopen.hidden = !approved;
+      reopen.disabled = state.approvalBusy;
+      const index = sections.findIndex(section => section.id === state.project.activeSection);
+      const next = sections[index + 1];
+      const nextButton = document.getElementById("nextSectionButton");
+      nextButton.hidden = !next;
+      nextButton.dataset.section = next?.id || "";
+      nextButton.title = next ? `Continue to ${next.title}` : "";
+    }
+
+    function updateReviewState(payload) {
+      if (payload.approval) state.project.approval = payload.approval;
+      if (payload.sections) renderSectionPicker(payload.sections);
+      renderApproval(state.project.approval);
+    }
+
+    function navigateToSection(identifier) {
+      const parameters = new URLSearchParams(location.search);
+      parameters.set("token", token);
+      parameters.set("section", identifier);
+      location.search = parameters.toString();
+    }
+
+    async function changeApproval(approved) {
+      if (state.approvalBusy) return;
+      if (approved && !composer.hidden && comment.value.trim()) {
+        showToast("Save or cancel your unfinished note before approving.");
+        return;
+      }
+      state.approvalBusy = true;
+      renderApproval(state.project.approval);
+      try {
+        const result = await request("/api/approval", {
+          method: "PATCH",
+          body: JSON.stringify({ approved, version: state.project.approval.version }),
+        });
+        updateReviewState(result);
+        const complete = result.sections?.every(section => section.reviewStatus === "approved");
+        showToast(approved
+          ? complete ? "All sections approved." : "Section approved. Other sections remain available."
+          : "Section reopened for review.");
+      } catch (error) {
+        showToast(error.message);
+        try { updateReviewState(await request("/api/revision")); } catch (_) { /* Keep the current review available. */ }
+      } finally {
+        state.approvalBusy = false;
+        renderApproval(state.project.approval);
+      }
+    }
+
+    function renderAudit(audit) {
+      const button = document.getElementById("auditButton");
+      const popover = document.getElementById("auditPopover");
+      if (!audit) {
+        button.hidden = true;
+        popover.hidden = true;
+        return;
+      }
+      if (state.auditReviewVersion && state.auditReviewVersion !== audit.reviewVersion) {
+        state.auditIssueId = null;
+        state.auditFinished = false;
+        state.auditPlayback = null;
+      }
+      state.auditReviewVersion = audit.reviewVersion;
+      if (state.auditFinished && audit.progress?.pending) {
+        state.auditFinished = false;
+        state.auditIssueId = null;
+      }
+      const issues = audit.issues || [];
+      let issue = issues.find(value => value.id === state.auditIssueId);
+      if (!issue && !state.auditFinished) {
+        issue = issues.find(value => value.reviewStatus === "pending")
+          || issues.find(value => value.reviewStatus === "deferred");
+        state.auditIssueId = issue?.id || null;
+      }
+      const signature = JSON.stringify([
+        audit, state.auditIssueId, state.auditFinished, state.auditBusy,
+        state.annotations.map(note => [note.id, note.status]),
+      ]);
+      if (state.auditSignature === signature) return;
+      state.auditSignature = signature;
+      button.hidden = false;
+      button.className = `audit-button ${audit.status || "needs_review"}`;
+      const progress = audit.progress || {};
+      const remaining = (progress.pending || 0) + (progress.deferred || 0);
+      button.textContent = remaining ? `Preflight: ${remaining} to check`
+        : progress.needs_change ? "Preflight: fixes requested"
+        : issues.length ? "Preflight: checked" : "Preflight: clear";
+      document.getElementById("auditTitle").textContent = `${audit.title} preflight`;
+      document.getElementById("auditSummary").textContent =
+        `${progress.checked || 0} checked · ${progress.needs_change || 0} ${progress.needs_change === 1 ? "fix" : "fixes"} requested · ${remaining} remaining`;
+      const list = document.getElementById("auditList");
+      list.replaceChildren();
+      if (!issue || state.auditFinished) {
+        const empty = document.createElement("div");
+        empty.className = "audit-item";
+        empty.textContent = !issues.length ? "No preflight flags in this section."
+          : remaining ? "You reached the end of this pass. Skipped flags are saved for later."
+          : progress.needs_change ? "Your change requests are queued. They will return for review when the preview changes."
+          : "Every flag in this version has been checked.";
+        list.append(empty);
+        const actions = document.createElement("div");
+        actions.className = "audit-actions";
+        if (remaining) {
+          const resume = document.createElement("button");
+          resume.textContent = "Review remaining flags";
+          resume.addEventListener("click", () => {
+            state.auditFinished = false;
+            state.auditIssueId = null;
+            renderAudit(state.project.audit);
+          });
+          actions.append(resume);
+        }
+        if (issues.length) {
+          const revisit = document.createElement("button");
+          revisit.textContent = "Revisit flags";
+          revisit.addEventListener("click", () => selectAuditIssue(issues[0].id));
+          actions.append(revisit);
+        }
+        list.append(actions);
+        return;
+      }
+      const index = issues.indexOf(issue);
+      const nav = document.createElement("div");
+      nav.className = "audit-nav";
+      const previous = document.createElement("button");
+      previous.textContent = "← Previous";
+      previous.disabled = index === 0 || state.auditBusy;
+      previous.addEventListener("click", () => selectAuditIssue(issues[index - 1].id));
+      const count = document.createElement("span");
+      count.textContent = `Flag ${index + 1} of ${issues.length}`;
+      const next = document.createElement("button");
+      next.textContent = "Next →";
+      next.disabled = index === issues.length - 1 || state.auditBusy;
+      next.addEventListener("click", () => selectAuditIssue(issues[index + 1].id));
+      nav.append(previous, count, next);
+      list.append(nav);
+      const question = document.createElement("div");
+      question.className = "audit-question";
+      question.textContent = issue.reviewQuestion || issue.message;
+      const phrase = document.createElement("div");
+      phrase.className = "audit-phrase";
+      const cue = state.cues.find(value => value.name === issue.cue);
+      const canSeek = typeof issue.time === "number" && Number.isFinite(issue.time);
+      phrase.textContent = canSeek
+        ? `${formatTime(issue.time)}${cue?.phrase ? ` · “${cue.phrase}”` : ""}`
+        : "This check applies to the whole section.";
+      list.append(question, phrase);
+      if (issue.reviewStatus !== "pending") {
+        const status = document.createElement("div");
+        status.className = `audit-review-status ${issue.reviewStatus}`;
+        status.textContent = {
+          checked: "✓ Checked for this version",
+          needs_change: "Fix requested · queued for Codex",
+          deferred: "Skipped for now",
+        }[issue.reviewStatus] || "";
+        list.append(status);
+      }
+      const details = document.createElement("details");
+      details.className = "audit-details";
+      const summary = document.createElement("summary");
+      summary.textContent = "Why this was flagged";
+      const reason = document.createElement("p");
+      reason.textContent = issue.message;
+      const location = document.createElement("div");
+      location.className = "audit-location";
+      location.textContent = issue.location || "";
+      details.append(summary, reason, location);
+      list.append(details);
+      const note = document.createElement("textarea");
+      note.className = "audit-note";
+      note.placeholder = "Optional: what would you like changed?";
+      note.setAttribute("aria-label", "Preflight change request note");
+      note.value = state.auditNoteDrafts[issue.id] || "";
+      note.addEventListener("input", () => { state.auditNoteDrafts[issue.id] = note.value; });
+      list.append(note);
+      const actions = document.createElement("div");
+      actions.className = "audit-actions";
+      if (canSeek) {
+        const watch = document.createElement("button");
+        watch.className = "audit-watch";
+        watch.textContent = "Watch moment";
+        watch.disabled = state.mediaLoading || state.auditBusy;
+        watch.addEventListener("click", () => watchAuditIssue(issue));
+        actions.append(watch);
+      }
+      const check = document.createElement("button");
+      check.className = "audit-check";
+      check.textContent = "Checked & next";
+      check.disabled = issue.severity === "error" || state.auditBusy;
+      check.title = issue.severity === "error" ? "Technical errors need investigation by Codex." : "Confirm this flag looks correct in the preview.";
+      check.addEventListener("click", () => saveAuditReview(issue, "checked"));
+      const fix = document.createElement("button");
+      fix.textContent = "Request a fix";
+      fix.disabled = state.auditBusy;
+      fix.addEventListener("click", () => saveAuditReview(issue, "needs_change"));
+      const later = document.createElement("button");
+      later.textContent = "Skip for now";
+      later.disabled = state.auditBusy;
+      later.addEventListener("click", () => saveAuditReview(issue, "deferred"));
+      actions.append(check, fix, later);
+      if (issue.reviewStatus !== "pending") {
+        const reopen = document.createElement("button");
+        reopen.textContent = "Reopen flag";
+        reopen.disabled = state.auditBusy;
+        reopen.addEventListener("click", () => saveAuditReview(issue, "pending", false));
+        actions.append(reopen);
+      }
+      list.append(actions);
+    }
+
+    function selectAuditIssue(identifier) {
+      state.auditFinished = false;
+      state.auditIssueId = identifier;
+      renderAudit(state.project.audit);
+    }
+
+    async function saveAuditReview(issue, status, advance = true) {
+      if (state.auditBusy) return;
+      state.auditBusy = true;
+      renderAudit(state.project.audit);
+      try {
+        const result = await request(`/api/preflight/${encodeURIComponent(issue.id)}`, {
+          method: "PATCH",
+          body: JSON.stringify({
+            status, version: state.project.audit.reviewVersion,
+            note: state.auditNoteDrafts[issue.id] || "",
+          }),
+        });
+        state.project.audit = result.audit;
+        state.annotations = result.annotations;
+        updateReviewState(result);
+        if (advance) {
+          const issues = result.audit.issues;
+          const index = issues.findIndex(value => value.id === issue.id);
+          const next = [...issues.slice(index + 1), ...issues.slice(0, index)]
+            .find(value => value.reviewStatus === "pending");
+          state.auditIssueId = next?.id || null;
+          state.auditFinished = !next;
+        }
+        if (status === "needs_change") showToast("Change request queued for Codex.");
+        renderAnnotations();
+      } catch (error) {
+        showToast(error.message);
+      } finally {
+        state.auditBusy = false;
+        renderAudit(state.project.audit);
+      }
+    }
+
+    function reviewExcerptBounds(time, proposedEnd) {
+      const words = state.project?.transcript?.words || [];
+      const duration = video.duration || state.project.section.duration;
+      let start = Math.max(0, time - .75);
+      let end = Math.min(duration, proposedEnd);
+      if (!words.length) return { start, end };
+      // Seek to a word boundary and stop in a pause, rather than clipping a
+      // syllable simply because an arbitrary preview timer expired.
+      const first = words.find(word => word.end >= start);
+      if (first) start = Math.max(0, first.start - .08);
+      for (let index = 0; index < words.length; index++) {
+        const word = words[index];
+        if (word.end < end) continue;
+        const next = words[index + 1];
+        if (!next || next.start - word.end >= .30 || /[.!?]$/.test(word.text.trim())) {
+          end = Math.min(duration, word.end + Math.min(.18, next ? Math.max(0, next.start - word.end) / 2 : .18));
+          break;
+        }
+      }
+      return { start, end };
+    }
+
+    async function watchAuditIssue(issue) {
+      const time = Math.max(0, issue.time);
+      const nextCue = state.cues.find(cue => cue.time > time + .5);
+      const transition = transitionAt(time);
+      const proposedEnd = Math.min(video.duration || state.project.section.duration,
+        Math.max(time + 4, Math.min(nextCue?.time + .6 || time + 8, time + 14),
+          transition?.end + .8 || 0));
+      const excerpt = reviewExcerptBounds(time, proposedEnd);
+      state.auditPlayback = null;
+      document.getElementById("auditPopover").hidden = true;
+      document.getElementById("transitionPanel").open = true;
+      if (transition) showTransition(transition.id, { pin: true, force: true });
+      seekReview(excerpt.start, issue.cue);
+      state.auditPlayback = { id: issue.id, end: excerpt.end };
+      try {
+        await video.play();
+      } catch (error) {
+        state.auditPlayback = null;
+        document.getElementById("auditPopover").hidden = false;
+        showToast("Press play to watch this moment, then return to Preflight.");
+      }
+    }
+
+    function finishAuditPlayback() {
+      if (!state.auditPlayback) return;
+      const identifier = state.auditPlayback.id;
+      state.auditPlayback = null;
+      video.pause();
+      selectAuditIssue(identifier);
+      document.getElementById("auditPopover").hidden = false;
+    }
+
+    async function initialize() {
+      const project = await request("/api/project");
+      state.project = project;
+      state.cues = project.cues;
+      state.animations = project.objects?.animations || [];
+      state.annotations = project.annotations;
+      state.project.objects = project.objects;
+      renderSectionPicker(project.sections);
+      document.getElementById("selectButton").textContent = defaultSelectLabel();
+      state.revision = project.revision;
+      document.getElementById("sectionTitle").textContent = project.section.title;
+      video.src = project.videoUrl;
+      if (project.music) {
+        state.musicConfig = project.music;
+        state.musicEnabled = project.music.enabled;
+        state.musicGainDb = project.music.gainDb;
+        state.musicOffset = project.music.offsetSeconds;
+        music.src = project.music.url;
+        document.getElementById("musicToolbar").hidden = false;
+        document.getElementById("musicTitle").textContent = project.music.title;
+        document.getElementById("musicNotice").textContent = project.music.notice;
+        document.getElementById("musicLevel").value = state.musicGainDb;
+        document.getElementById("musicOffset").value = state.musicOffset;
+        updateMusicLabels();
+      }
+      renderCues();
+      renderAnnotations();
+      renderAudit(project.audit);
+      renderTransitions(project.transitions);
+      updateRenderStatus(project.render);
+      setCue(state.cues[0]);
+      renderApproval(project.approval);
+    }
+
+    video.addEventListener("loadedmetadata", () => {
+      state.mediaLoading = false;
+      renderApproval(state.project?.approval);
+      state.auditSignature = null;
+      renderAudit(state.project?.audit);
+    });
+
+    video.addEventListener("timeupdate", () => {
+      if (!state.activeAnnotation && !state.pendingRegion) setCue(cueAt(video.currentTime));
+      updateActiveAnimationBars();
+      updateTranscriptPlayback();
+      followTransition(video.currentTime);
+      if (state.auditPlayback && video.currentTime >= state.auditPlayback.end - .035) finishAuditPlayback();
+      if (state.musicConfig && Math.abs(music.currentTime - targetMusicTime()) > .10) {
+        syncMusic(false);
+      }
+    });
+
+    video.addEventListener("play", async () => {
+      clearSelection();
+      state.transitionPinned = false;
+      followTransition(video.currentTime);
+      await syncMusic(true);
+      startMusicClock();
+    });
+    video.addEventListener("pause", () => music.pause());
+    video.addEventListener("seeked", () => {
+      syncMusic(true);
+      updateTranscriptPlayback(true);
+      followTransition(video.currentTime);
+    });
+    video.addEventListener("ratechange", () => { music.playbackRate = video.playbackRate; });
+    video.addEventListener("ended", () => { music.pause(); finishAuditPlayback(); });
+
+    document.getElementById("musicToggle").addEventListener("click", async () => {
+      state.musicEnabled = !state.musicEnabled;
+      updateMusicLabels();
+      if (state.musicEnabled) await syncMusic(true);
+      saveMusicSettings();
+    });
+    document.getElementById("musicLevel").addEventListener("input", event => {
+      state.musicGainDb = Number(event.target.value);
+      updateMusicLabels();
+      saveMusicSettings();
+    });
+    document.getElementById("musicOffset").addEventListener("input", event => {
+      state.musicOffset = Number(event.target.value);
+      updateMusicLabels();
+      syncMusic(true);
+      saveMusicSettings();
+    });
+    document.getElementById("sectionPicker").addEventListener("change", event => {
+      navigateToSection(event.target.value);
+    });
+    document.getElementById("approveSectionButton").addEventListener("click", () => changeApproval(true));
+    document.getElementById("reopenSectionButton").addEventListener("click", () => changeApproval(false));
+    document.getElementById("nextSectionButton").addEventListener("click", event => {
+      navigateToSection(event.currentTarget.dataset.section);
+    });
+    document.getElementById("selectButton").addEventListener("click", async () => {
+      if (state.drawing) clearSelection();
+      else if (!state.project?.objects) {
+        try {
+          await startRender({ preparingObjects: true });
+        } catch (error) { showToast(error.message); }
+      } else beginSelection();
+    });
+    document.getElementById("timeNoteButton").addEventListener("click", beginTimeNote);
+    document.getElementById("clearButton").addEventListener("click", clearSelection);
+    document.getElementById("cancelButton").addEventListener("click", clearSelection);
+    document.getElementById("saveButton").addEventListener("click", () => saveAnnotation().catch(error => showToast(error.message)));
+
+    document.getElementById("renderButton").addEventListener("click", async () => {
+      try {
+        await startRender();
+      } catch (error) { showToast(error.message); }
+    });
+
+    document.getElementById("auditButton").addEventListener("click", () => {
+      const popover = document.getElementById("auditPopover");
+      if (state.auditPlayback) {
+        state.auditPlayback = null;
+        video.pause();
+      }
+      popover.hidden = !popover.hidden;
+    });
+    document.getElementById("closeAuditButton").addEventListener("click", () => {
+      document.getElementById("auditPopover").hidden = true;
+    });
+
+    document.getElementById("transitionPicker").addEventListener("change", event => {
+      showTransition(event.target.value, { pin: true });
+      const transition = state.transitions.find(item => item.id === event.target.value);
+      if (transition) seekReview(transition.start, transition.cue);
+    });
+    for (const [id, direction] of [["previousTransition", -1], ["nextTransition", 1]]) {
+      document.getElementById(id).addEventListener("click", () => {
+        const index = state.transitions.findIndex(item => item.id === state.activeTransitionId);
+        const transition = state.transitions[index + direction];
+        if (!transition) return;
+        showTransition(transition.id, { pin: true });
+        seekReview(transition.start, transition.cue);
+      });
+    }
+    document.getElementById("followTransitions").addEventListener("click", () => {
+      state.transitionPinned = false;
+      followTransition(video.currentTime);
+    });
+    document.getElementById("transitionPanel").addEventListener("toggle", event => {
+      if (event.target.open && state.activeTransitionId) {
+        showTransition(state.activeTransitionId, { force: true });
+      }
+    });
+
+    document.getElementById("queueButton").addEventListener("click", async () => {
+      try {
+        const result = await request("/api/submit", { method: "POST", body: "{}" });
+        document.getElementById("queueResult").textContent = `${result.queued} new note${result.queued === 1 ? "" : "s"} queued in ${result.path}. Tell Codex to review the queued annotations.`;
+        state.annotations.forEach(value => { if (value.status === "draft") value.status = "pending"; });
+        renderAnnotations();
+      } catch (error) { showToast(error.message); }
+    });
+
+    document.addEventListener("keydown", event => {
+      if (event.target.closest("textarea, input, select, button, summary") && event.code !== "Escape") return;
+      if (event.code === "Escape" && !document.getElementById("auditPopover").hidden) {
+        document.getElementById("auditPopover").hidden = true;
+      } else if (event.code === "Escape" && (state.drawing || state.pendingRegion)) {
+        clearSelection();
+        showToast("Selection cancelled");
+      } else if (event.code === "Space") {
+        event.preventDefault();
+        video.paused ? video.play() : video.pause();
+      } else if (event.code === "ArrowLeft" || event.code === "ArrowRight") {
+        event.preventDefault();
+        video.currentTime = Math.max(0, Math.min(video.duration || Infinity, video.currentTime + (event.code === "ArrowRight" ? 1 : -1)));
+        video.pause();
+      }
+    });
+
+    async function poll() {
+      try {
+        const result = await request("/api/revision");
+        const renderChanged = state.revision != null && result.revision !== state.revision;
+        if (renderChanged) state.mediaLoading = true;
+        updateRenderStatus(result.render);
+        updateReviewState(result);
+        if (result.audit) {
+          state.project.audit = result.audit;
+          renderAudit(result.audit);
+        }
+        if (renderChanged) {
+          const refreshed = await request("/api/project");
+          state.project.objects = refreshed.objects;
+          state.animations = refreshed.objects?.animations || [];
+          state.project.transitions = refreshed.transitions;
+          document.getElementById("selectButton").textContent = defaultSelectLabel();
+          updateRenderStatus(refreshed.render);
+          state.reloadTime = video.currentTime;
+          state.revision = result.revision;
+          clearSelection();
+          video.src = api(`/video?revision=${result.revision}`);
+          video.addEventListener("loadedmetadata", () => {
+            video.currentTime = Math.min(state.reloadTime, video.duration || state.reloadTime);
+            video.pause();
+            renderCues();
+            renderTransitions(refreshed.transitions);
+            showToast("Fresh Manim render loaded");
+          }, { once: true });
+        }
+      } catch (_) { /* The local server may briefly restart. */ }
+      setTimeout(poll, 1400);
+    }
+
+    initialize().then(poll).catch(error => {
+      document.getElementById("statusText").textContent = error.message;
+      document.getElementById("status").className = "status error";
+    });
+  </script>
+</body>
+</html>

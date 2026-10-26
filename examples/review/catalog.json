@@ -1,0 +1,16 @@
+{
+  "defaultSection": "review_demo",
+  "sections": [
+    {
+      "id": "review_demo",
+      "title": "Store each answer once",
+      "source": "review_demo.py",
+      "scene": "ReviewDemo",
+      "video": "media/videos/review_demo/480p15/ReviewDemo.mp4",
+      "renderedVideo": "media/videos/review_demo/480p15/ReviewDemo.mp4",
+      "cues": "examples/review/cues.json",
+      "transcriptWords": "examples/review/words.json",
+      "audio": ".review/demo/silence.wav"
+    }
+  ]
+}

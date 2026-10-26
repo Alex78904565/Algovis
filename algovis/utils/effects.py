@@ -1,5 +1,22 @@
 from manim import *
 
+
+class Pulse(ApplyMethod):
+    """A small scale-only attention cue that preserves every semantic color."""
+    def __init__(self, mobject, scale_factor=1.04, **kwargs):
+        kwargs.setdefault("rate_func", there_and_back)
+        super().__init__(mobject.scale, scale_factor, **kwargs)
+
+
+class ReplaceContent(Succession):
+    """Replace a whole caption or composition without superimposing its text.
+
+    Use Transform/ApplyDefinition for mathematical substitutions that preserve
+    a student's visual reference. Use this for a different sentence or layout.
+    """
+    def __init__(self, source, target, **kwargs):
+        super().__init__(FadeOut(source), FadeIn(target), **kwargs)
+
 class FocusBox(SurroundingRectangle):
     """
     A dynamic SurroundingRectangle that can be moved or split.

@@ -163,56 +163,71 @@ class StoryItem(VGroup):
 
 
 class ThiefCharacter(VGroup):
-    """A friendly, diagrammatic thief silhouette for story introductions."""
+    """A friendly illustrated burglar, kept vector-native for clean scaling."""
 
     def __init__(self, *, theme=DEFAULT_THEME, label="THIEF", **kwargs):
         super().__init__(**kwargs)
-        hood = Circle(
-            radius=0.56, color=theme.primary,
-            fill_color=theme.node, fill_opacity=0.92, stroke_width=2,
-        ).shift(UP * 0.74)
-        face = Ellipse(
-            width=0.68, height=0.48, color=theme.foreground,
-            fill_color=theme.foreground, fill_opacity=0.13, stroke_width=1.2,
-        ).move_to(hood).shift(DOWN * 0.03)
+        skin = "#F2C7A5"
+        face = Circle(
+            radius=0.47, color=skin,
+            fill_color=skin, fill_opacity=1.0, stroke_width=1.6,
+        ).shift(UP * 0.76)
+        beanie = Arc(
+            radius=0.49, start_angle=0, angle=PI,
+            color=theme.primary, stroke_width=12,
+        ).move_to(face).shift(UP * 0.09)
+        beanie_band = RoundedRectangle(
+            width=0.96, height=0.16, corner_radius=0.05,
+            color=theme.primary, fill_color=theme.primary,
+            fill_opacity=0.95, stroke_width=0,
+        ).move_to(face.get_top() + DOWN * 0.13)
         mask = RoundedRectangle(
-            width=0.66, height=0.22, corner_radius=0.08,
+            width=0.78, height=0.25, corner_radius=0.10,
             color=theme.background, fill_color=theme.background,
             fill_opacity=0.96, stroke_width=0,
         ).move_to(face).shift(UP * 0.04)
-        eyes = VGroup(
-            Dot(mask.get_center() + LEFT * 0.17, radius=0.035,
-                color=theme.accent),
-            Dot(mask.get_center() + RIGHT * 0.17, radius=0.035,
-                color=theme.accent),
+        eye_whites = VGroup(
+            Ellipse(width=0.19, height=0.10, color=WHITE,
+                    fill_color=WHITE, fill_opacity=1, stroke_width=0),
+            Ellipse(width=0.19, height=0.10, color=WHITE,
+                    fill_color=WHITE, fill_opacity=1, stroke_width=0),
+        ).arrange(RIGHT, buff=0.16).move_to(mask)
+        pupils = VGroup(
+            Dot(eye_whites[0].get_center(), radius=0.026,
+                color=theme.background),
+            Dot(eye_whites[1].get_center(), radius=0.026,
+                color=theme.background),
         )
-        body = Polygon(
-            LEFT * 0.62 + UP * 0.25, RIGHT * 0.62 + UP * 0.25,
-            RIGHT * 0.88 + DOWN * 1.34, LEFT * 0.88 + DOWN * 1.34,
-            color=theme.primary,
-        ).set_fill(theme.node, opacity=0.72)
-        belt = Line(LEFT * 0.73 + DOWN * 0.73,
-                    RIGHT * 0.73 + DOWN * 0.73,
-                    color=theme.accent, stroke_width=4)
+        body = RoundedRectangle(
+            width=1.38, height=1.42, corner_radius=0.24,
+            color=theme.primary, fill_color=theme.surface,
+            fill_opacity=1.0, stroke_width=2.2,
+        ).shift(DOWN * 0.43)
+        stripes = VGroup(*[
+            Line(LEFT * 0.62, RIGHT * 0.62, color=theme.foreground,
+                 stroke_width=4).shift(DOWN * y)
+            for y in (0.02, 0.38, 0.74)
+        ])
         arms = VGroup(
-            Line(LEFT * 0.48 + DOWN * 0.05,
-                 LEFT * 1.02 + DOWN * 0.75,
-                 color=theme.node, stroke_width=11),
-            Line(RIGHT * 0.48 + DOWN * 0.05,
-                 RIGHT * 1.02 + DOWN * 0.48,
-                 color=theme.node, stroke_width=11),
+            Line(LEFT * 0.58 + DOWN * 0.05,
+                 LEFT * 1.00 + DOWN * 0.64,
+                 color=theme.primary, stroke_width=10),
+            Line(RIGHT * 0.58 + DOWN * 0.05,
+                 RIGHT * 1.00 + DOWN * 0.48,
+                 color=theme.primary, stroke_width=10),
         )
         legs = VGroup(
-            Line(LEFT * 0.28 + DOWN * 1.28,
-                 LEFT * 0.42 + DOWN * 1.75,
-                 color=theme.primary, stroke_width=11),
-            Line(RIGHT * 0.28 + DOWN * 1.28,
-                 RIGHT * 0.42 + DOWN * 1.75,
-                 color=theme.primary, stroke_width=11),
+            Line(LEFT * 0.28 + DOWN * 1.10,
+                 LEFT * 0.40 + DOWN * 1.62,
+                 color=theme.primary, stroke_width=10),
+            Line(RIGHT * 0.28 + DOWN * 1.10,
+                 RIGHT * 0.40 + DOWN * 1.62,
+                 color=theme.primary, stroke_width=10),
         )
         tag = Text(label, font_size=16, color=theme.muted)
         tag.next_to(legs, DOWN, buff=0.12)
-        self.add(arms, body, belt, legs, hood, face, mask, eyes, tag)
+        self.add(arms, legs, body, stripes, face, beanie, beanie_band,
+                 mask, eye_whites, pupils, tag)
 
 
 class CapacityBag(VGroup):
@@ -224,14 +239,14 @@ class CapacityBag(VGroup):
         self.used = 0.0
         self.theme = theme
 
-        self.body = RoundedRectangle(
-            width=2.05, height=1.90, corner_radius=0.38,
+        self.body = Ellipse(
+            width=2.12, height=1.78,
             color=theme.primary, fill_color=theme.surface, fill_opacity=0.98,
             stroke_width=2.4,
-        ).shift(DOWN * 0.16)
+        ).shift(DOWN * 0.24)
         neck = Polygon(
-            LEFT * 0.58 + UP * 0.94, RIGHT * 0.58 + UP * 0.94,
-            RIGHT * 0.76 + UP * 0.58, LEFT * 0.76 + UP * 0.58,
+            LEFT * 0.40 + UP * 1.02, RIGHT * 0.40 + UP * 1.02,
+            RIGHT * 0.63 + UP * 0.58, LEFT * 0.63 + UP * 0.58,
             color=theme.primary,
         ).set_fill(theme.node, opacity=0.50)
         tie = Arc(radius=0.48, start_angle=PI, angle=PI, color=theme.accent)

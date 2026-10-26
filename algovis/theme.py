@@ -20,7 +20,8 @@ DEFAULT_SPACING = AlgovisSpacing()
 class AlgovisTheme:
     """Semantic colors shared by an Algovis video.
 
-    ``primary`` is structural, ``accent`` marks the current focus,
+    ``primary`` is structural and supplies neutral spoken attention,
+    ``accent`` marks an active operation, choice, or optimizer,
     ``success`` means known/computed/correct, ``danger`` marks wasted work or
     warnings, ``foreground`` is neutral mathematics, and ``muted`` is context.
     Components should use these roles instead of importing arbitrary colors.
@@ -35,10 +36,34 @@ class AlgovisTheme:
     success: object = GREEN_B
     danger: object = RED_B
     muted: object = GREY_B
+    text_font: str | None = None
 
     def with_colors(self, **changes):
         """Return a copy with selected semantic colors replaced."""
         return replace(self, **changes)
+
+    def with_typography(self, *, text_font=None):
+        """Return a copy with a default font for ordinary ``Text`` objects."""
+        return replace(self, text_font=text_font)
+
+    def role_color(self, role):
+        """Resolve a storyboard semantic role to the active theme palette."""
+        colors = {
+            "neutral": self.foreground,
+            "current": self.primary,
+            "operation": self.accent,
+            "retained": self.success,
+            "repeated": self.danger,
+            # Friendly aliases used by lower-level components.
+            "structure": self.primary,
+            "success": self.success,
+            "danger": self.danger,
+            "muted": self.muted,
+        }
+        try:
+            return colors[role]
+        except KeyError as exc:
+            raise ValueError(f"Unknown semantic color role: {role!r}") from exc
 
     def apply(self, scene):
         scene.camera.background_color = self.background

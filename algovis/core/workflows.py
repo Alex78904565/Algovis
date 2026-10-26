@@ -8,6 +8,7 @@ from manim import (
 
 from .trees import RecursiveTree
 from ..theme import DEFAULT_THEME
+from ..utils.effects import Pulse
 
 
 class RecursionMemoComparison(VGroup):
@@ -232,9 +233,10 @@ class StateReframing(VGroup):
                 line_spacing=0.9,
             )
             explanation.scale_to_fit_width(min(panel_width - 0.55, explanation.width))
-            domain = MathTex(bound, color=theme.accent).scale(0.72)
-            cost = MathTex(runtime, color=color).scale(0.86)
-            body = VGroup(heading, formula, explanation, domain, cost).arrange(
+            domain = MathTex(bound, color=theme.accent).scale(0.72) if bound else None
+            cost = MathTex(runtime, color=color).scale(0.86) if runtime else None
+            body = VGroup(heading, formula, explanation,
+                          *[part for part in (domain, cost) if part is not None]).arrange(
                 DOWN, buff=0.25,
             )
             body.scale_to_fit_width(min(panel_width - 0.52, body.width))
@@ -268,15 +270,13 @@ class StateReframing(VGroup):
 
     def highlight_changed_bounds(self):
         return AnimationGroup(
-            Indicate(self.original.bound, color=self.theme.accent),
-            Indicate(self.alternate.bound, color=self.theme.accent),
+            *[Pulse(card.bound) for card in self.cards if card.bound is not None],
             lag_ratio=0.25,
         )
 
     def highlight_runtime_tradeoff(self):
         return AnimationGroup(
-            Indicate(self.original.runtime, color=self.theme.primary),
-            Indicate(self.alternate.runtime, color=self.theme.success),
+            *[Pulse(card.runtime) for card in self.cards if card.runtime is not None],
             lag_ratio=0.25,
         )
 
@@ -348,9 +348,7 @@ class ValueScan(VGroup):
         """Reveal the maximization after the scan has found a feasible state."""
         animations = [self.result.animate.set_opacity(1)]
         if self.selected_cell is not None:
-            animations.insert(0, Indicate(
-                self.selected_cell, color=self.theme.success,
-            ))
+            animations.insert(0, Pulse(self.selected_cell))
         return AnimationGroup(*animations, lag_ratio=0.20)
 
 

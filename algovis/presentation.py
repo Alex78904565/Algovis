@@ -1,14 +1,22 @@
 """Presentation primitives for authoring educational Manim videos."""
 
 from dataclasses import dataclass
+import json
+import numpy as np
+import os
+from pathlib import Path
 
 from manim import (
-    AnimationGroup, DOWN, FadeIn, FadeOut, MathTex, ORIGIN, RoundedRectangle,
-    Text, UP, VGroup, config,
+    AnimationGroup, Arrow, Circumscribe, DOWN, FadeIn, FadeOut, GrowArrow, Group,
+    Indicate, MathTex, ORIGIN, RoundedRectangle, Succession, Text, UP, VGroup,
+    Wait, config,
 )
 
 from .theme import DEFAULT_SPACING, DEFAULT_THEME
 from .narration import NarrationTrack
+from .core.math import ApplyDefinition
+from .review.inspection import capture_snapshot
+from .utils.effects import Pulse
 
 
 @dataclass(frozen=True)
@@ -129,10 +137,203 @@ class SlideSceneMixin:
 
     def setup(self):
         super().setup()
+        if self.theme.text_font:
+            Text.set_default(font=self.theme.text_font)
         self.theme.apply(self)
         self.slide_layout = self.slide_layout or SlideLayout()
         self.current_slide = None
         self.narration = None
+        self._review_manifest_path = os.environ.get("ALGOVIS_REVIEW_MANIFEST")
+        self._review_snapshots = []
+        self._review_animations = []
+        self._review_object_ids = {}
+        self._review_next_object_id = 1
+        self._review_compiled_animations = None
+        self._review_is_compiling_play = False
+
+    def tear_down(self):
+        try:
+            self._write_review_manifest()
+            super().tear_down()
+        finally:
+            if self.theme.text_font:
+                Text.set_default()
+
+    def play(self, *animations, **kwargs):
+        animations = self._filter_cleanup_animations(animations)
+        if not animations:
+            # Repeated cleanup is a timed no-op, not an invitation to add an
+            # absent object back to the scene. Keep narration timing intact.
+            return self.wait(kwargs.get("run_time", 1.0))
+        start = float(self.renderer.time)
+        self._review_compiled_animations = None
+        self._review_is_compiling_play = bool(self._review_manifest_path)
+        try:
+            result = super().play(*animations, **kwargs)
+        finally:
+            self._review_is_compiling_play = False
+        end = float(self.renderer.time)
+        self._capture_review_snapshot()
+        self._capture_review_animations(
+            self._review_compiled_animations or (), start, end,
+        )
+        return result
+
+    def compile_animations(self, *args, **kwargs):
+        compiled = super().compile_animations(*args, **kwargs)
+        if self._review_is_compiling_play:
+            self._review_compiled_animations = list(compiled)
+        return compiled
+
+    def wait(self, duration=1, *args, **kwargs):
+        result = super().wait(duration, *args, **kwargs)
+        self._capture_review_snapshot()
+        return result
+
+    def _capture_review_snapshot(self):
+        """Capture selectable Manim objects for the local review surface.
+
+        This does nothing during ordinary renders. The review server supplies
+        ``ALGOVIS_REVIEW_MANIFEST`` only for an annotated section render.
+        """
+        if not self._review_manifest_path:
+            return
+        snapshot = capture_snapshot(self, float(config.frame_width),
+                                    float(config.frame_height))
+        if (
+            self._review_snapshots
+            and abs(self._review_snapshots[-1]["time"] - snapshot["time"]) < 1e-6
+        ):
+            self._review_snapshots[-1] = snapshot
+        else:
+            self._review_snapshots.append(snapshot)
+
+    def _capture_review_animations(self, animations, start, end):
+        """Record the real time span of every leaf animation in ``play``.
+
+        A single Manim ``play`` call may contain several simultaneous
+        animations, and animation groups may contain delayed children.  The
+        review UI uses these intervals to draw stacked duration bars over the
+        transcript instead of treating a narration phrase as a duration.
+        """
+        if not self._review_manifest_path or end <= start or not animations:
+            return
+        maximum = max(
+            (float(getattr(animation, "run_time", 0.0)) for animation in animations),
+            default=0.0,
+        )
+        scale = (end - start) / maximum if maximum > 0 else 1.0
+        play_index = len({item["play"] for item in self._review_animations})
+        for animation_index, animation in enumerate(animations):
+            duration = min(
+                end - start,
+                max(0.0, float(getattr(animation, "run_time", end - start)) * scale),
+            )
+            self._append_review_animation(
+                animation,
+                start,
+                start + duration,
+                play_index,
+                str(animation_index + 1),
+            )
+
+    def _append_review_animation(self, animation, start, end, play_index, path):
+        if isinstance(animation, ApplyDefinition):
+            source = self._review_object_label(animation.definition)
+            destination = self._review_object_label(animation.result)
+            self._review_animations.append({
+                "id": f"play-{play_index + 1:04d}-{path}",
+                "play": play_index,
+                "kind": "ApplyDefinition",
+                "label": f"Apply definition: {source} → {destination}",
+                "objectId": self._review_object_ids.get(id(animation.result)),
+                "sourceObjectId": self._review_object_ids.get(id(animation.definition)),
+                "start": float(start), "end": float(end),
+                **getattr(self, "_review_active_cue", {}),
+            })
+            return
+        children = getattr(animation, "anims_with_timings", None)
+        if children is not None and len(children):
+            local_duration = max(
+                (float(timing["end"]) for timing in children),
+                default=float(getattr(animation, "run_time", 0.0)),
+            )
+            scale = (end - start) / local_duration if local_duration > 0 else 1.0
+            for child_index, timing in enumerate(children):
+                self._append_review_animation(
+                    timing["anim"],
+                    start + float(timing["start"]) * scale,
+                    start + float(timing["end"]) * scale,
+                    play_index,
+                    f"{path}.{child_index + 1}",
+                )
+            return
+
+        if isinstance(animation, Wait):
+            return
+
+        mobject = getattr(animation, "mobject", None)
+        target = getattr(animation, "target_mobject", None)
+        label = self._review_object_label(mobject) if mobject is not None else ""
+        target_label = (
+            self._review_object_label(target) if target is not None else ""
+        )
+        if target_label and target_label != label:
+            label = f"{label} → {target_label}" if label else target_label
+        object_id = (
+            self._review_object_ids.get(id(mobject)) if mobject is not None else None
+        )
+        self._review_animations.append({
+            "id": f"play-{play_index + 1:04d}-{path}",
+            "play": play_index,
+            "kind": type(animation).__name__.lstrip("_"),
+            "label": label or type(animation).__name__.lstrip("_"),
+            "objectId": object_id,
+            "start": float(start),
+            "end": float(end),
+            **getattr(self, "_review_active_cue", {}),
+        })
+
+    @staticmethod
+    def _review_object_label(mobject):
+        for attribute in ("_algovis_label", "text", "tex_string"):
+            value = getattr(mobject, attribute, None)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+        labels = []
+        for descendant in mobject.get_family()[1:]:
+            for attribute in ("_algovis_label", "text", "tex_string"):
+                value = getattr(descendant, attribute, None)
+                if isinstance(value, str) and value.strip():
+                    cleaned = value.strip()
+                    if cleaned not in labels:
+                        labels.append(cleaned)
+                    break
+            if len(labels) >= 3:
+                break
+        return " · ".join(labels) or type(mobject).__name__
+
+    def _write_review_manifest(self):
+        if not self._review_manifest_path:
+            return
+        self._capture_review_snapshot()
+        path = Path(self._review_manifest_path).resolve()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = path.with_suffix(path.suffix + ".tmp")
+        temporary.write_text(
+            json.dumps({
+                "scene": type(self).__name__,
+                "frameRate": float(config.frame_rate),
+                "frame": {
+                    "width": float(config.frame_width),
+                    "height": float(config.frame_height),
+                },
+                "snapshots": self._review_snapshots,
+                "animations": self._review_animations,
+            }, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        os.replace(temporary, path)
 
     def begin_narration(self, cue_path, *, project_root=None, gain=None):
         """Attach a mastered voice track and return its named cue timeline."""
@@ -142,7 +343,12 @@ class SlideSceneMixin:
     def wait_for_cue(self, name, offset=0.0):
         if self.narration is None:
             raise RuntimeError("Call begin_narration() before wait_for_cue().")
-        return self.narration.wait_for(self, name, offset=offset)
+        result = self.narration.wait_for(self, name, offset=offset)
+        self._review_active_cue = {
+            "cue": name, "cueTime": self.narration.cue_time(name),
+            "cueOffset": float(offset),
+        }
+        return result
 
     def play_to_cue(self, name, *animations, minimum=0.05, offset=0.0):
         if self.narration is None:
@@ -150,6 +356,40 @@ class SlideSceneMixin:
         return self.narration.play_until(
             self, name, *animations, minimum=minimum, offset=offset,
         )
+
+    def spoken_focus(self, target, kind="object", *, source=None, color=None,
+                     scale_factor=1.04, buff=0.08, arrow_hold=0.18):
+        """Return a restrained attention cue for the currently spoken idea.
+
+        ``object`` pulses an already isolated object. ``term`` boxes one part
+        of a larger expression. ``relationship`` briefly grows a directional
+        arrow from ``source`` to ``target``.
+        """
+        # Spoken attention should not silently turn an object into an
+        # operation, success, or error. Blue is the neutral "look here" role.
+        color = color or self.theme.role_color("current")
+        if kind == "object":
+            return Pulse(target, scale_factor=scale_factor)
+        if kind == "term":
+            return Circumscribe(target, color=color, buff=buff, fade_out=True)
+        if kind == "relationship":
+            if source is None:
+                raise ValueError("A relationship focus requires source=...")
+            delta = target.get_center() - source.get_center()
+            norm = np.linalg.norm(delta)
+            direction = delta / norm if norm > 1e-6 else np.array((1.0, 0.0, 0.0))
+            arrow = Arrow(
+                source.get_boundary_point(direction),
+                target.get_boundary_point(-direction),
+                buff=buff,
+                color=color,
+                stroke_width=2.4,
+                max_tip_length_to_length_ratio=0.18,
+            )
+            return Succession(
+                GrowArrow(arrow), Wait(arrow_hold), FadeOut(arrow),
+            )
+        raise ValueError(f"Unknown spoken-focus kind: {kind!r}")
 
     def finish_narration(self, tail=0.0):
         if self.narration is None:
@@ -159,10 +399,43 @@ class SlideSceneMixin:
     def make_slide(self, title, kicker=None):
         return Slide(title, kicker, theme=self.theme, layout=self.slide_layout)
 
+    def transition(self, *animations, **kwargs):
+        """Clear outgoing material before revealing its replacement.
+
+        Use for two compositions occupying the same space. The supplied
+        runtime covers both phases, so narration cues do not move.
+        """
+        animations = self._filter_cleanup_animations(animations)
+        outgoing = [animation for animation in animations if isinstance(animation, FadeOut)]
+        incoming = [animation for animation in animations if not isinstance(animation, FadeOut)]
+        if not outgoing or not incoming:
+            return self.play(*animations, **kwargs)
+        return self.play(Succession(
+            AnimationGroup(*outgoing, lag_ratio=0),
+            AnimationGroup(*incoming, lag_ratio=0),
+        ), **kwargs)
+
+    def _filter_cleanup_animations(self, animations):
+        """Prune absent children from direct cleanup requests before Manim adds them.
+
+        Do not descend into a Succession: its later cleanup may target an
+        object introduced by an earlier step in that same sequence.
+        """
+        result = []
+        for animation in animations:
+            if isinstance(animation, FadeOut):
+                present = self.present_mobjects(animation.mobject)
+                if not present:
+                    continue
+                if present != (animation.mobject,):
+                    animation.mobject = present[0] if len(present) == 1 else Group(*present)
+            result.append(animation)
+        return tuple(result)
+
     def begin_slide(self, title, kicker=None, *, transition=True):
         incoming = self.make_slide(title, kicker)
         if transition and self.current_slide is not None:
-            outgoing = list(self.current_slide.mobjects)
+            outgoing = self.present_mobjects(*self.current_slide.mobjects)
             self.play(AnimationGroup(*[FadeOut(m, shift=DOWN * 0.08)
                                        for m in outgoing], lag_ratio=0.03),
                       run_time=self.default_transition_time)
@@ -191,7 +464,7 @@ class SlideSceneMixin:
             animations = [FadeIn(caption, shift=UP * 0.05)]
             if old_caption is not None:
                 animations.insert(0, FadeOut(old_caption, shift=UP * 0.05))
-            self.play(*animations, run_time=self.default_transition_time)
+            self.transition(*animations, run_time=self.default_transition_time)
         return caption
 
     def clear_content(self, *, keep_caption=False, run_time=None):
@@ -203,16 +476,60 @@ class SlideSceneMixin:
             self.current_slide.footer = None
         self.current_slide.content.clear()
         if objects:
-            self.play(*[FadeOut(m, shift=DOWN * 0.06) for m in objects],
-                      run_time=run_time or self.default_transition_time)
+            present = self.present_mobjects(*objects)
+            if present:
+                self.play(*[FadeOut(m, shift=DOWN * 0.06) for m in present],
+                          run_time=run_time or self.default_transition_time)
 
     # Compatibility helpers make gradual migration of existing scenes easy.
     def title(self, text, kicker):
         return self.make_slide(text, kicker).header
 
+    def present_mobjects(self, *mobjects):
+        """Return only requested mobjects that are actually in the scene.
+
+        Fading an absent mobject can make Manim add it for the animation and
+        create the exact pop-in we are trying to avoid. This identity-based
+        filter also makes repeated cleanup calls harmless. A temporary wrapper
+        may no longer be a scene root after its children were animated; in
+        that case return its actually present descendants instead.
+        """
+        visible_ids = {
+            id(member)
+            for root in self.mobjects
+            for member in root.get_family()
+        }
+        candidates = []
+        selected = set()
+
+        def collect(mobject):
+            if id(mobject) in selected:
+                return
+            if id(mobject) in visible_ids:
+                candidates.append(mobject)
+                selected.add(id(mobject))
+                return
+            for child in mobject.submobjects:
+                collect(child)
+
+        for mobject in mobjects:
+            collect(mobject)
+        # A caller may request both a parent and one of its children. Animate
+        # the parent once, regardless of which was supplied first.
+        covered = {
+            id(member)
+            for candidate in candidates
+            for member in candidate.get_family()[1:]
+        }
+        return tuple(candidate for candidate in candidates
+                     if id(candidate) not in covered)
+
     def wipe(self, *mobjects):
+        present = self.present_mobjects(*mobjects)
+        if not present:
+            return Wait(0)
         return AnimationGroup(*[FadeOut(m, shift=DOWN * 0.12)
-                                for m in mobjects], lag_ratio=0.04)
+                                for m in present], lag_ratio=0.04)
 
     def card(self, tex, color=None, scale=0.72):
         label = MathTex(tex, color=self.theme.foreground).scale(scale)

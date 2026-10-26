@@ -28,6 +28,7 @@ Thumbs.db
 # Local production and QA workspace
 .codex-remote-attachments/
 .qa/
+.review/
 .tmp_*/
 tmp/
 assets/audio/
@@ -52,3 +53,24 @@ manimtest.py
 !tools/
 tools/*
 !tools/verify_dp_examples.py
+!tools/master_dialogue.py
+!tools/export_storyboards.py
+
+# Standalone audio helpers, with no recordings or project configuration.
+!tools/audio_pipeline.py
+!tools/audio_qa.py
+!tools/internal_stitch_qa.py
+!tools/repair_dialogue.py
+
+# This exporter contains the unreleased lesson's narration-specific adapter.
+/tools/export_storyboards.py
+
+# Private production configuration and generated review reports.
+/review_sections.json
+/review_video.ps1
+/review_clip5.ps1
+/storyboards/dynamic_programming/
+/docs/CURRENT_ANIMATION_AUDIT.md
+/docs/FULL_VIDEO_AUDIT_*.md
+/assets/fonts/
+/assets/icons/

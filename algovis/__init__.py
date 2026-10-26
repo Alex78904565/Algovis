@@ -1,4 +1,4 @@
-from .core.math import Function, ApplyFunction, Substitute
+from .core.math import Function, ApplyFunction, ApplyDefinition, Substitute
 from .core.trees import RecursiveTree, NodeState
 from .core.induction import MonotonicVisualizer, InductionStep
 from .core.structures import CellState, DPTable, DPWorkflow, HashTable, GraphVis
@@ -22,10 +22,16 @@ from .theme import (
 )
 from .presentation import Slide, SlideLayout, SlideRegion, SlideScene, SlideSceneMixin, slide_scene
 from .narration import NarrationCue, NarrationTrack
+from .storyboard import (
+    ACTION_VERBS, ATTENTION_STYLES, ENTRY_STYLES, EXIT_STYLES,
+    SEMANTIC_ROLES, StoryAction, StoryAnimation,
+    StoryBeat as AnimationBeat, StoryObject, Storyboard,
+    StoryboardSyntaxError, parse_storyboard,
+)
 from .lesson import (
     AlgorithmLessonScene, BellmanSpec, ComparisonSpec, ProblemLesson, ProofSpec,
 )
-from .utils.effects import FocusBox, Highlight
+from .utils.effects import FocusBox, Highlight, Pulse, ReplaceContent
 from .utils.layout import PanelLayout, SmartBulletedList
 
 __version__ = "0.1.0"

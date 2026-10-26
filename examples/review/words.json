@@ -1,0 +1,28 @@
+{
+  "text": "Compute a state. Request the same state again. Both calls have the same input. Share one stored answer. Keep the answer.",
+  "segments": [
+    {"words": [
+      {"word": "Compute", "start": 0.0, "end": 0.4},
+      {"word": " a", "start": 0.4, "end": 0.6},
+      {"word": " state.", "start": 0.6, "end": 1.0},
+      {"word": "Request", "start": 2.0, "end": 2.4},
+      {"word": " the", "start": 2.4, "end": 2.6},
+      {"word": " same", "start": 2.6, "end": 2.9},
+      {"word": " state", "start": 2.9, "end": 3.2},
+      {"word": " again.", "start": 3.2, "end": 3.6},
+      {"word": "Both", "start": 4.0, "end": 4.25},
+      {"word": " calls", "start": 4.25, "end": 4.55},
+      {"word": " have", "start": 4.55, "end": 4.8},
+      {"word": " the", "start": 4.8, "end": 4.95},
+      {"word": " same", "start": 4.95, "end": 5.2},
+      {"word": " input.", "start": 5.2, "end": 5.6},
+      {"word": "Share", "start": 6.0, "end": 6.35},
+      {"word": " one", "start": 6.35, "end": 6.6},
+      {"word": " stored", "start": 6.6, "end": 7.0},
+      {"word": " answer.", "start": 7.0, "end": 7.4},
+      {"word": "Keep", "start": 8.0, "end": 8.2},
+      {"word": " the", "start": 8.2, "end": 8.35},
+      {"word": " answer.", "start": 8.35, "end": 8.7}
+    ]}
+  ]
+}

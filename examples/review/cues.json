@@ -1,0 +1,11 @@
+{
+  "audio": ".review/demo/silence.wav",
+  "duration": 9.0,
+  "cues": [
+    {"name": "section_start", "time": 0.0, "phrase": "Compute a state"},
+    {"name": "duplicate", "time": 2.0, "phrase": "Request the same state again"},
+    {"name": "compare", "time": 4.0, "phrase": "Both calls have the same input"},
+    {"name": "share", "time": 6.0, "phrase": "Share one stored answer"},
+    {"name": "section_end", "time": 8.0, "phrase": "Keep the answer"}
+  ]
+}

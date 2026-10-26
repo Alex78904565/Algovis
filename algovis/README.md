@@ -1,5 +1,17 @@
 # Algovis
 
+## Review animations before rendering
+
+Algovis includes a cue-driven storyboard language for reviewing visual logic
+without reading Manim code. Each high-level animation declares one goal, then
+lists the spoken phrases that trigger its individual visual components. See
+[`docs/ANIMATION_LANGUAGE.md`](../docs/ANIMATION_LANGUAGE.md). The current
+Dynamic Programming video is transcribed under
+[`storyboards/dynamic_programming`](../storyboards/dynamic_programming).
+The mandatory production gates are in
+[`docs/ANIMATION_QA_STANDARD.md`](../docs/ANIMATION_QA_STANDARD.md); the review
+app displays the generated per-section audit before playback.
+
 Reusable Manim components for algorithm and dynamic-programming explanations.
 
 ## Slides and hand-authored videos
@@ -292,6 +304,12 @@ encoding, substitutes `C = 2^(log C)`, and explains the term
 "pseudo-polynomial" without making authors hand-place five separate equations.
 
 ## Decisions and parameters
+
+`ApplyDefinition(definition, application, result)` carries a copy from a
+visible definition to the term where it is used. The definition stays visible;
+only the application is replaced. Position `result` first, keeping surrounding
+equation terms outside the animation. Pass `None` as the application to fill
+a blank part of an equation. This also works for induction hypotheses.
 
 `DecisionFanout` supports fixed or variable choices, branch labels, disabled
 choices, selected transitions, and `min`/`max` merge gates.

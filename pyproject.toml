@@ -23,8 +23,17 @@ classifiers = [
 [project.urls]
 Repository = "https://github.com/Alex78904565/Algovis"
 
+[project.optional-dependencies]
+audio = ["noisereduce", "openai-whisper"]
+
+[project.scripts]
+algovis-review = "algovis.review.server:main"
+
 [tool.setuptools.packages.find]
 include = ["algovis*"]
+
+[tool.setuptools.package-data]
+"algovis.review" = ["static/*.html"]
 
 [tool.ruff]
 line-length = 100

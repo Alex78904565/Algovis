@@ -91,3 +91,49 @@ class Substitute(Succession):
             Uncreate(box),
             *args, **kwargs
         )
+
+
+class ApplyDefinition(AnimationGroup):
+    """Carry a copy of a visible definition to its application.
+
+    The definition stays visible. Only ``application`` is replaced by the
+    pre-positioned ``result``; surrounding equation terms remain untouched.
+    Use selectable subexpressions, e.g.::
+
+        self.play(ApplyDefinition(hypothesis_rhs, child_call, expanded_sum))
+
+    The definition and application must already be visible in the scene.
+    Pass ``None`` for application when filling a previously blank position.
+    """
+
+    def __init__(self, definition, application, result, *, path_arc=-PI / 8,
+                 definition_label=None, result_label=None, **kwargs):
+        if definition is application:
+            raise ValueError("The definition and its application must be distinct")
+        if result is definition or result is application:
+            raise ValueError("The result must be a new, pre-positioned mobject")
+        self.definition = definition
+        self.application = application
+        self.result = result
+        if definition_label:
+            definition._algovis_label = str(definition_label)
+        if result_label:
+            result._algovis_label = str(result_label)
+        animations = [
+            ReplacementTransform(definition.copy(), result, path_arc=path_arc),
+        ]
+        if application is not None:
+            animations.append(FadeOut(application))
+        super().__init__(
+            *animations,
+            lag_ratio=0,
+            **kwargs,
+        )
+
+    def _setup_scene(self, scene):
+        # A pre-laid-out equation may already own the hidden destination.
+        # Detach it before the first frame, so it is not visible underneath
+        # the travelling copy. Remove descendants too: Manim can dissolve
+        # an animated container into separate scene objects.
+        scene.remove(*self.result.get_family())
+        super()._setup_scene(scene)

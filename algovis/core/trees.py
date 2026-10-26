@@ -745,6 +745,47 @@ class RecursiveTree(VGroup):
 
         return UpdateFromAlphaFunc(self, reveal)
 
+    def get_node_reveal_anim(self, node_data):
+        """Reveal one prepared node together with its incoming edge.
+
+        This is useful when narration names siblings one at a time instead of
+        introducing an entire tree layer with one phrase.
+        """
+        self.prepare_layered_unroll()
+        node, original, _depth = next(
+            record for record in self._layered_unroll_nodes
+            if record[0] is node_data["mobject"]
+        )
+
+        incoming_edge = None
+        incoming_original = None
+        for parent, _parent_depth in self.iter_nodes():
+            for child, edge in zip(parent["children"], parent["edges"]):
+                if child is not node_data:
+                    continue
+                incoming_edge, incoming_original, _edge_depth = next(
+                    record for record in self._layered_unroll_edges
+                    if record[0] is edge
+                )
+                break
+            if incoming_edge is not None:
+                break
+
+        def reveal(_tree, alpha):
+            amount = smooth(alpha)
+            node.become(
+                original.copy()
+                .scale(0.84 + 0.16 * amount, about_point=original.get_center())
+                .set_opacity(amount)
+            )
+            if incoming_edge is not None:
+                incoming_edge.pointwise_become_partial(
+                    incoming_original, 0, amount,
+                )
+                incoming_edge.set_opacity(amount)
+
+        return UpdateFromAlphaFunc(self, reveal)
+
     def get_fade_in_anim(self):
         """Safely fade in a complete tree without a one-frame label flash.
 
