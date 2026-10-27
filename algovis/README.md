@@ -44,6 +44,34 @@ animations.
 
 See `slide_authoring_demo.py` for a complete renderable example.
 
+### Plan columns without silently shrinking text
+
+`ColumnLayout` places named rows relative to a safe region. It never adds future
+content to the scene or rescales a row. A row that does not fit raises an error,
+so the layout can be revised before rendering. Nested regions support proof
+labels, content columns, and balanced comparisons:
+
+```python
+from algovis import ColumnLayout, LessonStyle
+
+style = LessonStyle(theme=self.theme)
+labels, content = self.slide_layout.body.split_columns(1, 4)
+column = ColumnLayout(content, name="proof")
+claim = column.add("claim", style.math(r"P(k)", peers="proof-equations"))
+base = column.add("base", style.math(r"f(0)=0", peers="proof-equations"))
+# Place a future version in the same reserved slot, keeping f anchored.
+target = column.place("claim", style.math(r"P(k+1)", peers="proof-equations"))
+```
+
+`LessonStyle` uses semantic colors and a shared `LessonTypography` scale.
+Equations declared as peers retain a common size; labels and supporting notes
+have explicit smaller roles. The render manifest records final font sizes and
+the agent's animation ledger flags size differences within a declared peer group.
+The reviewer refuses to publish a mismatch in a declared peer group, retaining
+the previous video. This catches accidental scaling, but does not replace visual inspection. Use
+`ApplyDefinition` for a visible definition carried to its application; planning
+a target does not choose or schedule an animation for you.
+
 For complete algorithm lessons, `AlgorithmLessonScene` accepts declarative
 `ProblemLesson` specifications:
 

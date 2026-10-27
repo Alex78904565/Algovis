@@ -1,12 +1,19 @@
 import unittest
 from types import SimpleNamespace
 
-from manim import RIGHT, Square, VGroup
+from manim import RIGHT, Square, Text, VGroup, WHITE
 from algovis import SlideScene
 from algovis.review.inspection import capture_snapshot, visible_opacity
 
 
 class RenderInspectionTests(unittest.TestCase):
+    def test_text_color_comes_from_visible_glyphs_not_svg_container_default(self):
+        label=Text('known value',color=WHITE,font_size=24)
+        data=capture_snapshot(self.scene(label),14,8)
+        item=next(obj for obj in data['objects'] if obj['kind']=='Text')
+        self.assertEqual(item['paintColors'],['#FFFFFF'])
+        self.assertEqual(item['color'],'#FFFFFF')
+
     def scene(self, *objects):
         scene = object.__new__(SlideScene)
         scene.mobjects = list(objects)

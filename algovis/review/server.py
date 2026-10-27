@@ -1093,8 +1093,19 @@ class ReviewServer:
                 self.request_render()
 
     def _validate_render_timing(self) -> None:
-        """Keep a mistimed render out of the reviewer, preserving the last good video."""
+        """Reject timing and declared peer-type errors, keeping the last good video."""
         from .audit import audit_section
+        from .inspection import typography_findings
+        if self.manifest_path is None or not self.manifest_path.is_file():
+            return
+        manifest = json.loads(self.manifest_path.read_text(encoding="utf-8"))
+        type_problems = [finding for snapshot in manifest.get("snapshots", [])
+                         for finding in typography_findings(snapshot)]
+        if type_problems:
+            details = "; ".join(dict.fromkeys(
+                f"{item['group']} ({item['typeRole']}) at {item['time']:.2f}s"
+                for item in type_problems))
+            raise RuntimeError("Peer typography rejected before publication: " + details[:800])
         paths = [self.manifest_path, self.cue_path, self.transcript_path]
         if any(path is None or not path.is_file() for path in paths):
             return

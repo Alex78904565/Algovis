@@ -102,7 +102,7 @@ class RecurrenceComparison(VGroup):
                 fill_color=theme.surface, fill_opacity=0.95,
             )
             content.move_to(background).shift(DOWN * 0.08)
-            heading = Text(title, font_size=18, color=color)
+            heading = Text(title, font_size=18, color=theme.foreground)
             heading.next_to(
                 background.get_top(), DOWN, buff=DEFAULT_SPACING.tight,
             )
@@ -115,7 +115,7 @@ class RecurrenceComparison(VGroup):
             recursive_tex, titles[0], theme.primary, base_case=recursive_base_tex,
         )
         self.array = make_panel(
-            array_tex, titles[1], theme.success,
+            array_tex, titles[1], theme.primary,
             population=population_order_tex, base_case=array_base_tex,
         )
         self.panels = VGroup(self.recursive, self.array).arrange(
@@ -173,10 +173,10 @@ class TopDownDPBridge(VGroup):
         )
         for index, line in enumerate(self.panel.lines):
             if index in self.added_lines:
-                line.set_color(theme.success).set_opacity(0)
+                line.set_color(theme.accent).set_opacity(0)
 
         self.gain = VGroup(
-            Text(gain_note, font_size=22, color=theme.accent),
+            Text(gain_note, font_size=22, color=theme.foreground),
             Text(
                 "each reachable state is evaluated once",
                 font_size=18, color=theme.success,
@@ -191,13 +191,13 @@ class TopDownDPBridge(VGroup):
             rf"f({state_tex})\longrightarrow f[{state_tex}]",
             color=theme.foreground,
         ).scale(0.95)
-        order_value = Text(population_order, font_size=21, color=theme.success)
+        order_value = Text(population_order, font_size=21, color=theme.primary)
         order_value.scale_to_fit_width(min(panel_width, order_value.width))
         self.order = VGroup(
             Text("POPULATION ORDER", font_size=15, color=theme.muted), order_value,
         ).arrange(DOWN, buff=DEFAULT_SPACING.tight)
         self.bottom_up = VGroup(
-            Text("BOTTOM-UP ARRAY", font_size=19, color=theme.primary),
+            Text("BOTTOM-UP ARRAY", font_size=19, color=theme.foreground),
             self.array_equation, self.order,
         ).arrange(DOWN, buff=DEFAULT_SPACING.normal)
         self.bottom_up.move_to(self.panel)

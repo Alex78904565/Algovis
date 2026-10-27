@@ -89,9 +89,59 @@ def capture_snapshot(scene, width, height):
             item["color"] = mobject.get_color().to_hex()
         except (AttributeError, ValueError, TypeError):
             pass
+        if item["semantic"]:
+            # SVG text containers can report black while their visible glyphs
+            # are white. Inspect the paint, rather than that container default.
+            colors = set()
+            for part in mobject.family_members_with_points():
+                try:
+                    if float(np.max(part.get_fill_opacity())) > .015:
+                        colors.add(part.get_fill_color().to_hex())
+                    if (float(np.max(part.get_stroke_width())) > 0 and
+                            float(np.max(part.get_stroke_opacity())) > .015):
+                        colors.add(part.get_stroke_color().to_hex())
+                except (AttributeError, ValueError, TypeError):
+                    pass
+            item["paintColors"] = sorted(colors)
+            if len(colors) == 1:
+                item["color"] = next(iter(colors))
+        font_size = getattr(mobject, "font_size", None)
+        if isinstance(font_size, (int, float)) and np.isfinite(font_size):
+            item["fontSize"] = round(float(font_size), 4)
+        for attribute, key in (("_algovis_semantic_role", "semanticRole"),
+                               ("_algovis_type_role", "typeRole"),
+                               ("_algovis_typography_group", "typographyGroup"),
+                               ("_algovis_layout", "layout"),
+                               ("_algovis_layout_row", "layoutRow")):
+            value = getattr(mobject, attribute, None)
+            if isinstance(value, str):
+                item[key] = value
         if right <= left or bottom <= top:
             offscreen.append(item)
         else:
             visible.append(item)
     return {"time": float(scene.renderer.time), "objects": visible,
             "offscreenObjects": offscreen}
+
+
+def typography_findings(snapshot, *, relative_tolerance=.025):
+    """Flag inconsistent sizes in explicitly declared peer groups, not headings.
+
+    This checks actual Manim font size after scaling. Different roles (for
+    example equations versus notes) form separate groups. Glyph bounds alone
+    cannot compare a tall fraction with a short formula's letter size.
+    """
+    groups = {}
+    for obj in snapshot.get("objects", []):
+        if obj.get("typographyGroup") and obj.get("fontSize", 0) > 0:
+            key = (obj["typographyGroup"], obj.get("typeRole", ""))
+            groups.setdefault(key, []).append(obj)
+    findings = []
+    for (group, role), objects in groups.items():
+        sizes = [obj["fontSize"] for obj in objects]
+        if max(sizes)-min(sizes) > relative_tolerance*max(sizes):
+            findings.append({"kind":"peer_font_size_mismatch", "time":snapshot.get("time",0),
+                             "group":group, "typeRole":role,
+                             "objects":[{"id":obj["id"],"label":obj["label"],"fontSize":obj["fontSize"]}
+                                        for obj in objects]})
+    return findings

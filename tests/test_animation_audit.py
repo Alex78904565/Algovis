@@ -4,6 +4,15 @@ from algovis.review.audit import audit_section, content_change, phrase_anchor, t
 
 
 class WordLevelAuditTests(unittest.TestCase):
+    def test_declared_peer_size_regression_is_included_once(self):
+        snapshot={'time':2,'objects':[
+            {'id':'a','label':'general','typographyGroup':'runtime','typeRole':'equation','fontSize':34},
+            {'id':'b','label':'example','typographyGroup':'runtime','typeRole':'equation','fontSize':28}]}
+        manifest={'animations':[],'plays':[{'start':0,'end':1,'before':[],'after':[]}],
+                  'snapshots':[snapshot,{**snapshot,'time':3}]}
+        findings=audit_section(manifest,{'cues':[]},{'words':[]})['findings']
+        self.assertEqual([f['kind'] for f in findings],['peer_font_size_mismatch'])
+
     def manifest(self, start, trigger=None):
         return {"frameRate":15,"animations":[{
             "id":"pulse-1","play":0,"kind":"Pulse","start":start,"end":start+.6,

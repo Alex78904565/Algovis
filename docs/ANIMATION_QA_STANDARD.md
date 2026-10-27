@@ -103,6 +103,12 @@ across layout changes.
 
 ## 6. Layout is relational
 
+- Plan the completed composition before its incremental reveals. For a layout
+  repair, compare a few sketches and record the chosen arrangement. Use named
+  rows and nested regions rather than a new coordinate for every object.
+- Use one rendered type size for peer statements. A separate heading, supporting
+  note, or diagram label may use an explicit hierarchy. Check actual font size
+  after transformations; equal initial scales do not prevent later drift.
 - Inspect visual density and hierarchy separately from overlap tests. A frame
   can have no collisions and still ask the viewer to read too many things.
 - Give the current idea one primary visual group, with supporting material

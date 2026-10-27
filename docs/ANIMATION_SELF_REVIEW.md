@@ -33,6 +33,14 @@ not merely its final appearance.
 
 ## Decide the animation before rendering
 
+Before editing a crowded or repeatedly criticized composition, sketch two or
+three arrangements using its final text, not placeholder lengths. Record the
+chosen arrangement and why the alternatives were rejected. Prefer an established
+proof, recurrence, comparison, or diagram format when it fits. Fix the content
+column, row order, type hierarchy, and reserved future space before timing reveals.
+Use `ColumnLayout` and `LessonStyle` to enforce those choices without shrinking
+individual rows. An overflow means revising the plan, not reducing one peer's size.
+
 For each conceptual change, write down:
 
 1. **Why:** what new fact or relationship does this make easier to understand?
@@ -137,6 +145,11 @@ every proof row and its continuations. Repeat after adding parameters and after
 moving content into the proof rail. Prefer stable left anchors to separately
 centered rows. Check that fixed input data and changing state have explicit
 labels and consistent color roles in both examples and symbolic expressions.
+Check rendered font sizes as well as glyph bounds: a fraction has a taller box
+than a short formula at the same type size. Declare peer equation groups where
+possible so the timing ledger can catch accidental later scaling. Notes, diagram
+labels, headings, and primary equations may differ by an explicit hierarchy;
+two peer claims must not differ just because one was harder to fit.
 
 For an overview of a completed build, sample the relevant animation's end, not
 the end of the cue's inherited pause: the latter can put the sample into the

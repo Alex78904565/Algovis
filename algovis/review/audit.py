@@ -13,7 +13,7 @@ import json
 from pathlib import Path
 import re
 
-from .inspection import semantic_objects
+from .inspection import semantic_objects, typography_findings
 
 ATTENTION = {"Pulse", "Indicate", "Circumscribe", "ShowPassingFlash", "Flash",
              "Highlight", "FocusOn", "Wiggle"}
@@ -179,6 +179,16 @@ def audit_section(manifest, cue_document, transcript, *, attention_tolerance=Non
             findings.append({"kind":finding,"change":change["id"],"time":play["start"],
                              "cue":play.get("cue"),"source":play.get("source",{})})
         changes.append(change)
+    # Explicit peer groups make type-size regressions mechanically detectable.
+    # Report the first occurrence of each mismatch, not the same flag per hold.
+    seen_type = set()
+    for snapshot in manifest.get("snapshots", []):
+        for finding in typography_findings(snapshot):
+            signature = (finding["group"], finding["typeRole"],
+                         tuple((o["id"],o["fontSize"]) for o in finding["objects"]))
+            if signature not in seen_type:
+                seen_type.add(signature)
+                findings.append(finding)
     return {"events":events,"changes":changes,"findings":findings,
             "wordCount":len(words), "frameTolerance":tolerance,
             "status":"requires_agent_review" if findings else "automated_checks_passed"}

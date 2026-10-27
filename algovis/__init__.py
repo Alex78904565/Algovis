@@ -22,6 +22,7 @@ from .theme import (
     WARM_THEME, NIGHTCLUB_THEME,
 )
 from .presentation import Slide, SlideLayout, SlideRegion, SlideScene, SlideSceneMixin, slide_scene
+from .layout import ColumnLayout, LessonStyle, LessonTypography
 from .narration import NarrationCue, NarrationTrack
 from .storyboard import (
     ACTION_VERBS, ATTENTION_STYLES, ENTRY_STYLES, EXIT_STYLES,

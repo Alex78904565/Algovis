@@ -29,6 +29,21 @@ class SlideRegion:
     width: float
     height: float
 
+    def split_columns(self, *weights, gutter=DEFAULT_SPACING.section):
+        """Return nested regions without changing or fitting any scene objects."""
+        if not weights or any(not np.isfinite(w) or w <= 0 for w in weights):
+            raise ValueError("Column weights must be positive")
+        available = self.width-gutter*(len(weights)-1)
+        if gutter < 0 or available <= 0:
+            raise ValueError("Column gutters leave no content area")
+        x = self.center[0]-self.width/2
+        regions = []
+        for weight in weights:
+            width = available*weight/sum(weights)
+            regions.append(SlideRegion((x+width/2,self.center[1],self.center[2]),width,self.height))
+            x += width+gutter
+        return tuple(regions)
+
     def place(self, mobject, padding=0.0, allow_upscale=False):
         """Fit and center ``mobject`` inside this region."""
         available_width = max(0.01, self.width - 2 * padding)

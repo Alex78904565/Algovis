@@ -136,6 +136,12 @@ Apply this preference across existing sections, not only the section containing
 the latest annotation. Record the groups corrected and the layouts deliberately
 preserved. Centered standalone diagrams and balanced comparison panels can stay
 centered; the related explanatory rows inside a panel still need shared anchors.
+Plan with the final populated rows before animating. When a layout needs repair,
+compare a few simple sketches, choose the arrangement, and keep its anchors
+through the build. Peer equations use one type size; smaller headings, notes,
+or diagram labels need an explicit role in the hierarchy. Do not squeeze one
+formula to repair a layout that needs more room. Use the reusable column and
+typography helpers so later parameter additions cannot silently undo the plan.
 
 Blue identifies structure or the current state. Yellow identifies an operation
 or active choice. Green means known, stored, valid, or complete. Red means

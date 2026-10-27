@@ -5,6 +5,14 @@ from manim import BLUE, GREEN, RIGHT, Scene, Square, VGroup
 
 
 class PublicApiTests(unittest.TestCase):
+    def test_comparison_headings_do_not_use_stored_answer_color(self):
+        comparison=algovis.RecurrenceComparison(
+            'f(n)=f(n-1)', 'f[n]=f[n-1]', 'O(2^n)', 'O(n)', 'n=1,2,3')
+        for panel in (comparison.recursive,comparison.array):
+            for glyph in panel[1].family_members_with_points():
+                self.assertEqual(glyph.get_fill_color(),comparison.theme.foreground)
+            self.assertEqual(panel[0].get_stroke_color(),comparison.theme.primary)
+
     def test_clear_before_reveal_finishes_exit_before_replacement_starts(self):
         from manim import FadeIn, FadeOut
         scene = object.__new__(algovis.SlideScene)
