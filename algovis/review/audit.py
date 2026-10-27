@@ -25,6 +25,11 @@ NUMBERS = {str(i): word for i, word in enumerate(
 
 def tokens(text):
     text = str(text).lower().replace("’", "'")
+    # ASR may split a hyphenated spoken word into "long", "-term".
+    # This is a word continuation, not a spoken minus operator. Keep the
+    # exception narrow so mathematical negative numbers still require minus.
+    if text.strip() in {"-term", "-down", "-up"}:
+        text = text.replace("-", "", 1)
     text = re.sub(r"\b([vw])_?i\b", r"\1 i", text)
     text = re.sub(r"([a-z]{2,})-([a-z]{2,})", r"\1 \2", text)
     text = re.sub(r"\b([fghpq])\s*[\[(]([^\])]+)[\])]", r"\1 of \2", text)

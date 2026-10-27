@@ -1,6 +1,6 @@
 import unittest
 
-from algovis.review.audit import audit_section, content_change, phrase_anchor, timed_words
+from algovis.review.audit import audit_section, content_change, phrase_anchor, timed_words, tokens
 
 
 class WordLevelAuditTests(unittest.TestCase):
@@ -52,6 +52,16 @@ class WordLevelAuditTests(unittest.TestCase):
     def test_math_subscript_spelling_matches_spoken_letters(self):
         words = [{'word':'vi', 'start':2, 'end':2.5}]
         self.assertEqual(phrase_anchor('v i', words, 2)['start'], 2)
+
+    def test_hyphenated_asr_continuations_keep_their_word_onset(self):
+        for first, second in [('long', '-term'), ('top', '-down'), ('bottom', '-up')]:
+            with self.subTest(first=first):
+                words = [{'word':first, 'start':2, 'end':2.2},
+                         {'word':second, 'start':2.2, 'end':2.5}]
+                anchor = phrase_anchor(first+second, words, 2)
+                self.assertEqual((anchor['start'],anchor['end']), (2,2.5))
+        self.assertEqual(tokens('-2'), ['minus','two'])
+        self.assertEqual(tokens('n-1'), ['n','minus','one'])
 
     def test_content_reveal_is_checked_independently_of_a_correct_later_pulse(self):
         manifest = self.manifest(3, 'f of five')

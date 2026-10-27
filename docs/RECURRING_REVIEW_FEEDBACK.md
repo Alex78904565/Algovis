@@ -373,6 +373,37 @@ use. List what stays in the composition at each refinement, including conditions
 function meaning, and prior proof work. Compare with the earlier successful proof
 layout and inspect the whole frame before accepting a local spacing repair.
 
+## Reuse established formats across the lesson
+
+The author explicitly identified reuse of the existing proof structure as a
+successful strategy. Prefer the familiar organization before designing another
+layout: definitions, claim, base case, induction hypothesis, and inductive step.
+Keep label positions, notation, type sizes, and semantic colors consistent.
+Shorter later proofs can omit repeated verbal detail while retaining this visual
+structure and the particular measure on which their induction depends.
+
+Reuse the established visual grammar for equations and examples too. A new
+problem changes the mathematics, not the meaning of a blue input, a green stored
+answer, or a two-row choice brace. Introducing another parameter should refine
+the arguments while preserving the function name, delimiters, and equality.
+When reading an answer from the function's meaning, carry that same call and
+substitute the requested inputs locally. Keep an immediate term in place while
+refining its remaining-problem term.
+
+**Agent check:** compare each later example with the earlier successful example
+of its kind. Name what is reused and why any departure is needed. A new layout
+is justified by a different explanatory need, not by being in a new section.
+Inspect populated labels and internal substitution phases in the actual video.
+
+Keep that structure in the code as well. If a later animation changes just an
+argument, every earlier refinement must preserve the function's separately
+addressable name, delimiters, arguments, and equality. A whole-formula transform
+can silently destroy those parts and make the next local change replace the
+wrong glyphs. Similarly, preparing a future reveal must not change the opacity
+of a child already owned by a visible object during the wait for its cue. Reserve
+its space, keep the future content detached, and introduce it on the spoken word.
+Check the actual frames immediately before the cue as well as after it.
+
 ## Before returning the work
 
 Ask the author early if a note could reasonably require different visual outcomes.
