@@ -456,6 +456,13 @@ proof rails and successful local explanatory devices while making these repairs.
 
 ## Before returning the work
 
+Ready-for-review notes need a repair starting point, separate from the original
+annotation evidence. Set `reviewAt` to the first cue where the change is visible;
+the viewer should not have to rewind from an old screenshot time to find it.
+Retain access to the original note time. Do not overlay its stale selection
+rectangle on a layout that has moved. A follow-up reopens the note rather than
+silently reusing the previous repair's location.
+
 Preserve the viewer's preflight decisions for unchanged moments. A render name,
 source-line change, or edit elsewhere in a section must not reopen every flag.
 Record the local rendered evidence and narration when a check is accepted;

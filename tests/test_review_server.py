@@ -579,6 +579,43 @@ class ReviewServerTests(unittest.TestCase):
         self.assertIn("Could the labels remain", pending)
         self.assertIn("Codex: I simplified the notation", pending)
 
+    def test_fix_handoff_carries_its_own_review_start_and_preserves_evidence(self):
+        note = self.review.save_annotation({
+            "cue": "change", "phrase": "change this", "timestamp": 2.2,
+            "region": {"x": .2, "y": .2, "width": .1, "height": .1},
+            "comment": "This should have started earlier.",
+        })
+        ready = self.review.add_annotation_response(note["id"], {
+            "author": "codex", "body": "The new layout starts with the example.",
+            "reviewAt": {"cue": "start"},
+        })
+        self.assertEqual(ready["reviewTarget"]["time"], 0)
+        self.assertEqual(ready["timestamp"], 2.2)
+        self.assertEqual(ready["cue"], "change")
+        self.assertEqual(ready["responses"][-1]["reviewAt"], {"cue": "start", "offset": 0})
+        self.assertNotIn("reviewTarget", self.review.annotations()[0])
+        self.assertEqual(self.review.project_payload()["annotations"][0]["reviewTarget"]["time"], 0)
+        reopened = self.review.add_annotation_response(note["id"], {"author": "user", "body": "One more change."})
+        self.assertIsNone(reopened["reviewTarget"])
+        self.assertNotIn("reviewAt", reopened)
+        self.assertIn("reviewAt", reopened["responses"][0])
+
+    def test_status_handoff_can_set_a_fix_location_without_a_duplicate_response(self):
+        note = self.review.save_annotation({
+            "cue": "change", "phrase": "change this", "timestamp": 2.2,
+            "region": {"x": .2, "y": .2, "width": .1, "height": .1}, "comment": "Spacing.",
+        })
+        ready = self.review.set_annotation_status(note["id"], "pending_review", review_at={"cue": "start"})
+        self.assertEqual(ready["reviewTarget"]["time"], 0)
+        self.assertEqual(ready["responses"], [])
+        with self.assertRaises(ValueError):
+            self.review.set_annotation_status(note["id"], "resolved", review_at={"cue": "start"})
+        self.review.set_annotation_status(note["id"], "pending")
+        with self.assertRaisesRegex(ValueError, "note changed"):
+            self.review.set_annotation_status(note["id"], "pending_review",
+                review_at={"cue": "start"}, expected_status="pending_review")
+        self.assertEqual(self.review.annotations()[0]["status"], "pending")
+
     def test_unknown_cue_and_out_of_frame_region_are_rejected(self) -> None:
         common = {
             "phrase": "nope",

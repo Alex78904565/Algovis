@@ -30,6 +30,7 @@ from urllib.parse import parse_qs, quote, urlparse
 import uuid
 
 from .transitions import build_transition_index
+from .annotation_navigation import normalize_review_at, review_target
 from .preflight import finding_evidence, finding_id, legacy_id, store_decision
 
 
@@ -215,6 +216,29 @@ class ReviewServer:
             except (FileNotFoundError, json.JSONDecodeError):
                 return []
 
+    def annotation_payload(self, annotation, *, manifest=None, cue_data=None):
+        """Add navigation without rewriting the original annotation evidence."""
+        if cue_data is None:
+            cue_data = json.loads(self.cue_path.read_text(encoding="utf-8"))
+        if manifest is None:
+            manifest = self.object_manifest()
+        return {**annotation, "reviewTarget": review_target(
+            annotation, cue_data.get("cues", []), manifest,
+            float(cue_data.get("duration", 0)), self._video_revision(),
+        )}
+
+    def annotations_payload(self, manifest=None):
+        cue_data = json.loads(self.cue_path.read_text(encoding="utf-8"))
+        if manifest is None:
+            manifest = self.object_manifest()
+        return [self.annotation_payload(item, manifest=manifest, cue_data=cue_data)
+                for item in self.annotations()]
+
+    def _normalize_review_at(self, value):
+        cue_data = json.loads(self.cue_path.read_text(encoding="utf-8"))
+        return normalize_review_at(value, cue_data.get("cues", []),
+                                   float(cue_data.get("duration", 0)), self._video_revision())
+
     def project_payload(self) -> dict:
         duration = 0.0
         cue_data = json.loads(self.cue_path.read_text(encoding="utf-8"))
@@ -256,7 +280,7 @@ class ReviewServer:
             ),
             "revision": self.revision,
             "render": status,
-            "annotations": self.annotations(),
+            "annotations": self.annotations_payload(manifest),
             "music": music,
             "objects": manifest,
             "audit": self.audit_payload(),
@@ -523,7 +547,7 @@ class ReviewServer:
             })
             _atomic_json(self.finding_reviews_path, reviews)
             return {
-                "audit": self.audit_payload(), "annotations": self.annotations(),
+                "audit": self.audit_payload(), "annotations": self.annotations_payload(),
                 "approval": self.approval_payload(),
             }
 
@@ -776,6 +800,7 @@ class ReviewServer:
                     if old_asset.exists():
                         old_asset.unlink()
             match.update(fields)
+            match.pop("reviewAt", None)
             match.update({
                 "target": payload.get("target"),
                 "screenshot": screenshot,
@@ -835,10 +860,13 @@ class ReviewServer:
             "path": str(self.pending_path.relative_to(self.workspace)),
         }
 
-    def set_annotation_status(self, identifier: str, status: str) -> dict:
+    def set_annotation_status(self, identifier: str, status: str, *, review_at=None, expected_status=None) -> dict:
         allowed = {"pending", "pending_review", "resolved"}
         if status not in allowed:
             raise ValueError(f"Unsupported annotation status: {status!r}")
+        anchor = self._normalize_review_at(review_at) if review_at is not None else None
+        if anchor is not None and status != "pending_review":
+            raise ValueError("A review location belongs to a fix ready for review")
         with self._lock:
             annotations = self.annotations()
             match = next(
@@ -847,13 +875,19 @@ class ReviewServer:
             )
             if match is None:
                 raise KeyError(identifier)
+            if expected_status is not None and match.get("status") != expected_status:
+                raise ValueError("This note changed before its review location was updated")
             match["status"] = status
+            if anchor is not None:
+                match["reviewAt"] = anchor
+            elif status == "pending":
+                match.pop("reviewAt", None)
             match["updatedAt"] = _utc_now()
             _atomic_json(self.annotations_path, annotations)
             self._write_pending_file(annotations)
             if status == "resolved":
                 self._confirm_linked_finding(identifier)
-            return match.copy()
+            return self.annotation_payload(match.copy())
 
     def _confirm_linked_finding(self, annotation_id: str) -> None:
         """A viewer resolving a flag's note also confirms that exact moment."""
@@ -887,12 +921,19 @@ class ReviewServer:
         author = str(payload.get("author", "user")).strip().lower()
         if author not in {"user", "codex"}:
             raise ValueError("Response author must be user or codex")
+        anchor = None
+        if payload.get("reviewAt") is not None:
+            if author != "codex":
+                raise ValueError("Only the repair response sets its review location")
+            anchor = self._normalize_review_at(payload["reviewAt"])
         response = {
             "id": uuid.uuid4().hex[:12],
             "author": author,
             "body": body,
             "createdAt": _utc_now(),
         }
+        if anchor is not None:
+            response["reviewAt"] = anchor
         with self._lock:
             annotations = self.annotations()
             match = next(
@@ -902,6 +943,11 @@ class ReviewServer:
             if match is None:
                 raise KeyError(identifier)
             match.setdefault("responses", []).append(response)
+            # Each handoff has its own location; preserve earlier ones in the
+            # discussion history rather than reusing them for another repair.
+            match.pop("reviewAt", None)
+            if anchor is not None:
+                match["reviewAt"] = anchor
             # A viewer follow-up returns the item to Codex's active queue.
             # A Codex explanation hands it back without pretending the user
             # has approved either the answer or the visual fix.
@@ -909,7 +955,7 @@ class ReviewServer:
             match["updatedAt"] = _utc_now()
             _atomic_json(self.annotations_path, annotations)
             self._write_pending_file(annotations)
-            return match.copy()
+            return self.annotation_payload(match.copy())
 
     def _write_pending_file(self, annotations: list[dict]) -> None:
         lines = [
@@ -1437,8 +1483,10 @@ class ReviewRequestHandler(BaseHTTPRequestHandler):
             if suffix.endswith("/status"):
                 identifier = suffix[:-len("/status")]
                 try:
+                    payload = self._payload()
                     updated = self.review.set_annotation_status(
-                        identifier, str(self._payload().get("status", "")),
+                        identifier, str(payload.get("status", "")), review_at=payload.get("reviewAt"),
+                        expected_status=payload.get("expectedStatus"),
                     )
                 except KeyError:
                     self._error(HTTPStatus.NOT_FOUND, "Annotation not found")

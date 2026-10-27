@@ -114,6 +114,31 @@ running preflight by itself does not reset approval.
 
 ## Inspect a change without scrubbing
 
+Clicking a note **ready for your review** starts at the beginning of its fix,
+not the later moment where the original screenshot was taken. Its discussion
+has **Review fix** and **Original note** buttons; the original timestamp,
+phrase, target and screenshot are preserved. The old selection rectangle is
+not drawn over the changed layout when reviewing the fix.
+
+When handing back a repair, attach `reviewAt` to the Codex response:
+
+```json
+{"author":"codex","body":"Kept the definition throughout the example.",
+ "reviewAt":{"cue":"example_start"}}
+```
+
+Use the first cue whose animation shows the repair, even if it precedes the
+annotation's cue. An optional `offset` selects a later internal phase. A
+cue-based location follows its actual rendered start after retiming. An exact
+`{"time":12.3}` location belongs to the current video revision; it is not reused
+blindly after a different render. The status endpoint also accepts `reviewAt`
+when setting `pending_review`, so existing handoffs can be annotated without
+duplicating their written responses.
+
+Older notes without a supplied repair location use the start of their associated
+animation and say **Review animation**. A new viewer follow-up reopens the note
+and clears the active fix location; earlier locations stay in response history.
+
 The **Animation frames** strip shows three frames extracted from the actual
 Manim MP4: one just before a change, one halfway through it, and one just after.
 Animations running together are grouped into one change so that a transition

@@ -148,7 +148,11 @@ speech when removing noise from pauses. State any listening limitation or pickup
 needed instead of claiming a perceptual audio check that was not performed.
 
 Only after repairs and verification should a note move to `pending_review`, with
-a concrete explanation. Only the viewer resolves it. Answer annotation questions
+a concrete explanation and a `reviewAt` cue for the first visible effect of the
+repair. Do not reuse the screenshot timestamp when the change begins earlier.
+Preserve the original evidence and verify that clicking the ready note starts
+at the repair, with the appropriate transcript cue selected. Only the viewer
+resolves it. Answer annotation questions
 in their threads, and leave unresolved repairs visibly pending. Assemble the full
 preview after the section checks; repeat checks only for subsequent changes.
 

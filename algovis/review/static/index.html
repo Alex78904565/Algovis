@@ -665,6 +665,9 @@
       white-space: pre-wrap;
     }
 
+    .annotation-navigation { display: flex; gap: 7px; flex-wrap: wrap; margin-bottom: 10px; }
+    .annotation-navigation button { font-size: 11px; padding: 5px 8px; }
+
     .annotation-thread {
       display: none;
       margin-top: 11px;
@@ -1776,7 +1779,10 @@
         item.dataset.id = annotation.id;
         item.innerHTML = `<div class="annotation-meta"></div><div class="annotation-status"></div><div class="annotation-comment"></div><div class="annotation-thread"><div class="thread-heading">Discussion</div><div class="thread-messages"></div><textarea class="follow-up" placeholder="Ask a follow-up or explain what still feels wrong…"></textarea><div class="follow-up-actions"><button class="send-follow-up">Send follow-up</button></div></div><button class="resolve-note" hidden>Mark resolved</button><button class="edit-note" title="Edit note">✎</button><button class="delete-note" title="Delete note">×</button>`;
         const targetLabel = annotation.target?.label ? ` · ${annotation.target.label}` : "";
-        item.querySelector(".annotation-meta").textContent = `${index + 1} · ${formatTime(annotation.timestamp)} · ${annotation.phrase}${targetLabel}`;
+        const reviewTarget = annotation.status === "pending_review" ? annotation.reviewTarget : null;
+        const destination = reviewTarget?.time ?? annotation.timestamp;
+        const location = reviewTarget ? `Review from ${formatTime(destination)}` : formatTime(destination);
+        item.querySelector(".annotation-meta").textContent = `${index + 1} · ${location} · ${reviewTarget?.phrase || annotation.phrase}${targetLabel}`;
         const statusLabels = {
           draft: "not queued",
           pending: "queued for Codex",
@@ -1804,21 +1810,40 @@
             messages.append(message);
           });
         }
+        const openNote = (original = false) => {
+          clearSelection();
+          state.activeAnnotation = annotation;
+          const moment = original ? annotation.timestamp : destination;
+          video.currentTime = moment;
+          video.pause();
+          const cueName = original ? annotation.cue : (reviewTarget?.cue || annotation.cue);
+          setCue(state.cues.find(value => value.name === cueName) || cueAt(moment));
+          updateTranscriptPlayback(true);
+          document.querySelectorAll(".annotation").forEach(note => note.classList.remove("active"));
+          item.classList.add("active");
+          // The old annotation rectangle may describe a layout that was moved
+          // or replaced. It is evidence, not the geometry of the repaired frame.
+          if (original || !reviewTarget) drawRegion(annotation.region, "saved-box", index + 1);
+        };
+        if (reviewTarget) {
+          const navigation = document.createElement("div");
+          navigation.className = "annotation-navigation";
+          const reviewButton = document.createElement("button");
+          reviewButton.textContent = `Review ${reviewTarget.source === "fix" ? "fix" : "animation"} · ${formatTime(destination)}`;
+          reviewButton.addEventListener("click", event => { event.stopPropagation(); openNote(); });
+          const originalButton = document.createElement("button");
+          originalButton.textContent = `Original note · ${formatTime(annotation.timestamp)}`;
+          originalButton.addEventListener("click", event => { event.stopPropagation(); openNote(true); });
+          navigation.append(reviewButton, originalButton);
+          item.querySelector(".annotation-thread").prepend(navigation);
+        }
         item.addEventListener("click", event => {
-          if (event.target.closest(".delete-note, .edit-note, .resolve-note, .send-follow-up, .follow-up")) return;
+          if (event.target.closest(".delete-note, .edit-note, .resolve-note, .send-follow-up, .follow-up, .annotation-navigation")) return;
           if (state.activeAnnotation?.id === annotation.id) {
             clearSelection();
             return;
           }
-          clearSelection();
-          state.activeAnnotation = annotation;
-          video.currentTime = annotation.timestamp;
-          video.pause();
-          const cue = state.cues.find(value => value.name === annotation.cue) || cueAt(annotation.timestamp);
-          setCue(cue);
-          document.querySelectorAll(".annotation").forEach(note => note.classList.remove("active"));
-          item.classList.add("active");
-          drawRegion(annotation.region, "saved-box", index + 1);
+          openNote();
         });
         item.querySelector(".send-follow-up").addEventListener("click", async event => {
           event.stopPropagation();
