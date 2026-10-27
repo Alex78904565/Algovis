@@ -6,10 +6,12 @@ should not change merely to make a frame look more varied.
 
 ## Semantic palette
 
-- **Blue (`theme.primary`) — structure and state.** Inputs, parameters, current
-  states, array indices, dependencies, and neutral branches use blue. For
-  example, `v_i`, `w_i`, and `C` are all input data and therefore use the same
-  blue.
+- **Blue (`theme.primary`) — structure and state.** Current subproblems,
+  function arguments, array indices, dependencies, and neutral branches use
+  blue. When the setup distinguishes INPUTS from STATE, fixed problem data
+  such as item weights, item values, and capacity stay neutral white; the
+  changing state is blue. Both groups have explicit labels, so color is a
+  supporting distinction rather than the only explanation.
 - **Yellow (`theme.accent`) — the decision currently under discussion.** Use it
   for the active choice, optimizer, question, or piece of algebra presently
   receiving attention.
@@ -52,10 +54,21 @@ call's value. Use `ApplyDefinition` instead of morphing the entire equation.
 Before publishing a clip:
 
 1. The same symbol retains the same semantic color across a layout change.
-2. Related inputs such as `v_i`, `w_i`, and `C` share the structural blue.
+2. Related fixed inputs such as `v_i`, `w_i`, and `C` share one neutral style;
+   distinguish them from blue current-state arguments when both are shown.
 3. Green never means merely “currently mentioned”; it means known, stored,
    selected, valid, or complete.
 4. Red never decorates neutral content; it identifies a real error, rejection,
    violation, or repeated waste.
 5. A screenshot taken at any point should be interpretable without relying on
    a transient flash to explain the colors.
+
+## Shared layout anchors
+
+Related explanations normally share a left edge: setup bands, function
+meaning, recurrence, and base case. A proof rail supplies one stable label
+column and one stable content column. Add arguments by extending a call to
+the right; keep its first symbol anchored. Align equation continuations with
+their parent equals sign where that makes the algebra easier to follow.
+Centering remains useful for a standalone title, diagram, or single formula;
+do not independently center the rows of a developing explanation.

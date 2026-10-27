@@ -131,6 +131,13 @@ Inspect the start, middle, and end of every changed transition. Check the comple
 composition, including diagrams, guides, arrows, labels, and chapter marker.
 Inspect continuous motion separately where three frames cannot establish it.
 
+For grouped explanations, compare their actual left edges across the complete
+composition. Check function meaning, recurrence, and base case together, then
+every proof row and its continuations. Repeat after adding parameters and after
+moving content into the proof rail. Prefer stable left anchors to separately
+centered rows. Check that fixed input data and changing state have explicit
+labels and consistent color roles in both examples and symbolic expressions.
+
 For multi-phase helpers, inspect each internal boundary and neighboring video
 frames, not only the outer play's start, middle, and end. In particular check
 definition travel, arrival, substitution, and adoption with repeated symbols and

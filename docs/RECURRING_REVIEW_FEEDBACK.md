@@ -122,10 +122,36 @@ Short, stable topic headings are preferred. Text on screen organizes the argumen
 it does not need to repeat every conversational phrase. Local notes belong beside
 their targets. Leave enough space for their labels, effects, and connecting edges.
 
+Use a shared left edge for related explanations: problem-data and state bands,
+the function meaning, its recurrence, its base case, and proof content rows.
+Choose the content column before revealing its contents. Do not independently
+center each row or let a longer function signature push its first symbol left.
+When adding an argument, retain the function's left edge and make room to its
+right. An equation continuation may align its equals sign with the preceding
+equals sign; that is a deliberate mathematical indent, not another centered row.
+Keep short function meanings to one or two left-aligned lines. Inspect the full
+composition both before and after argument changes, proof-layout moves, and
+later substitutions. An aligned label alone does not establish an aligned row.
+
 Blue identifies structure or the current state. Yellow identifies an operation
 or active choice. Green means known, stored, valid, or complete. Red means
 invalid or wasted repeated work. White is neutral; gray is supporting material.
 Do not cycle these roles merely to emphasize a spoken mention.
+
+When fixed problem inputs and the current recursive state appear together,
+label them INPUTS and STATE explicitly. Use neutral white for fixed quantities
+and blue for the current subproblem, rather than assigning both the same blue
+and relying on their position. Carry that distinction into the example's item
+badges and symbolic arithmetic; a variable's role must not change at the next
+equation. Computed valid totals can be green and a failed test red. Preserve the
+existing semantic palette instead of introducing a new color for each label.
+
+An omitted sequence must remain visibly omitted when its endpoint appears:
+`f(i+3,...) -> ... -> f(n,...)`, not a direct next-step arrow to `f(n,...)`.
+Extend a running sum by retaining its existing terms, inserting the new addend,
+and updating its result. Do not replace the whole line with a new fade merely
+because the total changed. Keep redundant range captions out of a recurrence
+when the separately retained base case already makes that distinction clear.
 
 Count possible calls from parameter ranges. Storage may be an array, but its
 physical dimensions are not required to derive the recurrence, correctness,
