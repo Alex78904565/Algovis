@@ -522,8 +522,19 @@ class SlideSceneMixin:
         runtime covers both phases, so narration cues do not move.
         """
         animations = self._filter_cleanup_animations(animations)
-        outgoing = [animation for animation in animations if isinstance(animation, FadeOut)]
-        incoming = [animation for animation in animations if not isinstance(animation, FadeOut)]
+        def only_exits(animation):
+            if isinstance(animation, FadeOut):
+                return True
+            # wipe() returns a group of fades. Treat the whole exit as an
+            # exit, while preserving timing inside authored mixed sequences.
+            if isinstance(animation, AnimationGroup):
+                return bool(animation.animations) and all(
+                    only_exits(child) for child in animation.animations
+                )
+            return False
+
+        outgoing = [animation for animation in animations if only_exits(animation)]
+        incoming = [animation for animation in animations if not only_exits(animation)]
         if not outgoing or not incoming:
             return self.play(*animations, **kwargs)
         return self.play(Succession(

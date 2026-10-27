@@ -28,6 +28,33 @@ class PublicApiTests(unittest.TestCase):
         self.assertEqual(filtered, (fade,))
         self.assertIs(fade.mobject, present)
 
+    def test_wipe_group_finishes_before_transition_replacement_starts(self):
+        from manim import AnimationGroup, FadeIn, FadeOut, Succession
+        scene = object.__new__(algovis.SlideScene)
+        first, second, target = Square(), Square().shift(RIGHT), Square()
+        scene.mobjects = [first, second]
+        captured = []
+        scene.play = lambda animation, **kwargs: captured.append((animation, kwargs))
+        exits = AnimationGroup(scene.wipe(first), AnimationGroup(FadeOut(second)))
+        scene.transition(exits, FadeIn(target), run_time=.8)
+        animation, kwargs = captured[0]
+        self.assertIsInstance(animation, Succession)
+        outgoing, incoming = animation.anims_with_timings
+        self.assertLessEqual(outgoing['end'], incoming['start'])
+        self.assertIs(outgoing['anim'].animations[0], exits)
+        self.assertEqual(kwargs['run_time'], .8)
+
+    def test_transition_preserves_mixed_authored_sequence(self):
+        from manim import FadeIn, FadeOut, Succession
+        scene = object.__new__(algovis.SlideScene)
+        source, target = Square(), Square()
+        scene.mobjects = [source]
+        captured = []
+        scene.play = lambda *animations, **kwargs: captured.extend(animations)
+        sequence = Succession(FadeOut(source), FadeIn(target))
+        scene.transition(sequence, run_time=.8)
+        self.assertEqual(captured, [sequence])
+
     def test_cleanup_in_a_sequence_is_not_pruned_before_its_reveal(self):
         from manim import FadeIn, FadeOut, Succession
         scene = object.__new__(algovis.SlideScene)
@@ -140,6 +167,55 @@ class PublicApiTests(unittest.TestCase):
         definition, result = Square(), Square().shift(2 * RIGHT)
         animation = algovis.ApplyDefinition(definition, None, result)
         self.assertEqual(len(animation.animations), 1)
+
+    def test_definition_transfer_uses_source_position_when_its_turn_begins(self):
+        import numpy as np
+        from manim import LEFT, UP
+        definition = VGroup(Square(side_length=.3), Square(side_length=.7).shift(RIGHT))
+        result = Square().shift(4 * RIGHT)
+        animation = algovis.ApplyDefinition(definition, None, result)
+        # Stand in for an earlier layout move in a composed Succession.
+        definition.scale(.6).shift(2 * UP + 3 * LEFT)
+        source_points = definition.get_all_points().copy()
+        scene = Scene()
+        scene.add(definition)
+        scene.add_mobjects_from_animations([animation])
+        animation._setup_scene(scene)
+        animation.begin()
+        animation.interpolate(0)
+        np.testing.assert_allclose(animation.traveller.get_all_points(), source_points, atol=1e-7)
+        animation.interpolate(.35)
+        np.testing.assert_allclose(
+            animation.traveller[1].get_center() - animation.traveller[0].get_center(),
+            definition[1].get_center() - definition[0].get_center(), atol=1e-7)
+        animation.finish()
+        animation.clean_up_from_scene(scene)
+        np.testing.assert_allclose(definition.get_all_points(), source_points, atol=1e-7)
+
+    def test_delayed_definition_copy_is_absent_until_its_turn(self):
+        import numpy as np
+        from manim import LEFT, UP, Succession
+        definition = VGroup(Square(side_length=.3), Square(side_length=.7).shift(RIGHT))
+        result = Square().shift(4 * RIGHT)
+        transfer = algovis.ApplyDefinition(definition, None, result, run_time=1)
+        sequence = Succession(
+            definition.animate(run_time=1).scale(.6).shift(2 * UP + 3 * LEFT),
+            transfer,
+        )
+        scene = Scene()
+        scene.add(definition)
+        scene.add_mobjects_from_animations([sequence])
+        sequence._setup_scene(scene)
+        sequence.begin()
+        sequence.interpolate(.25)
+        self.assertNotIn(transfer.traveller, scene.get_mobject_family_members())
+        sequence.interpolate(.5)
+        self.assertIn(transfer.traveller, scene.get_mobject_family_members())
+        np.testing.assert_allclose(transfer.traveller.get_all_points(), definition.get_all_points())
+        sequence.finish()
+        sequence.clean_up_from_scene(scene)
+        self.assertIn(result, scene.get_mobject_family_members())
+        self.assertNotIn(transfer.traveller, scene.get_mobject_family_members())
 
     def test_review_labels_follow_transformed_content_without_changing_tex(self):
         from manim import Transform

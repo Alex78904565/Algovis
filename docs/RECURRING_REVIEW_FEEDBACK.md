@@ -95,6 +95,11 @@ Update the affected row in place. Do not fade in a whole replacement proof.
 Algebra can reuse one working line when retaining all intermediate equalities
 would force tiny text or move the work outside the proof.
 
+Place retained equations in their eventual reference or proof rows before new
+rows appear. Keeping a base case visible in its old location is not useful if
+the induction hypothesis is subsequently written over it. Inspect the waiting
+states before its next narrated mention, not only its final position.
+
 ## Layout and color
 
 Short, stable topic headings are preferred. Text on screen organizes the argument;
@@ -121,6 +126,17 @@ of absent objects. Check motion as well as the final still frame.
 Diagrams should demonstrate the stated action: an empty array fills in its cells;
 a recurrence uses its two known values; a rejected item visibly exceeds capacity;
 one falling domino makes contact before its neighbor starts and eventually rests.
+
+Check grouped cleanup as well as direct fades. A `wipe()` is a group of exits;
+it must finish before replacement text enters the same space. Do not let nesting
+silently turn a clear-before-reveal transition into a crossfade. Preserve the
+timing of deliberately authored mixed sequences.
+
+A definition transfer queued after a layout move must copy the definition's
+position and size when its own turn begins. Its travelling copy must remain
+absent during earlier steps of the sequence. Check an actual nested sequence;
+testing a transfer in isolation cannot catch an early copy introduced by its
+parent animation group.
 
 When the narration has already introduced and filled an array before comparing it
 with the recursion tree, keep that array visible below the tree. The surviving

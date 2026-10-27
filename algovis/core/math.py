@@ -151,8 +151,17 @@ class ApplyDefinition(AnimationGroup):
         super().__init__(
             transfer,
             lag_ratio=0,
+            introducer=True,
             **kwargs,
         )
+
+    def begin(self):
+        # In a Succession the source may move or resize before this transfer
+        # starts. Copy its visible geometry now, rather than reviving the
+        # position it had when the animation sequence was constructed.
+        self.traveller.become(self.definition.copy()).set_z_index(30)
+        self.landing.become(self.traveller.copy().move_to(self.result))
+        super().begin()
 
     def _setup_scene(self, scene):
         # A pre-laid-out equation may already own the hidden destination.
@@ -160,6 +169,9 @@ class ApplyDefinition(AnimationGroup):
         # the travelling copy. Remove descendants too: Manim can dissolve
         # an animated container into separate scene objects.
         scene.remove(*self.result.get_family())
+        # A delayed application must not be auto-added by an enclosing
+        # Succession before its turn. Introduce the copy only on activation.
+        scene.add(self.traveller)
         super()._setup_scene(scene)
 
     def clean_up_from_scene(self, scene):
