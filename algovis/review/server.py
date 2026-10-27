@@ -341,6 +341,12 @@ class ReviewServer:
 
     def audit_payload(self) -> dict | None:
         """Return the generated preflight findings for the active section."""
+        # Polling and project refresh can arrive together. Legacy migration and
+        # the shared evidence cache must not race a saved viewer decision.
+        with self._lock:
+            return self._audit_payload()
+
+    def _audit_payload(self) -> dict | None:
         path = self.workspace / ".review" / "audit.json"
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
