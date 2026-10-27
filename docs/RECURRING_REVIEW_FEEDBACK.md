@@ -132,11 +132,18 @@ equals sign; that is a deliberate mathematical indent, not another centered row.
 Keep short function meanings to one or two left-aligned lines. Inspect the full
 composition both before and after argument changes, proof-layout moves, and
 later substitutions. An aligned label alone does not establish an aligned row.
+Apply this preference across existing sections, not only the section containing
+the latest annotation. Record the groups corrected and the layouts deliberately
+preserved. Centered standalone diagrams and balanced comparison panels can stay
+centered; the related explanatory rows inside a panel still need shared anchors.
 
 Blue identifies structure or the current state. Yellow identifies an operation
 or active choice. Green means known, stored, valid, or complete. Red means
 invalid or wasted repeated work. White is neutral; gray is supporting material.
 Do not cycle these roles merely to emphasize a spoken mention.
+Punctuation does not gain an operator or stored-answer color just because its
+shape changes. In a parentheses-to-brackets conversion, preserve its neutral
+color and let the notation change carry the explanation.
 
 When fixed problem inputs and the current recursive state appear together,
 label them INPUTS and STATE explicitly. Use neutral white for fixed quantities

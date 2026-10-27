@@ -138,6 +138,11 @@ moving content into the proof rail. Prefer stable left anchors to separately
 centered rows. Check that fixed input data and changing state have explicit
 labels and consistent color roles in both examples and symbolic expressions.
 
+For an overview of a completed build, sample the relevant animation's end, not
+the end of the cue's inherited pause: the latter can put the sample into the
+next transition. Use the actual animation records and neighboring frames to
+distinguish a settled composition from a travelling copy or a layout change.
+
 For multi-phase helpers, inspect each internal boundary and neighboring video
 frames, not only the outer play's start, middle, and end. In particular check
 definition travel, arrival, substitution, and adoption with repeated symbols and
