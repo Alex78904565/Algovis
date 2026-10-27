@@ -66,6 +66,9 @@ Viewer-endorsed patterns from this lesson's reviews:
 - **Count the relevant objects visibly:** highlighting all tree nodes helped
   distinguish all calls from just the base-case calls. Restore that instructional
   connection when needed; removing unnecessary motion must not remove evidence.
+  The latest refinement specifically endorses a persistent tint on the uncounted
+  internal nodes during "only some of the times," while the counted base cases
+  keep their established color. Preserve that subset distinction.
 
 Before revising one of these devices, state which part of it is working and which
 part needs repair. Preserve the working part, compare the old and new rendered
@@ -405,6 +408,25 @@ its space, keep the future content detached, and introduce it on the spoken word
 Check the actual frames immediately before the cue as well as after it.
 
 ## Before returning the work
+
+Preserve the viewer's preflight decisions for unchanged moments. A render name,
+source-line change, or edit elsewhere in a section must not reopen every flag.
+Record the local rendered evidence and narration when a check is accepted;
+reopen it only when that evidence changes. Keep earlier decisions as history.
+Do not infer approval of changed content from an old decision without evidence.
+
+Static operation counts are an agent diagnostic, not proof of visual clutter.
+A coordinated notation change can manipulate many objects while conveying one
+idea. Exclude cleanup from counts of new content and treat explicitly coordinated
+builds as a unit. Deduplicate the same concern at the same cue, while keeping
+different moments and technical errors distinct. Ask a specific question about
+the actual concern instead of repeatedly asking whether a moment looks good.
+
+In a runtime argument, make a numerical sum's symbolic identity explicit before
+generalizing it. Distinguish uncounted internal calls from counted base calls
+with a persistent structural tint when the narration explains the omission.
+Peer formulas should use consistent rendered text sizes; neutral qualifiers
+such as SUPPOSE do not acquire the operator color merely to attract attention.
 
 Ask the author early if a note could reasonably require different visual outcomes.
 Specific questions are welcome; a long wait followed by a guessed interpretation

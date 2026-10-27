@@ -162,7 +162,7 @@ def audit_source_method(
         if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef)):
             continue
         for call in ast.walk(statement):
-            if not isinstance(call, ast.Call) or _call_name(call) != "wait_for_cue":
+            if not isinstance(call, ast.Call) or _call_name(call) not in {"wait_for_cue", "play_on_cue"}:
                 continue
             cue = _literal(call.args[0]) if call.args else None
             if not isinstance(cue, str):
@@ -192,11 +192,11 @@ def audit_source_method(
         if not isinstance(node, ast.Call):
             continue
         name = _call_name(node)
-        if name in {"play", "transition"}:
+        if name in {"play", "transition", "play_on_cue"}:
             play_count += 1
-        elif name == "wait":
+        if name == "wait":
             hard_wait_lines.append(node.lineno)
-        elif name == "wait_for_cue":
+        elif name in {"wait_for_cue", "play_on_cue"}:
             cue = _literal(node.args[0]) if node.args else None
             if isinstance(cue, str):
                 used_cues.add(cue)
@@ -225,10 +225,10 @@ def audit_source_method(
         next_control = next((call for call in sorted(
             (call for call in ast.walk(reachable) if isinstance(call, ast.Call)
              and call.lineno > line and _call_name(call) in {
-                 "wait_for_cue", "play_to_cue", "play", "transition", "finish_narration",
+                 "wait_for_cue", "play_to_cue", "play_on_cue", "play", "transition", "finish_narration",
              }), key=lambda call: call.lineno)), None)
         if next_control is None or _call_name(next_control) in {
-            "wait_for_cue", "play_to_cue", "finish_narration",
+            "wait_for_cue", "play_to_cue", "play_on_cue", "finish_narration",
         }:
             # A still hold before another named cue does not move that cue.
             # The rendered late-arrival check detects an actual overrun.
@@ -342,7 +342,8 @@ def audit_project(
                         ))
                 unmatched = [
                     cue.get("name", "") for cue in cues
-                    if cue.get("phrase") and not _contains_phrase(words, str(cue["phrase"]))
+                    if cue.get("name") not in {"section_start", "section_end"}
+                    and cue.get("phrase") and not _contains_phrase(words, str(cue["phrase"]))
                 ]
                 for cue_name in unmatched:
                     report.issues.append(AuditIssue(

@@ -67,15 +67,27 @@ Click a saved note to open its marked frame and discussion. Click the same note
 again to close it. After Codex attempts a fix, the note changes to **ready for
 your review**; only the viewer marks it resolved.
 
-Preflight decisions are saved per flag and per audiovisual version. Reloading
-the reviewer resumes the unfinished checks. A new render or soundtrack change
-reopens them; adding a change request does not reset the other checks. Use
+Preflight decisions are saved for the flagged moment. Reloading the reviewer,
+rerendering identical content, or editing another part of the section keeps the
+decision. The reviewer compares the actual decoded video frames and local
+narration timings; timing and audio checks also compare the speech. Music and
+mix changes reopen audio checks, without reopening unrelated visual checks.
+Earlier decisions remain in the local history. Older decisions that have no
+moment-level evidence migrate only when their original version still matches.
+Adding a change request does not reset the other checks. Use
 **Previous**, **Next**, or **Revisit flags** to inspect earlier decisions, and
 **Reopen flag** to undo one. Technical errors must be investigated or fixed and
 cannot be cleared solely by checking the picture. Ordinary preflight warnings
 can be checked off when the preview is correct.
-Checking a flag also resolves the change request linked to that flag, so the
-same fix does not need to be confirmed twice.
+Checking a flag also resolves its linked change request. Resolving that request
+also checks the corresponding nontechnical flag for the current moment, so the
+same fix does not need to be confirmed twice. Duplicate reports of the same
+concern at one cue share a check; different moments stay separate.
+
+Density estimates count independent additions rather than every animation
+primitive. Cleanup adds no competing content, and an explicitly coordinated
+build counts as one unit. They remain conservative prompts for inspection;
+word-timing, continuity, geometry, and technical errors have separate checks.
 
 ## Approve a finished section
 

@@ -2047,8 +2047,8 @@
         empty.className = "audit-item";
         empty.textContent = !issues.length ? "No preflight flags in this section."
           : remaining ? "You reached the end of this pass. Skipped flags are saved for later."
-          : progress.needs_change ? "Your change requests are queued. They will return for review when the preview changes."
-          : "Every flag in this version has been checked.";
+          : progress.needs_change ? "Your change requests are queued. Only changed moments will need another check."
+          : "Every flagged moment has been checked. Unrelated edits keep these decisions.";
         list.append(empty);
         const actions = document.createElement("div");
         actions.className = "audit-actions";
@@ -2101,21 +2101,27 @@
         const status = document.createElement("div");
         status.className = `audit-review-status ${issue.reviewStatus}`;
         status.textContent = {
-          checked: "✓ Checked for this version",
+          checked: "✓ Checked · this moment is unchanged",
           needs_change: "Fix requested · queued for Codex",
           deferred: "Skipped for now",
         }[issue.reviewStatus] || "";
         list.append(status);
+      }
+      if (issue.reviewReason) {
+        const reason = document.createElement("p");
+        reason.className = "audit-review-status";
+        reason.textContent = issue.reviewReason;
+        list.append(reason);
       }
       const details = document.createElement("details");
       details.className = "audit-details";
       const summary = document.createElement("summary");
       summary.textContent = "Why this was flagged";
       const reason = document.createElement("p");
-      reason.textContent = issue.message;
+      reason.textContent = [...new Set((issue.relatedDiagnostics || [issue]).map(value => value.message))].join("\n");
       const location = document.createElement("div");
       location.className = "audit-location";
-      location.textContent = issue.location || "";
+      location.textContent = [...new Set((issue.relatedDiagnostics || [issue]).map(value => value.location).filter(Boolean))].join(" · ");
       details.append(summary, reason, location);
       list.append(details);
       const note = document.createElement("textarea");
@@ -2175,6 +2181,7 @@
           method: "PATCH",
           body: JSON.stringify({
             status, version: state.project.audit.reviewVersion,
+            evidenceVersion: issue.evidenceVersion,
             note: state.auditNoteDrafts[issue.id] || "",
           }),
         });

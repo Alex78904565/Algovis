@@ -320,9 +320,11 @@ def _walk_actions(actions):
 
 
 def _visual_action_count(actions):
-    quiet = {"hold", "note"}
-    return sum(1 for action in _walk_actions(actions)
-               if action.verb not in quiet | {"together"})
+    # A coordinated build is one beat, not a new idea per glyph/mobject. Cleanup
+    # adds no competing content; rendered continuity checks audit large clears.
+    quiet = {"hold", "note", "hide"}
+    return sum((bool(_visual_action_count(action.children)) if action.verb == "together"
+                else action.verb not in quiet) for action in actions)
 
 
 def _parse_action(text, line_number):

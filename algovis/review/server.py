@@ -30,6 +30,7 @@ from urllib.parse import parse_qs, quote, urlparse
 import uuid
 
 from .transitions import build_transition_index
+from .preflight import finding_evidence, finding_id, legacy_id, store_decision
 
 
 MAX_JSON_BYTES = 8 * 1024 * 1024
@@ -171,6 +172,7 @@ class ReviewServer:
         self._frame_lock = threading.Lock()
         self._transition_cache_key = None
         self._transition_cache = []
+        self._finding_evidence_cache = {}
         self._render_requested = False
         self.render_status = RenderStatus()
         self.revision = self._video_revision()
@@ -351,17 +353,36 @@ class ReviewServer:
             reviews = json.loads(self.finding_reviews_path.read_text(encoding="utf-8"))
         except (FileNotFoundError, json.JSONDecodeError):
             reviews = {}
-        # Reviewing one flag must not reset the rest when its change request
-        # creates an annotation. Only changes to the audiovisual version do.
+        # The whole-section version rejects stale requests. Individual decisions
+        # depend on their local evidence, not unrelated edits elsewhere.
         version = self._review_version([])
         progress = {"pending": 0, "checked": 0, "needs_change": 0, "deferred": 0}
+        grouped = {}
         for issue in audit.get("issues", []):
-            identity = {key: issue.get(key) for key in (
-                "severity", "category", "message", "location", "cue", "time",
-            )}
-            identifier = hashlib.sha256(json.dumps(identity, sort_keys=True).encode("utf-8")).hexdigest()[:20]
-            saved = reviews.get(identifier, {})
-            status = saved.get("status", "pending") if saved.get("version") == version else "pending"
+            identifier = finding_id(issue)
+            if identifier in grouped:
+                grouped[identifier]["relatedDiagnostics"].append(dict(issue))
+                if issue.get("severity") == "error":
+                    grouped[identifier]["severity"] = "error"
+            else:
+                grouped[identifier] = {**issue, "relatedDiagnostics": [dict(issue)]}
+        audit["issues"] = list(grouped.values())
+        migrated = False
+        for identifier, issue in grouped.items():
+            saved = reviews.get(identifier, {}) or next((
+                reviews[old] for diagnostic in issue["relatedDiagnostics"]
+                if (old := legacy_id(diagnostic)) in reviews
+            ), {})
+            evidence = finding_evidence(self, issue, self._finding_evidence_cache)
+            matches = saved.get("evidenceVersion") == evidence["version"]
+            # Legacy decisions lack local evidence. Migrate only when the exact
+            # audiovisual version they reviewed is still present; retain other
+            # historical decisions without inventing approval of changed media.
+            if saved and not saved.get("evidenceVersion") and saved.get("version") == version:
+                saved = {**saved, "evidenceVersion": evidence["version"], "evidence": evidence}
+                reviews[identifier] = saved
+                matches = migrated = True
+            status = saved.get("status", "pending") if matches else "pending"
             if status not in progress:
                 status = "pending"
             issue.update({
@@ -370,8 +391,17 @@ class ReviewServer:
                 "reviewedAt": saved.get("reviewedAt") if status != "pending" else None,
                 "annotationId": saved.get("annotationId"),
                 "reviewQuestion": self._finding_question(issue),
+                "evidenceVersion": evidence["version"],
+                "reviewScope": evidence["scope"],
+                "reviewStart": evidence["start"], "reviewEnd": evidence["end"],
+                "reviewReason": ("This moment changed since you checked it."
+                                 if saved.get("evidenceVersion") and not matches else
+                                 "Earlier review saved without moment-level evidence."
+                                 if saved and not matches else None),
             })
             progress[status] += 1
+        if migrated:
+            _atomic_json(self.finding_reviews_path, reviews)
         audit.get("issues", []).sort(key=lambda issue: (
             issue.get("time") is None,
             float(issue.get("time") or 0.0),
@@ -397,20 +427,29 @@ class ReviewServer:
             audit["status"] = "ready"
         return audit
 
-    @staticmethod
-    def _finding_question(issue: dict) -> str:
+    def _finding_question(self, issue: dict) -> str:
         if issue.get("severity") == "error":
             return "This needs a technical check. Send it to Codex to investigate."
         category = issue.get("category")
+        cue = next((cue for cue in self.cues if cue["name"] == issue.get("cue")), {})
+        phrase = cue.get("phrase", "")
+        moment = f' during “{phrase}”' if phrase else " in this moment"
+        message = issue.get("message", "")
         if category == "timing":
-            return "Does the animation line up with the words you are saying?"
+            if "not an exact transcript match" in message:
+                return f'Is “{phrase}” the right spoken trigger for this change?'
+            return f"Does this change start on the intended words{moment}?"
         if category in {"density", "storyboard"}:
-            return "Is there enough time to follow each change, without too much happening at once?"
+            if "active beats are only" in message:
+                return f"Is there enough time to follow the preceding change before this one{moment}?"
+            if "no spoken phrase" in message:
+                return "Which spoken words should introduce this change?"
+            return f"Are the new ideas easy to follow{moment}?"
         if category == "color":
-            return "Does this highlight use a color that makes sense here?"
+            return f"Does this highlight's color match the object's meaning{moment}?"
         if category == "audio":
-            return "Does this moment sound right, including the music?"
-        return "Does this part look and sound right?"
+            return f"Are speech and music clear and balanced{moment}?"
+        return message or "Does this part look and sound right?"
 
     def review_finding(self, identifier: str, payload: dict) -> dict:
         status = payload.get("status")
@@ -420,11 +459,12 @@ class ReviewServer:
             audit = self.audit_payload()
             if audit is None:
                 raise ValueError("No preflight report is available for this section.")
-            if payload.get("version") != audit["reviewVersion"]:
-                raise ValueError("The preview changed. Review the latest version of this flag.")
             issue = next((item for item in audit["issues"] if item["id"] == identifier), None)
             if issue is None:
                 raise ValueError("This flag is no longer in the current preflight report.")
+            if (payload.get("version") != audit["reviewVersion"]
+                    and payload.get("evidenceVersion") != issue["evidenceVersion"]):
+                raise ValueError("The preview changed. Review the latest version of this flag.")
             if status == "checked" and issue.get("severity") == "error":
                 raise ValueError("This technical error needs a fix before it can be cleared.")
             try:
@@ -469,10 +509,12 @@ class ReviewServer:
                 linked = next((item for item in self.annotations() if item["id"] == annotation_id), None)
                 if linked is not None and linked.get("status") != "resolved":
                     self.set_annotation_status(annotation_id, "resolved")
-            reviews[identifier] = {
+            store_decision(reviews, identifier, {
                 "status": status, "version": audit["reviewVersion"],
                 "reviewedAt": _utc_now(), "annotationId": annotation_id,
-            }
+                "evidenceVersion": issue["evidenceVersion"],
+                "evidence": finding_evidence(self, issue, self._finding_evidence_cache),
+            })
             _atomic_json(self.finding_reviews_path, reviews)
             return {
                 "audit": self.audit_payload(), "annotations": self.annotations(),
@@ -803,7 +845,32 @@ class ReviewServer:
             match["updatedAt"] = _utc_now()
             _atomic_json(self.annotations_path, annotations)
             self._write_pending_file(annotations)
+            if status == "resolved":
+                self._confirm_linked_finding(identifier)
             return match.copy()
+
+    def _confirm_linked_finding(self, annotation_id: str) -> None:
+        """A viewer resolving a flag's note also confirms that exact moment."""
+        try:
+            reviews = json.loads(self.finding_reviews_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return
+        if not any(value.get("annotationId") == annotation_id for value in reviews.values()):
+            return
+        audit = self.audit_payload()
+        if not audit:
+            return
+        # audit_payload may have migrated another legacy decision meanwhile.
+        reviews = json.loads(self.finding_reviews_path.read_text(encoding="utf-8"))
+        for issue in audit["issues"]:
+            if issue.get("annotationId") == annotation_id and issue.get("severity") != "error":
+                store_decision(reviews, issue["id"], {
+                    "status": "checked", "version": audit["reviewVersion"],
+                    "reviewedAt": _utc_now(), "annotationId": annotation_id,
+                    "evidenceVersion": issue["evidenceVersion"],
+                    "evidence": finding_evidence(self, issue, self._finding_evidence_cache),
+                })
+        _atomic_json(self.finding_reviews_path, reviews)
 
     def add_annotation_response(self, identifier: str, payload: dict) -> dict:
         body = str(payload.get("body", "")).strip()

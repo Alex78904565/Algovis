@@ -262,6 +262,101 @@ class ReviewServerTests(unittest.TestCase):
         self.assertEqual(result["annotations"][0]["status"], "resolved")
         self.assertTrue(result["approval"]["canApprove"])
 
+    def test_preflight_identity_ignores_line_numbers_and_new_container_metadata(self):
+        self._write_preflight([{'severity':'warning', 'category':'storyboard',
+            'message':'notation/start: 5 visual changes for one phrase',
+            'location':'scene.py:12', 'cue':'start', 'time':0}])
+        audit=self.review.audit_payload();issue=audit['issues'][0]
+        self.review.review_finding(issue['id'],{'status':'checked','version':audit['reviewVersion']})
+        import os
+        path=self.review.video_path;stat=path.stat()
+        os.utime(path,ns=(stat.st_atime_ns,stat.st_mtime_ns+1000000))
+        self._write_preflight([{'severity':'warning', 'category':'storyboard',
+            'message':'notation/start: 6 visual changes for one phrase',
+            'location':'scene.py:99', 'cue':'start', 'time':0}])
+        refreshed=self.review.audit_payload()['issues'][0]
+        self.assertEqual(refreshed['id'],issue['id'])
+        self.assertEqual(refreshed['reviewStatus'],'checked')
+
+    def test_preflight_approval_is_scoped_to_decoded_video_moment(self):
+        if not shutil.which('ffmpeg'):
+            self.skipTest('FFmpeg is needed for interval integration test')
+        def render(first,second):
+            subprocess.run(['ffmpeg','-v','error','-y',
+                '-f','lavfi','-i',f'color=c={first}:s=96x64:r=10:d=1.5',
+                '-f','lavfi','-i',f'color=c={second}:s=96x64:r=10:d=1.5',
+                '-filter_complex','[0:v][1:v]concat=n=2:v=1:a=0[v]',
+                '-map','[v]','-c:v','libx264','-crf','0',str(self.review.video_path)],check=True)
+        render('red','blue')
+        self._write_preflight([{'severity':'warning','category':'storyboard',
+            'message':'Check the first build.','cue':'start','time':0}])
+        audit=self.review.audit_payload();issue=audit['issues'][0]
+        self.review.review_finding(issue['id'],{'status':'checked','version':audit['reviewVersion']})
+        render('red','green')
+        current=self.review.audit_payload()
+        self.assertNotEqual(current['reviewVersion'],audit['reviewVersion'])
+        self.assertEqual(current['issues'][0]['reviewStatus'],'checked')
+        # A click already in flight remains valid when only another moment changed.
+        self.review.review_finding(issue['id'],{'status':'checked',
+            'version':audit['reviewVersion'],'evidenceVersion':issue['evidenceVersion']})
+        render('white','green')
+        self.assertEqual(self.review.audit_payload()['issues'][0]['reviewStatus'],'pending')
+        with self.assertRaisesRegex(ValueError,'preview changed'):
+            self.review.review_finding(issue['id'],{'status':'checked',
+                'version':audit['reviewVersion'],'evidenceVersion':issue['evidenceVersion']})
+
+    def test_visual_check_survives_music_change_but_audio_check_reopens(self):
+        self._write_preflight([
+            {'severity':'warning','category':'storyboard','message':'Visual build.','cue':'start','time':0},
+            {'severity':'warning','category':'audio','message':'Music balance.','cue':'change','time':1.5}])
+        audit=self.review.audit_payload()
+        for issue in audit['issues']:
+            self.review.review_finding(issue['id'],{'status':'checked','version':audit['reviewVersion']})
+        self.review.music_gain_db=-20
+        visual,audio=self.review.audit_payload()['issues']
+        self.assertEqual(visual['reviewStatus'],'checked')
+        self.assertEqual(audio['reviewStatus'],'pending')
+
+    def test_duplicate_diagnostics_are_one_check_and_errors_stay_blocking(self):
+        item={'severity':'warning','category':'timing','message':'Anchor mismatch.',
+              'location':'scene.py:10','cue':'start','time':0}
+        self._write_preflight([item,{**item,'location':'scene.py:20'}])
+        audit=self.review.audit_payload()
+        self.assertEqual(len(audit['issues']),1)
+        self.assertEqual(len(audit['issues'][0]['relatedDiagnostics']),2)
+        issue=audit['issues'][0]
+        self.review.review_finding(issue['id'],{'status':'checked','version':audit['reviewVersion']})
+        self._write_preflight([item,{**item,'severity':'error'}])
+        self.assertEqual(self.review.audit_payload()['status'],'blocked')
+        self.assertEqual(self.review.audit_payload()['issues'][0]['reviewStatus'],'pending')
+
+    def test_legacy_preflight_migrates_only_with_matching_reviewed_version(self):
+        from algovis.review.preflight import legacy_id
+        item={'severity':'warning','category':'timing','message':'Anchor check.',
+              'cue':'start','time':0}
+        self._write_preflight([item]);version=self.review._review_version([])
+        self.review.finding_reviews_path.write_text(json.dumps({legacy_id(item):{
+            'status':'checked','version':version,'reviewedAt':'earlier'}}),encoding='utf-8')
+        self.assertEqual(self.review.audit_payload()['issues'][0]['reviewStatus'],'checked')
+        saved=json.loads(self.review.finding_reviews_path.read_text())
+        self.assertTrue(any(r.get('evidenceVersion')for r in saved.values()))
+        self.review.finding_reviews_path.write_text(json.dumps({legacy_id(item):{
+            'status':'checked','version':'unverifiable older version'}}),encoding='utf-8')
+        self.assertEqual(self.review.audit_payload()['issues'][0]['reviewStatus'],'pending')
+
+    def test_resolving_a_flags_note_confirms_only_its_linked_moment(self):
+        self._write_preflight([
+            {'severity':'warning','category':'timing','message':'First flag.','cue':'start','time':0},
+            {'severity':'warning','category':'timing','message':'Second flag.','cue':'change','time':1.5}])
+        audit=self.review.audit_payload();issue=audit['issues'][0]
+        result=self.review.review_finding(issue['id'],{'status':'needs_change',
+            'version':audit['reviewVersion'],'note':'Fix this moment.'})
+        self.review.set_annotation_status(result['annotations'][0]['id'],'resolved')
+        refreshed=self.review.audit_payload()
+        self.assertEqual([i['reviewStatus']for i in refreshed['issues']],['checked','pending'])
+        records=json.loads(self.review.finding_reviews_path.read_text())
+        self.assertEqual(records[issue['id']]['history'][-1]['status'],'needs_change')
+
     def test_skipping_preflight_does_not_clear_technical_errors(self):
         self._write_preflight([{
             "severity": "error", "category": "source", "message": "Unknown cue.",
