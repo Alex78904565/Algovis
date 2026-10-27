@@ -342,6 +342,10 @@ does not mean its current animations have been repaired or approved.
   together in the concrete example, and visibly undo an attempted choice that
   does not fit. Do not quietly restore example numbers after removing them to
   discuss the general problem.
+- Reserve label space using the final populated text. Two short symbols can have
+  ample space initially and collide when replaced with indexed numerical data.
+  Check the final glyphs and their gap at full-frame size, not only bounding-box
+  thresholds or the empty slots. Keep the same reserved positions during filling.
 - Refine the English choice locally. Introducing `w` does not justify immediately
   replacing "if it fits" with a complete capacity inequality. Introduce each
   quantity as needed, then translate the condition on the spoken explanation.
