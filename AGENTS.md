@@ -14,8 +14,10 @@ causes where possible, and state the actual scope of visual verification.
 For each change, justify what it adds to the explanation. Check continuity of
 the argument and notation, not only retained object IDs. Before an attention
 effect, verify that its target's actual text remains visible and readable.
-Use the focused checks under "Lessons from the first three sections" in the
-recurring-feedback reference; passing the timing ledger does not replace them.
+Use the focused checks under "Lessons from the first three sections" and
+"Lessons from the second review of sections 1–6" in the recurring-feedback
+reference; passing the timing ledger does not replace them. Check exact retained
+intermediate expressions, visual prerequisites, and each helper's internal phases.
 Consult "Successful patterns to preserve" as well. Record positive feedback
 with its specific scope and evidence, and preserve the working parts during
 repairs. Keep viewer endorsement distinct from the agent's own verification.

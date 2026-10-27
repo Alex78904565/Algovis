@@ -57,6 +57,15 @@ Viewer-endorsed patterns from this lesson's reviews:
 - **Equations built in place:** keep the function definition and useful work
   visible as the explanation develops. Preserve the existing orientation and
   refine the affected term rather than replacing the whole composition.
+- **Contact-based domino motion:** the viewer called the repaired fall a
+  "phenomenal fix." Preserve its contact geometry and resting positions. Dense
+  motion sampling and an explicit geometric model worked for this repair.
+- **English beside mathematics:** clip 2's revised explanation received positive
+  feedback. Keep its concise English rule as a descriptor below the recurrence,
+  following the viewer's latest preference; do not turn it into another slide.
+- **Count the relevant objects visibly:** highlighting all tree nodes helped
+  distinguish all calls from just the base-case calls. Restore that instructional
+  connection when needed; removing unnecessary motion must not remove evidence.
 
 Before revising one of these devices, state which part of it is working and which
 part needs repair. Preserve the working part, compare the old and new rendered
@@ -92,8 +101,12 @@ symbols must not swap places because of differing Manim group structures.
 
 Keep the proof rail and prior reasoning while changing a hypothesis or base case.
 Update the affected row in place. Do not fade in a whole replacement proof.
-Algebra can reuse one working line when retaining all intermediate equalities
-would force tiny text or move the work outside the proof.
+Name the exact intermediate expressions the viewer must retain. A final result
+does not satisfy a request to keep the expression immediately after substitution.
+Reserve room for that substituted expression and the result together, extending
+the equality to the right or using aligned rows. Only nonessential arithmetic
+may reuse a working line; lack of space does not override an explicit retention
+request. Move supporting work or revise the layout before shrinking the proof.
 
 Place retained equations in their eventual reference or proof rows before new
 rows appear. Keeping a base case visible in its old location is not useful if
@@ -246,6 +259,79 @@ change immediately, but leave the animation repair pending until it has actually
 been made and checked. Do not use an earlier zero-error audit as a reply to new
 visual feedback. A repeated audio-noise report also reopens the edit; an earlier
 non-speech attenuation is not proof that the remaining noise is gone.
+
+## Lessons from the second review of sections 1–6
+
+These are failures of the previous checks, not new preferences. Use the concrete
+acceptance checks below when repairing the affected scenes and their other uses.
+
+### Check the argument's intermediate steps explicitly
+
+- Keep the numeric example while deriving its general rule. Replacing
+  `8 + 5 = 13 = f(7)` with `f(n)` does not explain why the identity holds for
+  every input. Show the base-case counts and the child-count addition rule.
+- Keep the expression immediately after substituting the induction hypothesis,
+  then the final result to its right. Other retained proof rows cannot substitute
+  for that missing expression. When applying the result later, replace only
+  `1 + 2 + ... + n` and preserve `f(n) =`.
+- Distinguish a numerical count from an asymptotic class. `O(n)` supplies neither
+  constant one nor a bound at a particular input. For this Fibonacci algorithm,
+  derive one addition per entry after the two base cases: `n - 2 <= n` for
+  `n >= 2`. That independently justifies at most 191 additions at input 191.
+- Label the quantity currently being discussed. Once operations are related to
+  calls, explain that the same curve bounds both; do not silently leave the plot
+  labeled as a call count while discussing operations. Prefer "base-case calls"
+  to undefined "leaves" for this audience.
+
+**Agent check:** list the required expressions and their roles (example, general
+rule, substituted expression, final result). Verify their actual coexistence in
+the rendered frame. Check the bridge between each pair, not merely their presence
+at different times. Count-based preflight warnings do not decide this question.
+
+### Verify prerequisites and the actual start of the thought
+
+- An addition guide must stay absent until both base values exist. Test an actual
+  nested fill sequence: a future `Create` or `Transform` target can become visible
+  when its outer animation group starts, before its own scheduled turn.
+- Choose the spoken thought that introduces the visual. A timestamp on a word
+  halfway through the sentence can pass a mechanical check and still be late.
+- Compare that intended onset with the first visible change after cleanup and
+  other nested actions. A correct cue followed by a half-second exit animation
+  does not make the subsequent reveal timely. Legacy cue waits without recorded
+  word timing remain unverified, even when the error count is zero.
+- Inspect definition transfers around each internal phase: travel, arrival,
+  substitution, and adoption. Include adjacent video frames at those boundaries.
+  Repeated glyphs and different formula groupings need their own motion check;
+  a correct arrival and final frame can conceal a brief symbol swap.
+
+**Agent check:** record the chosen phrase, intended word time, actual first-visible
+time, prerequisite state, and internal phase boundaries. Resolve a mismatch before
+calling the effect verified. Do not infer the cause of a brief glitch from a
+single still; distinguish an observed failure from a suspected implementation cause.
+
+### Retain useful work and retire completed illustrations
+
+- Keep derivations needed for the current reasoning. A graph whose point is
+  complete may leave so the active formulas can be regrouped. Retention is about
+  continuity of the explanation, not keeping every object forever.
+- Place a qualifier beside the statement it qualifies. A base-case explanation
+  in a global footer can incorrectly appear to describe the entire proof.
+- Keep comparable dependency diagrams in the same orientation. Preserve the
+  useful progression from `n` to smaller inputs; show continuation toward an
+  example base case consistently in both diagrams.
+- Compare rendered letter heights for peer equations. Equal `.scale()` calls on
+  different source objects do not guarantee equal visual text size. First ask
+  whether the equation needs to move to another composition at all.
+- Position related formulas together rather than scattering supporting results
+  into arbitrary corners. Keep "SUPPOSE" and its assumed equation on one line
+  in the current runtime estimate, as the viewer clarified.
+- A spoken mention and a new known status can justify a pulse plus a persistent
+  green tint. Removing decorative emphasis must not remove the onset cue for
+  the specific smaller input being assumed correct.
+
+**Agent check:** identify the active argument, each retained item's next use, and
+the scope of every note. Inspect the complete composition and peer text sizes.
+Preserve explicitly praised devices while repairing the local defect.
 
 ## Before returning the work
 

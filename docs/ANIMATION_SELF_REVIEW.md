@@ -44,6 +44,8 @@ For each conceptual change, write down:
    harder to follow? If not, remove it before rendering.
 7. **Quantity:** does this keep the established meaning, name, units, and type of
    bound? If it introduces another quantity, where is their relationship explained?
+8. **Prerequisites and retained steps:** which values must already exist, and
+   which exact intermediate expressions must remain alongside the result?
 
 A preceding `wait_for_cue` provides context. It does not justify every later
 animation until the next cue. A pulse after a reveal, color change, or another
@@ -79,6 +81,12 @@ publishing the new video. A rejected attempt leaves the last good preview
 available. A correctly timed pulse does not validate an earlier reveal: check
 when the underlying value first becomes visible, not just its emphasis.
 
+Verify the choice of trigger as well as its timestamp. Write the thought that
+introduces the change and check its onset against the recording. A matching word
+halfway through that thought can still be the wrong trigger. Include preceding
+cleanup in the measured first-visible time. Legacy plays without word-timing
+evidence are unverified, not zero-error timing passes.
+
 Definition transfers carry a rigid copy of the glyphs, then visibly substitute
 parameters or values after arrival. Do not carry a background patch or fade the
 copy away before the result exists. Adopt the final result with identical geometry
@@ -98,6 +106,13 @@ travelling copy, arrival, local substitution, and cleanup as well as the final r
   example is different from erasing a line and recreating it two seconds later.
 - **Dense construction:** count new ideas, not individual glyphs or drawing
   primitives. Reusing a brace and two rows can be clearer than a single new panel.
+- **Missing derivation:** name the exact example, general rule, substituted
+  expression, and result that must coexist. Keeping other proof rows does not
+  excuse deleting the requested intermediate step. Check mathematical dependence
+  separately from a warning about the number of animation primitives.
+- **Premature guide or value:** verify prerequisites in the actual nested
+  sequence. Future animation targets must remain absent until their turn; an
+  addition guide needs both base inputs visible before it appears.
 - **Retained identity:** compare adjacent compositions for continuity of meaning.
   A retained object fraction cannot certify that the explanation still flows.
 - **Referenced target:** inspect the text inside the focused object, not just its
@@ -115,6 +130,13 @@ report, zero overlaps, or passing tests do not constitute editorial signoff.
 Inspect the start, middle, and end of every changed transition. Check the complete
 composition, including diagrams, guides, arrows, labels, and chapter marker.
 Inspect continuous motion separately where three frames cannot establish it.
+
+For multi-phase helpers, inspect each internal boundary and neighboring video
+frames, not only the outer play's start, middle, and end. In particular check
+definition travel, arrival, substitution, and adoption with repeated symbols and
+different group structures. The right start and final result do not rule out a
+brief glyph swap. Compare rendered text heights, diagram orientation, and the
+scope implied by note placement across adjacent compositions.
 
 Check the ledger against the recording: named references must receive appropriate
 attention on their words; claims must not anticipate the narration. Inspect dense
@@ -134,3 +156,7 @@ New feedback on an audited behavior invalidates that behavior's earlier signoff.
 Record the new finding and its required evidence; do not reuse the previous
 zero-error summary as proof. Updating prevention documentation is not an animation
 repair and must not move the corresponding repair out of the pending queue.
+Preserve the earlier record as history and attach the new note IDs, failed
+acceptance criterion, and required new evidence. Record successes just as
+specifically: viewer praise for a domino fall does not approve an unrelated
+substitution, and resolving earlier notes is not approval of the whole section.

@@ -23,6 +23,9 @@ editorial checklist. An inherited cue is context, not a justification for a puls
 - A visual may remain visible after its trigger, but it may not anticipate a
   claim the viewer has not heard yet.
 - Silence is usable pacing room. Do not fill it with unrelated motion.
+- Check that the chosen phrase introduces the thought, rather than merely
+  containing a matching word later in the sentence. Measure the actual reveal
+  after any cleanup; a correctly timestamped cue alone is insufficient.
 
 ## 2. Prefer one stable composition per idea
 
@@ -92,6 +95,11 @@ across layout changes.
   count to an operation or runtime bound; do not silently relabel them as aliases.
 - Distinguish exact values, approximations, upper bounds, and lower bounds.
   Keep an asymptotic growth statement qualified rather than implying equality.
+- Show how a numeric example generalizes; changing its label to `f(n)` is not
+  that derivation. A finite operation count must be established independently
+  of big O, whose hidden constant and threshold are unspecified.
+- Retain an explicitly requested substituted expression beside its final result.
+  Preserving other proof rows does not satisfy that requirement.
 
 ## 6. Layout is relational
 
@@ -137,6 +145,11 @@ recurred during review.
   subtree leaves no orphaned edges.
 - A semantic object has one visible owner at a time. Never leave both the old
   and new representation stacked in the scene.
+- Future targets in nested animation groups must remain invisible until needed.
+  Verify prerequisites: both base values exist before their addition guide.
+- Inspect internal helper phase boundaries and adjacent frames for symbol swaps
+  or duplicate ownership, including formulas with repeated glyphs and different
+  group structures. Outer start/middle/end samples alone cannot certify them.
 - Use `SlideScene.transition` when outgoing and incoming compositions occupy
   the same space. It clears the old material before revealing its replacement
   within the original cue's time slot. Crossfading two sentences is an overlap.
