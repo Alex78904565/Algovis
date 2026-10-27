@@ -92,6 +92,108 @@ Diagrams should demonstrate the stated action: an empty array fills in its cells
 a recurrence uses its two known values; a rejected item visibly exceeds capacity;
 one falling domino makes contact before its neighbor starts and eventually rests.
 
+## Lessons from the first three sections
+
+These checks address failures found again after the earlier automated and sampled
+frame audits. They apply throughout the lesson. A passing ledger is insufficient.
+
+### Carry the argument, not just an object ID
+
+- Treat an English definition as the beginning of its mathematical definition.
+  Move it to make room, then refine its words into notation in the same composition.
+  Do not discard it and introduce the same definition on a fresh page.
+- Build one concise mathematical line when the point is a mathematical relation.
+  For example, develop the base-leaf count and its addition rule into `= f(n)`;
+  do not replace that connection with several sentences about Fibonacci numbers.
+- Retaining one formula while replacing every surrounding explanation does not
+  establish continuity. Check whether the viewer can follow the same argument
+  through the change without reconstructing what the screen now means.
+- Before changing a whole composition, name the new idea that requires it. A
+  paraphrase of the current idea is not a new idea. Prefer extending an existing
+  formula or adjusting its layout to making another explanatory slide.
+
+**Agent check:** compare the English definition, intermediate reasoning, and final
+formula side by side in the frame ledger. Identify what was reused, what changed,
+and why a student needs the change. Inspect adjacent plays together, not just each
+play's retained-object fraction.
+
+### Make screen text earn its space
+
+- A caption must identify something ambiguous, express a necessary relationship,
+  or retain a conclusion needed later. Being mentioned in the audio is insufficient.
+- Remove labels that merely narrate the animation or echo the obvious diagram,
+  such as a separate instruction to count leaves when the leaves are already
+  being identified and counted.
+- Prefer an equality or annotation on the existing mathematical line to a new
+  sentence announcing what that equality means.
+- State a caveat once. If the retained assumption already says it underestimates
+  runtime, do not add another caption saying a real call takes more work.
+
+**Agent check:** hide each supporting caption in the proposed composition. If the
+diagram, formula, and voice still convey the point clearly, leave it out. A cue
+justifies the time of an event; it does not justify the event's existence.
+
+### Keep quantities and claims consistent
+
+- Choose one name for each measured quantity and keep it. Do not alternate
+  between "all recursive calls," `# calls`, and `runtime(n)` as unexplained aliases.
+- Calls and runtime are related quantities, not identical notation. Retain the
+  call-count argument and introduce the work-per-call assumption at the explicit
+  step that connects it to an operation or runtime bound. Keep units clear.
+- Distinguish exact equalities, approximations, and asymptotic bounds. A bare
+  `growth rate: phi^n` is ambiguous. Use a properly qualified exponential-growth
+  statement; do not imply an exact Fibonacci formula.
+- Keep upper and lower bounds straight even if a review note uses the other term.
+  Counting only base-case leaves gives a lower bound on all calls. Establishing
+  that is not a reason to add an unneeded upper-bound analysis.
+- Do not introduce extra notation solely to repair a caption. Reuse the quantities
+  already established, and expose the reasoning when a genuinely new one is needed.
+
+**Agent check:** list every displayed name, its meaning, units, relation symbol,
+and justified claim. Follow each across the whole section and its neighboring
+sections. Check mathematical meaning separately from typography and object reuse.
+
+### Verify the visible target, not just its scheduled effect
+
+- Immediately before, during, and after a focus effect, the referenced glyphs must
+  remain visible, legible, and correctly layered. A visible node border is not
+  evidence that its `f(2)` label is visible.
+- Inspect fills, label opacity, object ownership, and draw order when highlighting
+  a container. Do not accept a timed pulse on a hidden or covered child label.
+- Check the actual rendered target without the review interface's selection box.
+  A screenshot annotation outline is not part of the Manim animation.
+
+**Agent check:** use a close view of the rendered target at the event boundary and
+midpoint, together with the complete frame. The timing audit currently verifies
+declared timing; it does not certify legible glyphs, occlusion, or semantic value.
+
+### Center the composition deliberately and keep plot styling meaningful
+
+- Decide whether the main plot, the complete labeled graph, or a deliberate split
+  composition is being centered. Include tick labels and axis labels in the layout,
+  but check the visible plotting area's balance separately.
+- Moving the curve's steep part toward the center by shifting the entire axes
+  right can leave the graph itself visibly off center. Inspect both, preserving
+  the honest fixed scale and the intended curve escaping the frame.
+- Moving a retained annotation away from a curve must trigger a composition check;
+  avoiding that one collision does not certify the revised layout.
+- Keep a plotted series one semantic color. Do not turn a growth curve red or
+  add an unexplained dot merely because it becomes steep. Introduce a marker
+  only when the narration uses that particular point or threshold.
+
+**Agent check:** view the complete graph before, during, and after its draw. Record
+the intended alignment and the meaning of each series, marker, and color change.
+Keep the graph's instructional purpose distinct from repeating the earlier bound.
+
+### Reopened feedback invalidates the affected signoff
+
+A new report on an already audited behavior reopens that behavior for verification.
+Keep a question's explanation distinct from an implemented repair. Record the rule
+change immediately, but leave the animation repair pending until it has actually
+been made and checked. Do not use an earlier zero-error audit as a reply to new
+visual feedback. A repeated audio-noise report also reopens the edit; an earlier
+non-speech attenuation is not proof that the remaining noise is gone.
+
 ## Before returning the work
 
 Read all notes, including drafts and follow-ups, across all sections. Apply the

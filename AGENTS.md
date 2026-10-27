@@ -11,6 +11,11 @@ do not ask the viewer to rediscover the same mistakes in a preliminary render.
 Keep recurring feedback in `docs/RECURRING_REVIEW_FEEDBACK.md` up to date. Use
 its complaint/check reference before returning work, repair underlying shared
 causes where possible, and state the actual scope of visual verification.
+For each change, justify what it adds to the explanation. Check continuity of
+the argument and notation, not only retained object IDs. Before an attention
+effect, verify that its target's actual text remains visible and readable.
+Use the focused checks under "Lessons from the first three sections" in the
+recurring-feedback reference; passing the timing ledger does not replace them.
 
 Read queued annotations, drafts, and follow-ups across every section. The
 selected section and its approval status do not limit which notes to handle.

@@ -40,6 +40,10 @@ For each conceptual change, write down:
 3. **Target:** which existing object or mathematical term is being discussed?
 4. **Action and duration:** reveal, move, substitute, box, pulse, or leave still.
 5. **Continuity:** which useful content stays? What must move to make room?
+6. **Need:** would removing this caption, marker, or transition make the argument
+   harder to follow? If not, remove it before rendering.
+7. **Quantity:** does this keep the established meaning, name, units, and type of
+   bound? If it introduces another quantity, where is their relationship explained?
 
 A preceding `wait_for_cue` provides context. It does not justify every later
 animation until the next cue. A pulse after a reveal, color change, or another
@@ -93,6 +97,13 @@ travelling copy and its cleanup, as well as the final substituted formula.
   example is different from erasing a line and recreating it two seconds later.
 - **Dense construction:** count new ideas, not individual glyphs or drawing
   primitives. Reusing a brace and two rows can be clearer than a single new panel.
+- **Retained identity:** compare adjacent compositions for continuity of meaning.
+  A retained object fraction cannot certify that the explanation still flows.
+- **Referenced target:** inspect the text inside the focused object, not just its
+  border. A timing pass cannot establish opacity, layering, or readable glyphs.
+- **Graph placement and styling:** check the visible plot's balance in the full
+  frame, its labels, and the rationale for every marker and color change. Keeping
+  a curve clear of a caption does not establish a good layout.
 
 Record a specific disposition and frame evidence for each remaining finding.
 Do not mark the user's preflight checks as approved on their behalf. A generated
@@ -117,3 +128,8 @@ Only after repairs and verification should a note move to `pending_review`, with
 a concrete explanation. Only the viewer resolves it. Answer annotation questions
 in their threads, and leave unresolved repairs visibly pending. Assemble the full
 preview after the section checks; repeat checks only for subsequent changes.
+
+New feedback on an audited behavior invalidates that behavior's earlier signoff.
+Record the new finding and its required evidence; do not reuse the previous
+zero-error summary as proof. Updating prevention documentation is not an animation
+repair and must not move the corresponding repair out of the pending queue.

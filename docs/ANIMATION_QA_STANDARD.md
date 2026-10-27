@@ -34,6 +34,10 @@ editorial checklist. An inherited cue is context, not a justification for a puls
 - A transition clears the outgoing composition before revealing the incoming
   one, unless their overlap itself explains a relationship.
 - Every paused frame should make sense as a screenshot.
+- Preserve the reasoning as well as the object identities. Retaining one formula
+  while repeatedly replacing its context can still produce a rapid slideshow.
+- Refine an existing English definition into its mathematical form rather than
+  discarding it to introduce the same idea on another page.
 
 ## 3. Animation must direct attention, not compete for it
 
@@ -48,6 +52,9 @@ Use the least intrusive device that answers “where should I look?”
 Do not flash a whole tree when the narration refers to its base cases. Do not
 pulse a term after the corresponding words have passed. Do not animate merely
 because the screen has been still.
+
+Inspect the target's actual glyphs before, during, and after the effect. A label
+hidden by a fill or removed child is a failure even when the border pulses on time.
 
 ## 4. Color is semantic
 
@@ -81,6 +88,10 @@ across layout changes.
 - Replace only that term. Keep the function name, equals sign, unaffected
   terms, scale, and semantic colors stable. Do not morph a whole equation
   when only its right-hand side changes.
+- Use one stable name per quantity. Show the reasoning when moving from a call
+  count to an operation or runtime bound; do not silently relabel them as aliases.
+- Distinguish exact values, approximations, upper bounds, and lower bounds.
+  Keep an asymptotic growth statement qualified rather than implying equality.
 
 ## 6. Layout is relational
 
@@ -96,6 +107,8 @@ across layout changes.
 - Maintain readable spacing around titles, section labels, equations, arrows,
   braces, and graph bounds.
 - Recenter a composition when its contents materially shrink or grow.
+- Inspect the balance of the visible plotting area separately from the bounds
+  of its labels. Do not shift an entire graph off center to center its steep part.
 - Before approving a transition, inspect the first frame, midpoint, and final
   frame for collisions, duplicated objects, off-screen content, and lingering
   edges.
@@ -146,6 +159,10 @@ recurred during review.
 - Prefer a local note beside the object it explains over a detached caption at
   the top of the frame.
 - Remove any animation whose absence does not reduce understanding.
+- Remove a caption if the retained formula, diagram, and narration already make
+  its point. State a caveat once; do not create a second slide to paraphrase it.
+- Give each plotted series a consistent meaning and color. A steepening curve
+  does not justify a new color or point marker without a narrated reason.
 
 ## 9. Audio and music
 
