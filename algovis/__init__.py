@@ -1,6 +1,7 @@
 from .core.math import Function, ApplyFunction, ApplyDefinition, Substitute
 from .core.trees import RecursiveTree, NodeState
 from .core.induction import MonotonicVisualizer, InductionStep
+from .core.dominoes import DominoGeometry
 from .core.structures import CellState, DPTable, DPWorkflow, HashTable, GraphVis
 from .core.state_space import StateSpaceVisualizer, StateParameter, BinaryStateVector
 from .core.pseudocode import PseudocodePanel

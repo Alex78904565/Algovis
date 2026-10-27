@@ -79,10 +79,11 @@ publishing the new video. A rejected attempt leaves the last good preview
 available. A correctly timed pulse does not validate an earlier reveal: check
 when the underlying value first becomes visible, not just its emphasis.
 
-Definition transfers carry a rigid, readable copy with a background, then
-replace the application locally after arrival. This prevents mid-flight symbol
-scrambling and keeps text legible when crossing other proof rows. Inspect the
-travelling copy and its cleanup, as well as the final substituted formula.
+Definition transfers carry a rigid copy of the glyphs, then visibly substitute
+parameters or values after arrival. Do not carry a background patch or fade the
+copy away before the result exists. Adopt the final result with identical geometry
+on the same frame. Route the copy clear of other work when possible. Inspect the
+travelling copy, arrival, local substitution, and cleanup as well as the final row.
 
 ## Work through the findings yourself
 

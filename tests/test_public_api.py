@@ -191,10 +191,34 @@ class PublicApiTests(unittest.TestCase):
         travelling = animation.travelling_formula
         np.testing.assert_allclose(travelling[1].get_center()-travelling[0].get_center(),
                                    original_delta, atol=1e-7)
-        self.assertEqual(animation.traveller[0].get_fill_opacity(), 1)
-        self.assertEqual(animation.traveller[0].get_fill_color(), BLUE)
-        self.assertEqual(animation.landing[0].get_fill_color(), BLUE)
+        self.assertIs(animation.traveller, travelling)
+        self.assertEqual(len(travelling.submobjects), len(source.submobjects))
+        self.assertTrue(all(obj.__class__.__name__ != "BackgroundRectangle"
+                            for obj in travelling.get_family()))
         self.assertNotIn(destination, scene.get_mobject_family_members())
+
+    def test_definition_arrival_has_no_blank_interval_or_shape_change_on_adoption(self):
+        import numpy as np
+        source = VGroup(Square(side_length=.3), Square(side_length=.7).shift(RIGHT))
+        destination = VGroup(Square(side_length=.5), Square(side_length=.4).shift(RIGHT))
+        destination.shift(4 * RIGHT)
+        scene = Scene()
+        scene.add(source)
+        animation = algovis.ApplyDefinition(source, None, destination)
+        scene.add_mobjects_from_animations([animation])
+        animation._setup_scene(scene)
+        animation.begin()
+        for progress in (.68, .70, .75, .85, .99):
+            animation.interpolate(progress)
+            self.assertIn(animation.traveller, scene.get_mobject_family_members())
+            self.assertTrue(all(max(obj.get_fill_opacity(), obj.get_stroke_opacity()) > .99
+                                for obj in animation.traveller.family_members_with_points()))
+        animation.finish()
+        painted = animation.traveller.get_all_points().copy()
+        animation.clean_up_from_scene(scene)
+        np.testing.assert_allclose(destination.get_all_points(), painted, atol=1e-7)
+        self.assertIn(source, scene.get_mobject_family_members())
+        self.assertNotIn(animation.traveller, scene.get_mobject_family_members())
 
     def test_definition_destination_is_not_visible_under_the_travelling_copy(self):
         scene = Scene()

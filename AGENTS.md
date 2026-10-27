@@ -16,6 +16,15 @@ the argument and notation, not only retained object IDs. Before an attention
 effect, verify that its target's actual text remains visible and readable.
 Use the focused checks under "Lessons from the first three sections" in the
 recurring-feedback reference; passing the timing ledger does not replace them.
+Consult "Successful patterns to preserve" as well. Record positive feedback
+with its specific scope and evidence, and preserve the working parts during
+repairs. Keep viewer endorsement distinct from the agent's own verification.
+
+Ask promptly when feedback has materially different plausible interpretations.
+The author welcomes specific clarification questions. Do not spend a long time
+implementing a guess and then present it as the requested fix. State the precise
+ambiguity, ask a short question, and continue independent work while awaiting
+the answer. Do not repeatedly ask about preferences already established here.
 
 Read queued annotations, drafts, and follow-ups across every section. The
 selected section and its approval status do not limit which notes to handle.

@@ -131,27 +131,22 @@ class ApplyDefinition(AnimationGroup):
             # hierarchy matching can otherwise pair the zero in f(0) with
             # the zero after '=' when a VGroup lands in a MathTex object.
             destination = definition.copy()
-            destination.stretch_to_fit_width(result.width)
-            destination.stretch_to_fit_height(result.height).move_to(result)
+            destination.scale_to_fit_height(result.height).move_to(result)
             result.become(destination)
-        # Carry readable glyphs, rather than morphing an entire definition
-        # into different symbols while it flies across other proof rows.
-        # An opaque backing keeps both copies legible during the transfer.
+        # Carry only the actual glyphs. A backing rectangle looked like a
+        # chunk of the slide being picked up and could obscure other rows.
+        # Keep a visible copy throughout arrival and local substitution;
+        # fading it out before revealing the result caused a blank frame.
         self.travelling_formula = definition.copy()
-        backing = BackgroundRectangle(
-            self.travelling_formula, buff=0.055,
-            fill_color=config.background_color, fill_opacity=1, stroke_width=0,
-        )
-        self.traveller = VGroup(backing, self.travelling_formula).set_z_index(30)
+        self.traveller = self.travelling_formula.set_z_index(30)
         landing = self.traveller.copy().move_to(result)
         self.landing = landing
-        cleanup = [FadeOut(self.traveller)]
+        arrival = [Transform(self.traveller, landing, path_arc=path_arc, run_time=0.70)]
         if application is not None:
-            cleanup.append(FadeOut(application))
+            arrival.append(Succession(Wait(0.55), FadeOut(application, run_time=0.15)))
         transfer = Succession(
-            Transform(self.traveller, landing, path_arc=path_arc, run_time=0.68),
-            AnimationGroup(*cleanup, run_time=0.12),
-            FadeIn(result, run_time=0.20),
+            AnimationGroup(*arrival, lag_ratio=0, run_time=0.70),
+            Transform(self.traveller, result, run_time=0.30),
         )
         super().__init__(
             transfer,
@@ -160,13 +155,18 @@ class ApplyDefinition(AnimationGroup):
         )
 
     def _setup_scene(self, scene):
-        # Theme backgrounds can differ from Manim's global configuration.
-        # Both ends of the move must match the actual camera background.
-        for chip in (self.traveller, self.landing):
-            chip[0].set_fill(scene.camera.background_color, opacity=1)
         # A pre-laid-out equation may already own the hidden destination.
         # Detach it before the first frame, so it is not visible underneath
         # the travelling copy. Remove descendants too: Manim can dissolve
         # an animated container into separate scene objects.
         scene.remove(*self.result.get_family())
         super()._setup_scene(scene)
+
+    def clean_up_from_scene(self, scene):
+        super().clean_up_from_scene(scene)
+        # The copy already paints the exact final result on the last frame.
+        # Adopt the caller's result without a fade, gap, or geometry change.
+        scene.remove(*self.traveller.get_family())
+        if self.application is not None:
+            scene.remove(*self.application.get_family())
+        scene.add(self.result)

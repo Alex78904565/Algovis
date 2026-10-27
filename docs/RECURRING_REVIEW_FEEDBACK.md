@@ -34,6 +34,36 @@ continuous playback, and perceptual audio listening are different scopes. Do not
 call every frame verified when only selected frames were inspected, and do not
 promise that passing checks makes further mistakes impossible.
 
+## Successful patterns to preserve
+
+Record successful choices as well as failures. Keep the evidence level explicit:
+the viewer liking a particular device is not approval of every section using it,
+and an agent's frame check is not viewer endorsement.
+
+Viewer-endorsed patterns from this lesson's reviews:
+
+- **Minimal introduction:** the topic title and one small, appropriately timed
+  character beat. Do not expand it back into a sequence of narrated slogans.
+- **Two-input addition lane:** the moving yellow pair box, a plus between the
+  inputs, and a short blue storage arrow clear of the box. Reuse this visual
+  grammar when another Fibonacci row performs the same addition.
+- **Local explanatory notes:** keep "already computed" and "requested again"
+  beside the specific nodes they explain, with room for tree edges. Preserve
+  this relationship when repairing spacing rather than relocating the notes to
+  a detached caption area.
+- **Tree compression:** preserve the visible connection between repeated calls,
+  surviving states, and storage. In the current narration's tree/array comparison,
+  survivors merge into the array below while that already computed row remains.
+- **Equations built in place:** keep the function definition and useful work
+  visible as the explanation develops. Preserve the existing orientation and
+  refine the affected term rather than replacing the whole composition.
+
+Before revising one of these devices, state which part of it is working and which
+part needs repair. Preserve the working part, compare the old and new rendered
+frames, and record any regression. Keep dated frame evidence and viewer responses
+in the private audit record; do not label an entire render approved based on a
+positive comment about one feature.
+
 ## Timing and attention
 
 When the narration names two objects in sequence, focus them in that sequence.
@@ -91,6 +121,13 @@ of absent objects. Check motion as well as the final still frame.
 Diagrams should demonstrate the stated action: an empty array fills in its cells;
 a recurrence uses its two known values; a rejected item visibly exceeds capacity;
 one falling domino makes contact before its neighbor starts and eventually rests.
+
+When the narration has already introduced and filled an array before comparing it
+with the recursion tree, keep that array visible below the tree. The surviving
+states should visibly merge into its existing cells. Do not blank the numbers or
+remove the row for the handoff; consolidate ownership after arrival without a
+visible change. This differs from revealing a destination that has not yet been
+introduced: that destination must remain empty until the relevant reveal.
 
 ## Lessons from the first three sections
 
@@ -195,6 +232,11 @@ visual feedback. A repeated audio-noise report also reopens the edit; an earlier
 non-speech attenuation is not proof that the remaining noise is gone.
 
 ## Before returning the work
+
+Ask the author early if a note could reasonably require different visual outcomes.
+Specific questions are welcome; a long wait followed by a guessed interpretation
+is not. Explain the ambiguity concretely and keep working on unaffected repairs.
+Use the answer to update this reference when it establishes a reusable preference.
 
 Read all notes, including drafts and follow-ups, across all sections. Apply the
 same correction wherever the pattern occurs. Ask yourself whether the problem
