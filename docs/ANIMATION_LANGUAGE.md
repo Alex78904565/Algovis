@@ -26,6 +26,13 @@ When a component applies a definition or an induction hypothesis, its motion
 must visibly connect source and application: keep the definition on screen,
 carry a copy to the replaced term, and leave surrounding symbols unchanged.
 The Manim authoring helper is `ApplyDefinition(definition, application, result)`.
+For a crowded proof, its optional `via=[point, ...]` routes the copied formula
+around intervening rows while preserving its glyphs. Keep the source visible.
+
+Use `DeferredAnimation(lambda: animation)` inside a sequence when a future
+guide or transform must stay absent until earlier steps finish. The factory is
+constructed and activated at its own turn, so it can use the current layout.
+For example, reveal both base values before constructing their addition guide.
 Use `None` for the application when filling a blank part of the equation.
 
 The exported storyboard records this as one semantic action:

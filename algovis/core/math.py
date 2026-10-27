@@ -104,9 +104,10 @@ class ApplyDefinition(AnimationGroup):
 
     The definition and application must already be visible in the scene.
     Pass ``None`` for application when filling a previously blank position.
+    Optional ``via`` points route the rigid copy around intervening content.
     """
 
-    def __init__(self, definition, application, result, *, path_arc=-PI / 8,
+    def __init__(self, definition, application, result, *, path_arc=-PI / 8, via=(),
                  definition_label=None, result_label=None, **kwargs):
         if definition is application:
             raise ValueError("The definition and its application must be distinct")
@@ -132,6 +133,12 @@ class ApplyDefinition(AnimationGroup):
             # the zero after '=' when a VGroup lands in a MathTex object.
             destination = definition.copy()
             destination.scale_to_fit_height(result.height).move_to(result)
+            # Canonicalizing the geometry must not discard a caller's uniform
+            # semantic destination color (e.g. green for a proved conclusion).
+            result_colors = {part.get_color().to_hex()
+                             for part in result.family_members_with_points()}
+            if len(result_colors) == 1:
+                destination.set_color(next(iter(result_colors)))
             result.become(destination)
         # Carry only the actual glyphs. A backing rectangle looked like a
         # chunk of the slide being picked up and could obscure other rows.
@@ -141,7 +148,15 @@ class ApplyDefinition(AnimationGroup):
         self.traveller = self.travelling_formula.set_z_index(30)
         landing = self.traveller.copy().move_to(result)
         self.landing = landing
-        arrival = [Transform(self.traveller, landing, path_arc=path_arc, run_time=0.70)]
+        self.waypoints = [self.traveller.copy().move_to(point) for point in via]
+        self.waypoint_positions = [point.copy() for point in via]
+        # Route around a dense proof instead of carrying the copy through its
+        # intervening rows. Each leg preserves the complete formula geometry.
+        stops = [*self.waypoints, landing]
+        travel = [Transform(self.traveller, stop,
+                            path_arc=0 if self.waypoints else path_arc,
+                            run_time=0.70 / len(stops)) for stop in stops]
+        arrival = [Succession(*travel, run_time=0.70)]
         if application is not None:
             arrival.append(Succession(Wait(0.55), FadeOut(application, run_time=0.15)))
         transfer = Succession(
@@ -161,6 +176,8 @@ class ApplyDefinition(AnimationGroup):
         # position it had when the animation sequence was constructed.
         self.traveller.become(self.definition.copy()).set_z_index(30)
         self.landing.become(self.traveller.copy().move_to(self.result))
+        for waypoint, position in zip(self.waypoints, self.waypoint_positions):
+            waypoint.become(self.traveller.copy().move_to(position))
         super().begin()
 
     def _setup_scene(self, scene):

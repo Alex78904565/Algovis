@@ -32,7 +32,7 @@ from .storyboard import (
 from .lesson import (
     AlgorithmLessonScene, BellmanSpec, ComparisonSpec, ProblemLesson, ProofSpec,
 )
-from .utils.effects import FocusBox, Highlight, Pulse, ReplaceContent
+from .utils.effects import DeferredAnimation, FocusBox, Highlight, Pulse, ReplaceContent
 from .utils.layout import PanelLayout, SmartBulletedList
 
 __version__ = "0.1.0"

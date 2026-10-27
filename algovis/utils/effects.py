@@ -1,6 +1,50 @@
 from manim import *
 
 
+class DeferredAnimation(Animation):
+    """Build and activate an animation only when its sequence reaches it.
+
+    Manim groups may introduce later Create/Transform targets during setup.
+    Use a factory when those objects must remain absent until prerequisites
+    have finished, e.g. ``Succession(fill_bases, DeferredAnimation(add_guide))``.
+    The factory returns one animation (possibly an AnimationGroup).
+    """
+    def __init__(self, factory, **kwargs):
+        self.factory = factory
+        self.animation = None
+        self.scene = None
+        kwargs.setdefault("rate_func", linear)
+        super().__init__(Group(), introducer=True, **kwargs)
+
+    def _setup_scene(self, scene):
+        self.scene = scene
+
+    def begin(self):
+        if self.scene is None:
+            raise RuntimeError("DeferredAnimation must be set up with a scene before beginning")
+        self.animation = self.factory()
+        self.scene.add_mobjects_from_animations([self.animation])
+        self.animation._setup_scene(self.scene)
+        self.animation.begin()
+        super().begin()
+
+    def interpolate_mobject(self, alpha):
+        if self.animation is not None:
+            self.animation.interpolate(alpha)
+
+    def update_mobjects(self, dt):
+        if self.animation is not None:
+            self.animation.update_mobjects(dt)
+
+    def finish(self):
+        super().finish()
+        self.animation.finish()
+
+    def clean_up_from_scene(self, scene):
+        self.animation.clean_up_from_scene(scene)
+        scene.remove(self.mobject)
+
+
 class Pulse(ApplyMethod):
     """A small scale-only attention cue that preserves every semantic color."""
     def __init__(self, mobject, scale_factor=1.04, *, trigger=None, reason=None, **kwargs):

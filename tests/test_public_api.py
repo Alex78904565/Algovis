@@ -168,6 +168,28 @@ class PublicApiTests(unittest.TestCase):
         animation = algovis.ApplyDefinition(definition, None, result)
         self.assertEqual(len(animation.animations), 1)
 
+    def test_definition_transfer_can_route_around_intervening_rows(self):
+        import numpy as np
+        from manim import UP, DOWN
+        scene = Scene()
+        definition = VGroup(Square(side_length=.3), Square(side_length=.6).shift(RIGHT))
+        result = definition.copy().shift(3 * DOWN)
+        scene.add(definition)
+        via = [4 * RIGHT + UP, 4 * RIGHT + 3 * DOWN]
+        animation = algovis.ApplyDefinition(definition, None, result, via=via)
+        scene.add_mobjects_from_animations([animation])
+        animation._setup_scene(scene)
+        animation.begin()
+        for alpha, expected in ((.70/3, via[0]), (.70*2/3, via[1])):
+            animation.interpolate(alpha)
+            np.testing.assert_allclose(animation.traveller.get_center(), expected, atol=1e-7)
+            np.testing.assert_allclose(
+                animation.traveller[1].get_center()-animation.traveller[0].get_center(),
+                definition[1].get_center()-definition[0].get_center(), atol=1e-7)
+        animation.finish()
+        animation.clean_up_from_scene(scene)
+        np.testing.assert_allclose(result.get_center(), definition.get_center()+3 * DOWN)
+
     def test_definition_transfer_uses_source_position_when_its_turn_begins(self):
         import numpy as np
         from manim import LEFT, UP
@@ -250,6 +272,15 @@ class PublicApiTests(unittest.TestCase):
         animation.interpolate(.5)
         traveller = animation.travelling_formula
         self.assertLess(traveller[0].get_x(), traveller[1].get_x())
+
+    def test_identical_formula_preserves_requested_destination_color(self):
+        definition = VGroup(Square(color=GREEN), Square(color=GREEN).shift(2 * RIGHT))
+        definition.tex_string = "k(k+1)/2"
+        result = VGroup(Square(color=BLUE)).shift(4 * RIGHT)
+        result.tex_string = "k(k+1)/2"
+        algovis.ApplyDefinition(definition, None, result)
+        self.assertTrue(all(part.get_color() == BLUE for part in result.family_members_with_points()))
+        self.assertTrue(all(part.get_color() == GREEN for part in definition.family_members_with_points()))
 
     def test_definition_glyphs_travel_rigidly_before_local_substitution(self):
         import numpy as np

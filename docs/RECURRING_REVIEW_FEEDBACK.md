@@ -333,6 +333,42 @@ single still; distinguish an observed failure from a suspected implementation ca
 the scope of every note. Inspect the complete composition and peer text sizes.
 Preserve explicitly praised devices while repairing the local defect.
 
+## Lessons from the knapsack deep dive
+
+These checks come from the viewer's detailed review of section 7. Recording them
+does not mean its current animations have been repaired or approved.
+
+- Introduce numerical values when their objects are named. Track weight and value
+  together in the concrete example, and visibly undo an attempted choice that
+  does not fit. Do not quietly restore example numbers after removing them to
+  discuss the general problem.
+- Refine the English choice locally. Introducing `w` does not justify immediately
+  replacing "if it fits" with a complete capacity inequality. Introduce each
+  quantity as needed, then translate the condition on the spoken explanation.
+  Similarly, reveal an immediate value on its introduction, then pulse that value
+  on the later explicit reference.
+- Give the problem data, current parameters, and meaning of `f` stable homes.
+  Retire completed choice scaffolding to make room for the definition; keep the
+  definition available for its later proof and answer extraction. Use existing
+  parameter definitions instead of adding competing underbraces and captions.
+- Reuse the arithmetic proof's organization: definitions, claim, base case,
+  hypothesis, and working step. A short readable hypothesis such as
+  "`f(i+1,w')` is correct for every valid `w'`" can replace dense prose. Keep the
+  capacity condition when adding the liked take/skip labels. Box the existing
+  definition or recurrence when it is referenced rather than repeating it below.
+- Show changing arguments inside successive function calls, populated on their
+  spoken references. Keep the proposed simpler base case tied to a local change
+  in the existing function meaning. Extract the answer by substituting into that
+  same function, rather than introducing an unrelated formula layout.
+- Reuse the established visual instance for the example distinguishing exhaustive
+  recursion from greedy choice. Keep its capacity with its items. Avoid oversized
+  branch headings or persistent boxes that compete with the calculation.
+
+**Agent check:** trace each introduced value from its spoken definition to its
+use. List what stays in the composition at each refinement, including conditions,
+function meaning, and prior proof work. Compare with the earlier successful proof
+layout and inspect the whole frame before accepting a local spacing repair.
+
 ## Before returning the work
 
 Ask the author early if a note could reasonably require different visual outcomes.
