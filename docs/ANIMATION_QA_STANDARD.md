@@ -115,6 +115,16 @@ across layout changes.
 - Maintain readable spacing around titles, section labels, equations, arrows,
   braces, and graph bounds.
 - Recenter a composition when its contents materially shrink or grow.
+- Reuse the established equation, proof, parameter-definition, and comparison
+  layouts. Keep peer formulas at the same rendered type size. In a comparison,
+  align corresponding headings and calls without shrinking one entire argument.
+- An ellipsis stands for omitted elements; it is not a boxed node with its own
+  children. Center continuation dots within the clear gap they explain.
+- Keep example data and the problem definition visible while using them. A
+  numerical route total requires visible edge costs; comparing two routes
+  requires retaining both routes and their totals.
+- Center arithmetic operators on their mathematical factors independently of
+  explanatory labels and underbraces. Inspect the actual glyph alignment.
 - Inspect the balance of the visible plotting area separately from the bounds
   of its labels. Do not shift an entire graph off center to center its steep part.
 - Before approving a transition, inspect the first frame, midpoint, and final
@@ -150,6 +160,9 @@ recurred during review.
 - Inspect internal helper phase boundaries and adjacent frames for symbol swaps
   or duplicate ownership, including formulas with repeated glyphs and different
   group structures. Outer start/middle/end samples alone cannot certify them.
+- Defer each future substitution and cancellation phase with `DeferredAnimation`
+  when composing a sequence. Deferring only a reveal does not prevent a later
+  fade or transform source from entering the scene during an earlier hold.
 - Use `SlideScene.transition` when outgoing and incoming compositions occupy
   the same space. It clears the old material before revealing its replacement
   within the original cue's time slot. Crossfading two sentences is an overlap.

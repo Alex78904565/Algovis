@@ -116,6 +116,7 @@ class ApplyDefinition(AnimationGroup):
         self.definition = definition
         self.application = application
         self.result = result
+        self._adopted = False
         if definition_label:
             definition._algovis_label = str(definition_label)
         if result_label:
@@ -174,6 +175,7 @@ class ApplyDefinition(AnimationGroup):
         # In a Succession the source may move or resize before this transfer
         # starts. Copy its visible geometry now, rather than reviving the
         # position it had when the animation sequence was constructed.
+        self._adopted = False
         self.traveller.become(self.definition.copy()).set_z_index(30)
         self.landing.become(self.traveller.copy().move_to(self.result))
         for waypoint, position in zip(self.waypoints, self.waypoint_positions):
@@ -192,6 +194,11 @@ class ApplyDefinition(AnimationGroup):
         super()._setup_scene(scene)
 
     def clean_up_from_scene(self, scene):
+        # Succession can clean a child when advancing and again when the
+        # enclosing sequence finishes. Re-adopting here could resurrect a
+        # formula that a later substitution already replaced.
+        if self._adopted:
+            return
         super().clean_up_from_scene(scene)
         # The copy already paints the exact final result on the last frame.
         # Adopt the caller's result without a fade, gap, or geometry change.
@@ -199,3 +206,4 @@ class ApplyDefinition(AnimationGroup):
         if self.application is not None:
             scene.remove(*self.application.get_family())
         scene.add(self.result)
+        self._adopted = True

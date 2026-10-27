@@ -407,6 +407,53 @@ of a child already owned by a visible object during the wait for its cue. Reserv
 its space, keep the future content detached, and introduce it on the spoken word.
 Check the actual frames immediately before the cue as well as after it.
 
+## Lessons from the latest examples and layout review
+
+- **An ellipsis is an omission, not another state.** Do not give it a node
+  box, a cell border, or its own recursive children. Leave it between the
+  genuine elements it abbreviates. Center vertical continuation dots in the
+  clear gap between the last calls and the base-case label, with even space
+  above and below.
+- **Peer statements keep the same rendered type size.** A numerical application
+  of a runtime calculation should not become smaller than its general formula.
+  Use the same math scale and reserve space for both. A comparison's headings,
+  function calls, and conclusions should have corresponding anchors across
+  its two columns; do not shrink one whole argument to make a split layout.
+- **Keep a small set of familiar layouts.** Center the main equation and its
+  parameter-definition block, or align them to an explicit shared column.
+  Avoid unrelated labels in opposite corners. A recurrence introduced on one
+  line should retain that organization as its terms become mathematical.
+- **Examples retain their problem data.** Keep the objective and distance
+  definition above a route example. Show edge costs before quoting their sum;
+  keep both routes and totals when the explanation compares them. Introduce
+  the numerical contribution alongside its symbolic contribution in a worked
+  knapsack sum, rather than revealing an unexplained total later.
+- **Show the intermediate algebra that explains the result.** When applying
+  a rule containing n at k+1, carry down the general rule, let it remain
+  readable, substitute k+1, and show the cancellation before simplifying.
+  Do not make that reasoning a fleeting morph inside the transfer helper.
+  Use the existing `DeferredAnimation` around each later substitution and
+  cancellation phase. Otherwise Manim can add a future phase's source while
+  the general rule is still being copied or held. The regression test must
+  check that future expressions and strike marks are actually absent.
+- **Undo the demonstrated action coherently.** An item returned from a bag
+  follows the reverse of its insertion path. Inspect the motion, not only its
+  final position. Preserve the working item art, capacity feedback, and timing.
+- **Neutral headings stay neutral.** Naming dynamic programming in a recap is
+  not a completed-result status. Green remains reserved for known, stored,
+  valid, selected, or completed work.
+- **The recap preserves the general rule's meaning.** Use `combine` in the
+  universal recurrence and in its per-choice construction. Addition is justified
+  in a particular additive problem; it must not silently replace the general
+  operation when summarizing the method. Match notation across the lesson and
+  its conclusion as well as across adjacent frames.
+
+**Agent check:** compare the general and concrete calculations at their actual
+rendered sizes; inspect the complete split composition and operator baselines.
+Trace each example's displayed totals to visible input data. Inspect the hold,
+substitution, cancellation, and final adoption separately. Keep established
+proof rails and successful local explanatory devices while making these repairs.
+
 ## Before returning the work
 
 Preserve the viewer's preflight decisions for unchanged moments. A render name,

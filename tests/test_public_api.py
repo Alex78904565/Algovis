@@ -231,6 +231,7 @@ class PublicApiTests(unittest.TestCase):
         sequence.begin()
         sequence.interpolate(.25)
         self.assertNotIn(transfer.traveller, scene.get_mobject_family_members())
+
         sequence.interpolate(.5)
         self.assertIn(transfer.traveller, scene.get_mobject_family_members())
         np.testing.assert_allclose(transfer.traveller.get_all_points(), definition.get_all_points())
@@ -238,6 +239,25 @@ class PublicApiTests(unittest.TestCase):
         sequence.clean_up_from_scene(scene)
         self.assertIn(result, scene.get_mobject_family_members())
         self.assertNotIn(transfer.traveller, scene.get_mobject_family_members())
+
+    def test_definition_cleanup_does_not_revive_a_later_replaced_formula(self):
+        definition, result = Square(), Square().shift(4 * RIGHT)
+        scene = Scene()
+        scene.add(definition)
+        transfer = algovis.ApplyDefinition(definition, None, result)
+        transfer._setup_scene(scene)
+        transfer.begin()
+        transfer.finish()
+        transfer.clean_up_from_scene(scene)
+        self.assertIn(result, scene.get_mobject_family_members())
+        # A later step replaces this adopted result. An enclosing Succession
+        # then repeats cleanup of its earlier children.
+        replacement = Square().shift(2 * RIGHT)
+        scene.remove(*result.get_family())
+        scene.add(replacement)
+        transfer.clean_up_from_scene(scene)
+        self.assertNotIn(result, scene.get_mobject_family_members())
+        self.assertIn(replacement, scene.get_mobject_family_members())
 
     def test_review_labels_follow_transformed_content_without_changing_tex(self):
         from manim import Transform

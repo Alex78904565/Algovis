@@ -5,6 +5,7 @@ import inspect
 import json
 import numpy as np
 import os
+import time
 from pathlib import Path
 
 from manim import (
@@ -420,7 +421,16 @@ class SlideSceneMixin:
             }, indent=2) + "\n",
             encoding="utf-8",
         )
-        os.replace(temporary, path)
+        # A Windows viewer or indexer can briefly hold the old manifest open.
+        # Retry the atomic replacement; never truncate the last usable file.
+        for attempt in range(4):
+            try:
+                os.replace(temporary, path)
+                break
+            except PermissionError:
+                if attempt == 3:
+                    raise
+                time.sleep(0.05 * 2 ** attempt)
 
     def begin_narration(self, cue_path, *, project_root=None, gain=None):
         """Attach a mastered voice track and return its named cue timeline."""

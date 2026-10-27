@@ -8,6 +8,11 @@ class DeferredAnimation(Animation):
     Use a factory when those objects must remain absent until prerequisites
     have finished, e.g. ``Succession(fill_bases, DeferredAnimation(add_guide))``.
     The factory returns one animation (possibly an AnimationGroup).
+
+    Also defer later substitutions and cancellation marks. A preconstructed
+    Succession collects the sources of its future FadeOut/Transform steps;
+    those sources can otherwise become visible while an earlier rule is being
+    copied or held. Wrap each later phase, not just its initial reveal.
     """
     def __init__(self, factory, **kwargs):
         self.factory = factory
