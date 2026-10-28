@@ -113,6 +113,18 @@ class ProofFrame:
         key = str(row).upper().replace('_', ' ')
         return self.labels_by_name[key].copy().align_to(first_line, UP)
 
+    def bind(self,row,content,*,first_line=None):
+        """Keep a live label aligned as its retained content changes."""
+        from .core.proof import bind_proof_label
+        key=str(row).upper().replace('_',' ')
+        return bind_proof_label(self.labels_by_name[key],content,first_line)
+
+    def align(self,row,content,*,first_line=None):
+        """Plan an animated binding; nothing visible moves before activation."""
+        from .core.proof import ProofLabelAlignment
+        key=str(row).upper().replace('_',' ')
+        return ProofLabelAlignment(self.labels_by_name[key],content,first_line)
+
 
 class EquationFrame:
     """Stable, named anchors for an explanation that grows into equations.

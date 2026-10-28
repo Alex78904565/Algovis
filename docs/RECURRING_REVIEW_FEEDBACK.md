@@ -129,6 +129,13 @@ states before its next narrated mention, not only its final position.
 
 ## Layout and color
 
+Treat repeated constructions as library objects, not independently drawn
+lookalikes. Use the [shared component hierarchy](COMPONENT_ARCHITECTURE.md).
+Tree call nodes and array cells share their frame implementation; proofs share
+first-line label constraints. Extend these components rather than patching an
+individual occurrence. Rebuild and inspect every affected context when a default
+changes, preserving the previously successful motion and composition.
+
 Short, stable topic headings are preferred. Text on screen organizes the argument;
 it does not need to repeat every conversational phrase. Local notes belong beside
 their targets. Leave enough space for their labels, effects, and connecting edges.

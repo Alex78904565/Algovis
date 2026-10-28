@@ -3,6 +3,8 @@ import enum
 import numpy as np
 
 from ..theme import DEFAULT_THEME
+from .structures import CallNode
+from ..semantics import SemanticProperties, SemanticChange
 
 class NodeState(enum.Enum):
     PENDING = 1
@@ -17,6 +19,7 @@ class RecursiveTree(VGroup):
                  width=1.15, node_radius=0.34, label_scale=0.58,
                  node_padding=0.12, node_factory=None, node_color=None,
                  state_key=None, level_fn=None, node_shape="circle",
+                 node_style=None, node_type=CallNode,
                  theme=DEFAULT_THEME,
                  **kwargs):
         super().__init__(**kwargs)
@@ -33,6 +36,8 @@ class RecursiveTree(VGroup):
         self.node_factory = node_factory
         self.node_color = node_color or theme.node
         self.node_shape = node_shape
+        self.node_style = node_style
+        self.node_type = node_type
         self.state_key = state_key or (lambda args: tuple(args))
         self.level_fn = level_fn
         self.memoized_graph = None
@@ -82,26 +87,16 @@ class RecursiveTree(VGroup):
         if self.node_factory is None:
             # Fixed-radius nodes clipped wider labels such as f(12).  Treat the
             # configured radius as a minimum and grow to fit the rendered label.
-            radius = max(
-                self.node_radius,
-                label.width / 2 + self.node_padding,
-                label.height / 2 + self.node_padding,
-            )
-            if self.node_shape == "square":
-                side = 2 * radius
-                node_shape = RoundedRectangle(
-                    width=side, height=side, corner_radius=min(0.08, side * 0.12),
-                    color=self.node_color, stroke_width=2.5,
-                ).set_fill(self.theme.background, opacity=0.92)
-            else:
-                node_shape = Circle(
-                    radius=radius,
-                    color=self.node_color,
-                    stroke_width=2.5,
-                ).set_fill(self.theme.background, opacity=0.92)
+            node_mobject=self.node_type(label,minimum_radius=self.node_radius,
+                padding=self.node_padding,shape=self.node_shape,color=self.node_color,
+                theme=self.theme,style=self.node_style)
+            node_shape=node_mobject.box
         else:
             node_shape = self.node_factory(label_str, label)
-        node_mobject = VGroup(node_shape, label)
+            node_mobject = VGroup(node_shape, label)
+            # Custom artwork keeps the same frame-only semantic binding.
+            node_mobject.box = node_shape
+            node_mobject.label = label
 
         self.nodes.add(node_mobject)
 
@@ -629,7 +624,10 @@ class RecursiveTree(VGroup):
     def get_set_state_anim(self, node_data, state):
         """Returns an animation to change a node's state"""
         node_data["state"] = state
-        target = node_data["mobject"].copy()
+        status={NodeState.PENDING:'unseen',NodeState.ACTIVE:'active',NodeState.RESOLVED:'computed'}[state]
+        animation=SemanticChange(node_data['mobject'],SemanticProperties('node',status),
+            theme=self.theme,part='box',channel='stroke')
+        target=animation.target_mobject
         if state == NodeState.ACTIVE:
             target[0].set_color(self.theme.accent).set_stroke(width=4)
         elif state == NodeState.RESOLVED:
@@ -638,7 +636,7 @@ class RecursiveTree(VGroup):
             )
         else:
             target[0].set_color(self.theme.node).set_stroke(width=2)
-        return Transform(node_data["mobject"], target)
+        return animation
 
     def get_unroll_anim(self, lag_ratio=0.5):
         """Grow edges and reveal nodes in a smooth top-to-bottom wave.

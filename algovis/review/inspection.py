@@ -109,6 +109,8 @@ def capture_snapshot(scene, width, height):
             "region": {"x": left, "y": top, "width": max(0., right-left),
                        "height": max(0., bottom-top)},
         }
+        if hasattr(mobject,'_algovis_semantics'):
+            item['semantics']=dict(mobject._algovis_semantics)
         if hasattr(type(mobject), 'native_layout_findings'):
             item['nativeMathRowErrors'] = mobject.native_layout_findings()
         try:

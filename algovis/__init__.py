@@ -2,7 +2,8 @@ from .core.math import Function, ApplyFunction, ApplyDefinition, Substitute
 from .core.trees import RecursiveTree, NodeState
 from .core.induction import MonotonicVisualizer, InductionStep
 from .core.dominoes import DominoGeometry
-from .core.structures import CellState, StateCell, StateRow, DPTable, DPWorkflow, HashTable, GraphVis
+from .core.structures import (CellState, StateCell, StateRow, StateCellStyle, CallNode,
+    DEFAULT_STATE_CELL_STYLE, DPTable, DPWorkflow, HashTable, GraphVis)
 from .core.state_space import StateSpaceVisualizer, StateParameter, BinaryStateVector
 from .core.pseudocode import PseudocodePanel
 from .core.comparison import AlgorithmComparison, RecurrenceComparison, TopDownDPBridge
@@ -30,6 +31,8 @@ from .frames import (
 from .narration import NarrationCue, NarrationTrack
 from .continuity import SectionHandoff
 from .core.math_row import MathRow
+from .core.proof import Proof, ProofRow
+from .semantics import SemanticProperties, SemanticChange, set_semantics
 from .storyboard import (
     ACTION_VERBS, ATTENTION_STYLES, ENTRY_STYLES, EXIT_STYLES,
     SEMANTIC_ROLES, StoryAction, StoryAnimation,

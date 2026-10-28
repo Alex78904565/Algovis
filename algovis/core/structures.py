@@ -1,8 +1,22 @@
 from manim import *
 import enum
 import math
+from dataclasses import dataclass
 
 from ..theme import DEFAULT_THEME
+from ..semantics import SemanticProperties, set_semantics, copy_semantics
+
+
+@dataclass(frozen=True)
+class StateCellStyle:
+    """The shared frame geometry for array entries and recursive call nodes."""
+    corner_radius: float = .07
+    stroke_width: float = 2.2
+    fill_opacity: float = .94
+    horizontal_padding: float = .16
+
+
+DEFAULT_STATE_CELL_STYLE = StateCellStyle()
 
 
 class CellState(enum.Enum):
@@ -21,24 +35,85 @@ class StateCell(VGroup):
     """
 
     def __init__(self, value, *, width=1.06, height=.78, value_scale=.64,
-                 color=None, theme=DEFAULT_THEME, **kwargs):
+                 color=None, theme=DEFAULT_THEME, style=None, frame_shape='box',
+                 semantics=None, role='current',status=None,evaluation=None, **kwargs):
         self.theme = theme
-        self.box = RoundedRectangle(
-            width=width, height=height, corner_radius=.07,
-            stroke_color=color or theme.primary, stroke_width=2.2,
-            fill_color=theme.background, fill_opacity=.94)
-        self.label = MathTex(str(value), color=theme.foreground).scale(value_scale)
-        if self.label.width > width-.16:
+        self.frame_style = style or DEFAULT_STATE_CELL_STYLE
+        if frame_shape not in ('box','circle'):
+            raise ValueError('State frame shape must be box or circle')
+        if frame_shape=='box':
+            self.box = RoundedRectangle(width=width,height=height,
+                corner_radius=min(self.frame_style.corner_radius,min(width,height)/2),
+                stroke_color=color or theme.primary,stroke_width=self.frame_style.stroke_width,
+                fill_color=theme.background,fill_opacity=self.frame_style.fill_opacity)
+        else:
+            self.box = Circle(radius=width/2,stroke_color=color or theme.primary,
+                stroke_width=self.frame_style.stroke_width,fill_color=theme.background,
+                fill_opacity=self.frame_style.fill_opacity)
+        self.label = value if isinstance(value,Mobject) else MathTex(str(value), color=theme.foreground).scale(value_scale)
+        if self.label.width > width-self.frame_style.horizontal_padding:
             raise ValueError("StateCell value exceeds its width; reserve a wider cell")
         self.label.move_to(self.box)
+        self._value_font_size=float(getattr(self.label,'font_size',48*value_scale)) if self.label.height>0 else 48*value_scale
+        self._initial_box_height=float(self.box.height)
         super().__init__(self.box, self.label, **kwargs)
+        if semantics is None and (color is None or status is not None or evaluation is not None):
+            semantics=SemanticProperties(role,status,evaluation)
+        if semantics is not None:
+            set_semantics(self,semantics,theme=theme,part='box',channel='stroke')
+
+    def populate(self,value,*,status='computed',evaluation=None):
+        """Plan value entry and its status together; live content stays untouched."""
+        target=self.copy()
+        label=MathTex(str(value),font_size=self._value_font_size*self.box.height/self._initial_box_height,
+                      color=self.theme.foreground).move_to(target.box)
+        if label.width>target.box.width-self.frame_style.horizontal_padding*self.box.height/self._initial_box_height:
+            raise ValueError('Value exceeds the cell; reserve a wider cell')
+        target.label.become(label);target.label.tex_string=str(value)
+        # Manim's become adopts geometry, not the TeX font reference. An
+        # initially empty label has a zero reference height; retain the new
+        # reference so later scaling and reviewer measurements stay finite.
+        target.label.initial_height=label.initial_height
+        properties=getattr(self,'semantics',SemanticProperties(role='current'))
+        changes={'status':status}
+        if evaluation is not None:changes['evaluation']=evaluation
+        set_semantics(target,properties,theme=self.theme,part='box',channel='stroke',**changes)
+        return _CellPopulation(self,target,str(value))
+
+
+class _CellPopulation(Transform):
+    def __init__(self,cell,target,value):
+        self.value=value
+        super().__init__(cell,target)
+
+    def finish(self):
+        super().finish()
+        cell=self.mobject
+        cell.box,cell.label=cell[0],cell[1]
+        cell.label.tex_string=self.value
+        cell.label.initial_height=self.target_mobject.label.initial_height
+        copy_semantics(self.target_mobject,cell)
+
+
+class CallNode(StateCell):
+    """A recursive-call state cell that grows around its existing math label."""
+
+    def __init__(self,label,*,minimum_radius=.34,padding=.12,shape='square',
+                 color=None,theme=DEFAULT_THEME,style=None,**kwargs):
+        if shape not in ('square','circle'):
+            raise ValueError('Call node shape must be square or circle')
+        if 'semantics' not in kwargs and (color is None or color==theme.node):
+            kwargs['semantics']=SemanticProperties(role='node')
+        radius=max(minimum_radius,label.width/2+padding,label.height/2+padding)
+        super().__init__(label,width=2*radius,height=2*radius,color=color or theme.node,
+            theme=theme,style=style,frame_shape='box' if shape=='square' else 'circle',**kwargs)
 
 
 class StateRow(VGroup):
     """A row of the standard cells, with room for a plus or short arrow."""
 
-    def __init__(self, values, *, gap=.42, theme=DEFAULT_THEME, **cell_options):
-        super().__init__(*[StateCell(value, theme=theme, **cell_options)
+    def __init__(self, values, *, gap=.42, theme=DEFAULT_THEME, cell_type=StateCell, **cell_options):
+        super().__init__(*[cell_type(value, theme=theme, **cell_options)
                            for value in values])
         self.arrange(RIGHT, buff=gap)
 

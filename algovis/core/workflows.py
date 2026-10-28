@@ -10,6 +10,7 @@ from .trees import RecursiveTree
 from ..theme import DEFAULT_THEME
 from ..frames import PanelFrame
 from ..utils.effects import Pulse
+from ..semantics import set_semantics
 
 
 class RecursionMemoComparison(VGroup):
@@ -385,6 +386,8 @@ class BitLengthRuntime(VGroup):
             f"polynomial in numeric {parameter} · potentially exponential in its bit length",
             font_size=18, color=theme.role_color('bad'),
         )
+        set_semantics(self.rewritten,status='computed',evaluation='bad',theme=theme)
+        set_semantics(self.warning,evaluation='bad',theme=theme)
         self.parallel = Text(
             f"The same reasoning applies to {parallel_parameter}.",
             font_size=20, color=theme.muted,

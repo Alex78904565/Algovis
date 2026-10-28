@@ -1,5 +1,10 @@
 # Shared lesson components
 
+Use the [component architecture](COMPONENT_ARCHITECTURE.md) when extending the
+library. Repeated geometry and behavior belong in shared components; scenes
+supply content and spoken cues. Prefer composition for style and layout, and
+subclass when the semantic purpose is genuinely more specific.
+
 For artwork that continues across independently rendered sections, use the same
 factory on both sides and verify the actual cut. `SectionHandoff` also carries
 native artwork into a deliberate topic transition without changing narration
@@ -19,7 +24,8 @@ another copy of a proof rail or inventing another column position.
 | Runtime comparison | `ComparisonFrame` | Column offsets and divider |
 | Chapter marker | `ChapterMarker` | Position, type sizes, gap and colors |
 | Page heading and safe regions | `Slide`, `SlideLayout` | Heading placement and frame regions |
-| State/value row | `StateCell`, `StateRow` | Fixed cell geometry and value placement |
+| State/value row and tree nodes | `StateCell`, `StateRow`, `CallNode` | Shared frame style, value placement and cue-safe population |
+| Proof composition | `Proof`, `ProofRow`, `InductiveProof` | Named content rows, first-line label constraints and parent-relative positioning |
 | Peer typesetting and substitutions | `LessonStyle`, `math_like` | Role-based sizes/colors and inheritance of the current rendered type size |
 | Editable mathematical row | `MathRow` | One native TeX baseline, named terms, consistent substitutions and optional numeric sum check |
 
@@ -30,16 +36,18 @@ express the orientation chosen before construction; they are not separate
 visual styles for different algorithms.
 
 Align proof labels with the first line of their content, rather than the
-center of a multiline block. `ProofFrame.label_target(row, first_line)` plans a
-label copy while leaving live artwork untouched; reveal or move the real label
-on the corresponding content cue. Preserve the content's existing geometry.
+center of a multiline block. `Proof` owns this constraint for its rows.
+`ProofFrame.bind` and `align` provide the same constraint for retained artwork;
+the latter plans a change without moving the live label before its cue.
+`ProofFrame.label_target` remains available for a static target.
 
 ## Resolve competing color meanings
 
 Follow the [semantic precedence](../VISUAL_LANGUAGE.md): good/bad evaluation
 outranks known/completed status, then operation, structure and neutral context.
-Use `theme.role_color('retained', 'bad')` for a correctly derived poor runtime,
-or `style.math(..., role='bad')` for an explicitly unfavorable statement.
+Use `style.math(..., status='computed', evaluation='bad')` for a correctly
+derived poor runtime. Its stored properties determine its color. Existing
+`theme.role_color('retained', 'bad')` callers remain supported.
 `good` overrides lower roles with the success color; `bad` overrides them with
 the danger color. The order of arguments does not choose the winner.
 Conflicting explicit good/bad evaluations raise an error and need a clear

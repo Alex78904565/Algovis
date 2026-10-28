@@ -2,6 +2,7 @@ from manim import *
 from .pseudocode import PseudocodePanel
 from ..theme import DEFAULT_SPACING, DEFAULT_THEME
 from ..frames import PanelFrame
+from ..semantics import SemanticProperties,set_semantics
 
 
 class AlgorithmComparison(VGroup):
@@ -31,6 +32,8 @@ class AlgorithmComparison(VGroup):
             self.optimized, DOWN, buff=DEFAULT_SPACING.normal,
         )
         self.runtime_labels = VGroup(self.naive_runtime, self.optimized_runtime)
+        set_semantics(self.naive_runtime,SemanticProperties(status='computed',evaluation='bad'),theme=theme)
+        set_semantics(self.optimized_runtime,SemanticProperties(status='computed',evaluation='good'),theme=theme)
         self.added_lines = list(added_lines or [])
         self.add(self.panels, self.runtime_labels)
 
@@ -122,6 +125,8 @@ class RecurrenceComparison(VGroup):
             self.array, DOWN, buff=DEFAULT_SPACING.normal,
         )
         self.runtime_labels = VGroup(self.naive_runtime, self.optimized_runtime)
+        set_semantics(self.naive_runtime,SemanticProperties(status='computed',evaluation='bad'),theme=theme)
+        set_semantics(self.optimized_runtime,SemanticProperties(status='computed',evaluation='good'),theme=theme)
         self.add(self.panels, self.runtime_labels)
 
     def reveal(self):

@@ -528,6 +528,42 @@ class SlideSceneMixin:
         row.commit(target, self)
         return row
 
+    def apply_definition_on_cue(self,name,definition,application,result,*,
+                                run_time=.8,reason,extra=(),proof=None,row=None,**transfer_options):
+        """Copy a definition to its use, preserving the source and spoken timing."""
+        from .core.math import ApplyDefinition
+        if proof is not None:
+            if row is None or (application is not None and application is not proof.row(row).content):
+                raise ValueError('Proof adoption requires the complete row; use native row substitution for a partial formula')
+            proof.prepare_content(row,result)
+            extra=(*extra,proof.frame.align(row,result))
+        self.play_on_cue(name,ApplyDefinition(definition,application,result,**transfer_options),
+                         *extra,run_time=run_time,reason=reason)
+        if proof is not None:
+            proof.adopt_row(row,result)
+            proof.consolidate(self)
+        return result
+
+    def proof_row_on_cue(self,name,proof,row,content,*,first_line=None,run_time=.6,reason):
+        """Add a proof row at its verified word; the proof owns its alignment."""
+        from .core.proof import Proof
+        if not isinstance(proof,Proof):
+            raise TypeError('A progressive row requires a Proof object')
+        self.wait_for_word(name)
+        key=str(row).upper().replace('_',' ')
+        if key in proof.rows_by_name:
+            from .utils.effects import ReplaceContent
+            old=proof.row(key)
+            proof.prepare_content(key,content)
+            self.play_on_cue(name,ReplaceContent(old.content,content),
+                proof.frame.align(key,content,first_line=first_line),run_time=run_time,reason=reason)
+            prepared=proof.adopt_row(key,content,first_line=first_line)
+        else:
+            prepared=proof.add_row(row,content,first_line=first_line)
+            self.play_on_cue(name,FadeIn(prepared.content),run_time=run_time,reason=reason)
+        proof.consolidate(self)
+        return prepared
+
     @contextmanager
     def cue_sequence(self, name, *, reason, edge="start"):
         """A measured word starts one multi-phase process, such as folding a tree.

@@ -60,7 +60,12 @@ The included examples can be rendered directly:
 manim -pql slide_authoring_demo.py SlideAuthoringDemo
 manim -pql library_features_demo.py TreeMemoizationDemo
 manim -pql library_features_demo.py CapacityStoryDemo
+manim -pql examples/extensible_components.py SharedCellsExample ProofExample
 ```
+
+See [the component architecture](docs/COMPONENT_ARCHITECTURE.md) for the shared
+cell/node hierarchy, proof objects, semantic properties, and definition-copy
+helpers. Extend a shared component once to update its uses throughout a lesson.
 
 ## Try the browser reviewer
 

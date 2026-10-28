@@ -10,6 +10,7 @@ import numpy as np
 from manim import MathTex, SingleStringMathTex, Text, UL
 
 from .theme import DEFAULT_SPACING, DEFAULT_THEME
+from .semantics import SemanticProperties, set_semantics
 
 
 def measured_font_size(mobject):
@@ -46,11 +47,11 @@ class LessonStyle:
     theme: object = DEFAULT_THEME
     typography: LessonTypography = LessonTypography()
 
-    def _options(self, role, type_role, options):
+    def _options(self, role, type_role, options, semantics=None):
         if "font_size" in options or "color" in options:
             raise ValueError("Use typography and semantic roles instead of a local size/color override")
         return dict(font_size=self.typography.size(type_role),
-                    color=self.theme.role_color(role), **options)
+                    color=(semantics or SemanticProperties(role=role)).color(self.theme), **options)
 
     @staticmethod
     def _mark(obj, role, type_role, peers):
@@ -78,11 +79,15 @@ class LessonStyle:
             if size is not None:
                 obj._algovis_font_reference = (float(size),float(obj.height))
 
-    def math(self, *tex, role="neutral", type_role="equation", peers=None, **options):
-        obj = MathTex(*tex, **self._options(role, type_role, options))
-        return self._mark(obj, role, type_role, peers)
+    def math(self, *tex, role="neutral", type_role="equation", peers=None,
+             status=None, evaluation=None, semantics=None, **options):
+        properties = semantics or SemanticProperties(role, status, evaluation)
+        obj = MathTex(*tex, **self._options(role, type_role, options, properties))
+        set_semantics(obj, properties, theme=self.theme)
+        return self._mark(obj, properties.role, type_role, peers)
 
-    def math_like(self, reference, *tex, role="neutral", peers=None, **options):
+    def math_like(self, reference, *tex, role="neutral", peers=None,
+                  status=None, evaluation=None, semantics=None, **options):
         """Typeset a replacement at the reference's current font size.
 
         Unlike matching bounding-box height, this keeps a new fraction or a
@@ -94,14 +99,19 @@ class LessonStyle:
         size=next((size for size in sizes if size is not None and size>0),None)
         if size is None:
             raise ValueError("The reference has no measurable type size")
-        obj=MathTex(*tex,font_size=size,color=self.theme.role_color(role),**options)
-        return self._mark(obj,role,"equation",peers)
+        properties = semantics or SemanticProperties(role,status,evaluation)
+        obj=MathTex(*tex,font_size=size,color=properties.color(self.theme),**options)
+        set_semantics(obj,properties,theme=self.theme)
+        return self._mark(obj,properties.role,"equation",peers)
 
-    def text(self, text, role="neutral", type_role="body", peers=None, **options):
+    def text(self, text, role="neutral", type_role="body", peers=None,
+             status=None, evaluation=None, semantics=None, **options):
         if self.theme.text_font and "font" not in options:
             options["font"] = self.theme.text_font
-        obj = Text(text, **self._options(role, type_role, options))
-        return self._mark(obj, role, type_role, peers)
+        properties = semantics or SemanticProperties(role,status,evaluation)
+        obj = Text(text, **self._options(role, type_role, options, properties))
+        set_semantics(obj,properties,theme=self.theme)
+        return self._mark(obj, properties.role, type_role, peers)
 
     def watch(self, peers, *mobjects, type_role="equation", kind="math"):
         """Check existing peer rows without changing their size or ownership.

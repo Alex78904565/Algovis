@@ -91,11 +91,14 @@ class MathRow(MathTex):
         return self
 
     def next_layout(self, parts=None, **changes):
+        from ..semantics import copy_semantics
         values = dict(parts) if parts is not None else {**self.slot_tex, **changes}
         target = MathRow(values, font_size=self._native_size*self._scale(), color=self.get_color())
         for name,part in target.parts.items():
             if name in self.parts:
                 part.set_color(self.parts[name].get_color())
+                copy_semantics(self.parts[name],part)
+        copy_semantics(self,target)
         if hasattr(self, '_sum_contract'): target._sum_contract = self._sum_contract
         return target.aligned_to(self)
 
@@ -115,6 +118,7 @@ class MathRow(MathTex):
 
     def commit(self, target, scene):
         """Adopt the exact native layout, preserving unchanged term owners."""
+        from ..semantics import copy_semantics
         old = self.parts.copy(); old_family = list(self.get_family())
         scene.remove(*old_family, *target.get_family())
         adopted = {}
@@ -125,6 +129,7 @@ class MathRow(MathTex):
                 part.submobjects = [child.copy() for child in new.submobjects]
             part._algovis_label = target.slot_tex[name]
             part.tex_string = target.slot_tex[name]
+            copy_semantics(new,part)
             if part.height>0:
                 part.initial_height = part.height/(target.font_size*SCALE_FACTOR_PER_FONT_POINT)
             adopted[name] = part
@@ -138,6 +143,7 @@ class MathRow(MathTex):
         self._remember_layout()
         self._algovis_label = ''.join(self.slot_tex.values())
         self.tex_string = self._algovis_label
+        copy_semantics(target,self)
         if hasattr(target, '_sum_contract'): self._sum_contract = target._sum_contract
         scene.add(self)
         if getattr(self, '_algovis_typography_group', None):

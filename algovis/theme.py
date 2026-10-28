@@ -64,6 +64,7 @@ class AlgovisTheme:
             "repeated": self.danger,
             # Friendly aliases used by lower-level components.
             "structure": self.primary,
+            "node": self.node,
             "success": self.success,
             "danger": self.danger,
             "muted": self.muted,
@@ -81,7 +82,7 @@ class AlgovisTheme:
             'good': 5, 'bad': 5, 'danger': 5, 'repeated': 5,
             'retained': 4, 'success': 4,
             'operation': 3,
-            'current': 2, 'structure': 2,
+            'current': 2, 'structure': 2, 'node': 2,
             'muted': 1, 'neutral': 0,
         }
         return colors[max(roles, key=priority.__getitem__)]

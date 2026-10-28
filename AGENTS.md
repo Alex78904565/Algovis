@@ -49,6 +49,13 @@ to make room, and apply definitions by carrying a copy to their use. Inspect
 composition changes as well as overlap diagnostics. Render sections separately
 and inspect transition frames before assembling the complete preview.
 
+Design for extension through the shared library. Read
+`docs/COMPONENT_ARCHITECTURE.md` before adding repeated drawing code. Components
+own common geometry, alignment and lifecycle; scenes own mathematical content
+and narration. Prefer composition for theme/layout choices, subclasses for real
+specializations, and separate objects for substantially different meanings. When
+extending a shared object, inventory and check its earlier and later uses too.
+
 Generate the word-level animation ledgers and work through their findings
 before requesting viewer review. Passing tests or geometry checks alone cannot
 certify timing, clarity, motion, or audio quality. Describe verification limits

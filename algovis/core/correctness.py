@@ -8,17 +8,17 @@ from manim import (
 
 from ..theme import DEFAULT_SPACING, DEFAULT_THEME
 from ..frames import ProofFrame
+from .proof import Proof
 from .state_space import BinaryStateVector
 
 
-class InductiveProof(VGroup):
+class InductiveProof(Proof):
     """A compact base/hypothesis/step proof for a recursive algorithm."""
 
     def __init__(self, *, measure, base_case, hypothesis, step, conclusion,
                  claim="",
                  theme=DEFAULT_THEME, width=11.5, **kwargs):
-        super().__init__(**kwargs)
-        self.frame = ProofFrame(theme=theme)
+        super().__init__(theme=theme,**kwargs)
         entries = [
             ("DEFINITIONS", measure, theme.foreground),
             ("CLAIM", claim or conclusion, theme.foreground),
@@ -26,7 +26,6 @@ class InductiveProof(VGroup):
             ("INDUCTION HYPOTHESIS", hypothesis, theme.foreground),
             ("INDUCTIVE STEP", step, theme.foreground),
         ]
-        self.rows = VGroup()
         for label, body, color in entries:
             explanation = Text(body, font_size=21, color=color)
             # Wrap words at the same type size instead of shrinking a long row.
@@ -36,15 +35,15 @@ class InductiveProof(VGroup):
                 explanation = Text(textwrap.fill(body, width=line_length), font_size=21, color=color)
             if explanation.width > min(width, 9.6):
                 raise ValueError("Proof text exceeds its content column")
-            self.frame.place(label, explanation)
-            self.rows.add(VGroup(self.frame.labels_by_name[label], explanation))
+            self.add_row(label,explanation)
         self.conclusion = self.frame.place("conclusion",Text(conclusion,font_size=21,color=theme.success))
         self.rows.add(self.conclusion)
-        self.add(self.rows)
 
     def reveal(self, lag_ratio=0.16):
-        return LaggedStart(*[FadeIn(row, shift=DOWN * 0.05) for row in self.rows],
-                           lag_ratio=lag_ratio)
+        from manim import AnimationGroup
+        return AnimationGroup(Create(self.frame.divider),
+            LaggedStart(*[FadeIn(row, shift=DOWN * 0.05) for row in self.rows],
+                        lag_ratio=lag_ratio))
 
 
 class MonotoneCall(VGroup):

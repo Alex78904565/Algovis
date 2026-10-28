@@ -14,6 +14,8 @@ import shlex
 
 
 SEMANTIC_ROLES = {
+    'good',        # Favorable evaluation; overrides status and attention roles.
+    'bad',         # Unfavorable evaluation; overrides status and attention roles.
     "neutral",     # Ordinary structure or context.
     "current",     # The object currently named by the narration.
     "operation",   # A transformation, choice, or arithmetic operation.
