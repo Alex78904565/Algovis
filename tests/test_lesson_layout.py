@@ -7,6 +7,19 @@ from algovis.review.inspection import capture_snapshot, typography_findings, ali
 
 
 class LessonLayoutTests(unittest.TestCase):
+    def test_identical_copy_does_not_register_a_smaller_supporting_condition(self):
+        from manim import MathTex, VGroup
+        from algovis import ApplyDefinition
+        style=LessonStyle()
+        source=VGroup(style.math('f(i,w)',peers='reference'),
+                      MathTex(r'w\le C').scale(.5))
+        target=source.copy()
+        style.watch('application',target[0])
+        ApplyDefinition(source,None,target)
+        self.assertEqual(target[0]._algovis_typography_group,'application')
+        self.assertFalse(any(hasattr(part,'_algovis_typography_group')
+                             for part in target[1].get_family()))
+
     def test_identical_selected_definition_preserves_rigid_copy_structure(self):
         from algovis import ApplyDefinition
         style=LessonStyle()

@@ -1,5 +1,6 @@
 from manim import *
 import re
+from collections import defaultdict, deque
 
 class Function(VGroup):
     """
@@ -131,18 +132,15 @@ class ApplyDefinition(AnimationGroup):
         if source_text and source_text == target_text:
             # Inspection contracts belong to the destination's role, even
             # when its glyphs come from a differently sized reference row.
-            contracts = {
-                (getattr(part, '_algovis_typography_group', None),
-                 getattr(part, '_algovis_type_role', 'equation'))
-                for part in result.get_family()
-                if getattr(part, '_algovis_typography_group', None)
-            }
-            typed_terms = {
-                getattr(part, 'tex_string', None):
-                    (part._algovis_typography_group, part._algovis_type_role)
-                for part in result.get_family()
-                if getattr(part, '_algovis_typography_group', None)
-            }
+            contracts = defaultdict(deque)
+            for part in result.get_family():
+                text = getattr(part, 'tex_string', None)
+                if isinstance(text, str):
+                    # Include unregistered occurrences too. A condition's w
+                    # need not share the role of an argument's earlier w.
+                    contracts[text].append((
+                        getattr(part, '_algovis_typography_group', None),
+                        getattr(part, '_algovis_type_role', 'equation')))
             # An identical formula must travel as a rigid copy. Manim's
             # hierarchy matching can otherwise pair the zero in f(0) with
             # the zero after '=' when a VGroup lands in a MathTex object.
@@ -166,17 +164,20 @@ class ApplyDefinition(AnimationGroup):
                 for attribute in ('_algovis_typography_group', '_algovis_type_role'):
                     if hasattr(part, attribute):
                         delattr(part, attribute)
-            if contracts:
-                from ..layout import LessonStyle
-                style = LessonStyle()
-                if len(contracts) == 1:
-                    peers, role = next(iter(contracts))
-                    style.watch(peers, result, type_role=role)
+            from ..layout import LessonStyle
+            for part in result.get_family():
+                matching = contracts.get(getattr(part, 'tex_string', None))
+                if not matching:
+                    continue
+                peers, role = matching.popleft()
+                if peers:
+                    LessonStyle._watch_type(part, peers, role)
                 else:
-                    for part in result.get_family():
-                        contract = typed_terms.get(getattr(part, 'tex_string', None))
-                        if contract:
-                            style.watch(contract[0], part, type_role=contract[1])
+                    # A parent may just have registered its whole formula;
+                    # preserve a destination child's explicit exception.
+                    for attribute in ('_algovis_typography_group', '_algovis_type_role'):
+                        if hasattr(part, attribute):
+                            delattr(part, attribute)
         # Carry only the actual glyphs. A backing rectangle looked like a
         # chunk of the slide being picked up and could obscure other rows.
         # Keep a visible copy throughout arrival and local substitution;
