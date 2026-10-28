@@ -300,6 +300,14 @@ declared timing; it does not certify legible glyphs, occlusion, or semantic valu
     Keep speech samples intact and retime subsequent words/captions/cues together.
     The viewer specifically liked clip 6's rule-copy, substitution, cancellation,
     and simplification sequence; preserve that sequence when repairing its timing.
+  - In deferred sequences, check the boundary between phases. The previous
+    copy must be adopted and its traveller removed before the next substitution
+    begins. Deferring construction alone does not establish one visible owner.
+    A clean final frame can hide an old formula underneath the moving one.
+    For a copied mathematical rule followed by substitutions, finish the scene
+    play before changing its glyphs as well; inspect that actual handoff.
+  - Numbered instructions use `1.`, `2.`, and so on. A middle dot is not a list
+    separator. Keep this convention across numbered lesson instructions.
 
 - Decide whether the main plot, the complete labeled graph, or a deliberate split
   composition is being centered. Include tick labels and axis labels in the layout,

@@ -18,6 +18,7 @@ class DeferredAnimation(Animation):
         self.factory = factory
         self.animation = None
         self.scene = None
+        self._inner_cleaned = False
         kwargs.setdefault("rate_func", linear)
         super().__init__(Group(), introducer=True, **kwargs)
 
@@ -27,6 +28,7 @@ class DeferredAnimation(Animation):
     def begin(self):
         if self.scene is None:
             raise RuntimeError("DeferredAnimation must be set up with a scene before beginning")
+        self._inner_cleaned = False
         self.animation = self.factory()
         self.scene.add_mobjects_from_animations([self.animation])
         self.animation._setup_scene(self.scene)
@@ -44,10 +46,20 @@ class DeferredAnimation(Animation):
     def finish(self):
         super().finish()
         self.animation.finish()
+        # A following deferred factory may immediately animate this result.
+        # Adopt copies and retire outgoing objects now, before that factory
+        # starts; waiting for the enclosing group's cleanup paints both stages.
+        self._clean_up_inner(self.scene)
 
-    def clean_up_from_scene(self, scene):
+    def _clean_up_inner(self, scene):
+        if self._inner_cleaned:
+            return
         self.animation.clean_up_from_scene(scene)
         scene.remove(self.mobject)
+        self._inner_cleaned = True
+
+    def clean_up_from_scene(self, scene):
+        self._clean_up_inner(scene)
 
 
 class Pulse(ApplyMethod):

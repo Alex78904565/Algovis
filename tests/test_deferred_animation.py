@@ -2,10 +2,30 @@ import unittest
 
 from manim import AnimationGroup, Create, FadeOut, Line, Scene, Square, Succession, Transform, Wait, RIGHT
 
-from algovis import DeferredAnimation, ReplaceContent
+from algovis import ApplyDefinition, DeferredAnimation, ReplaceContent
 
 
 class DeferredAnimationTests(unittest.TestCase):
+    def test_definition_copy_is_adopted_before_the_next_substitution_begins(self):
+        scene=Scene()
+        definition,result=Square(),Square().shift(2*RIGHT)
+        scene.add(definition)
+        transfer=ApplyDefinition(definition,None,result)
+        first=DeferredAnimation(lambda:AnimationGroup(transfer,Create(Line())),run_time=1)
+        next_phase=[]
+        def substitute():
+            family=scene.get_mobject_family_members()
+            next_phase.append((result in family,transfer.traveller in family))
+            return Transform(result,result.copy().shift(RIGHT))
+        sequence=Succession(first,DeferredAnimation(substitute,run_time=1),Wait(run_time=1))
+        scene.add_mobjects_from_animations([sequence]);sequence._setup_scene(scene);sequence.begin()
+        sequence.interpolate(.4)
+        self.assertEqual(next_phase,[(True,False)])
+        sequence.finish();sequence.clean_up_from_scene(scene)
+        self.assertIn(result,scene.get_mobject_family_members())
+        self.assertNotIn(transfer.traveller,scene.get_mobject_family_members())
+        self.assertAlmostEqual(result.get_x(),3)
+
     def test_substitution_and_cancellation_wait_for_their_own_phase(self):
         scene = Scene()
         general, expanded, result = Square(), Square().shift(RIGHT), Square().shift(2 * RIGHT)
