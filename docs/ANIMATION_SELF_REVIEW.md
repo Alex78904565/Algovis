@@ -151,6 +151,22 @@ possible so the timing ledger can catch accidental later scaling. Notes, diagram
 labels, headings, and primary equations may differ by an explicit hierarchy;
 two peer claims must not differ just because one was harder to fit.
 
+Apply these contracts to existing scenes as well as new layouts. Use
+`LessonStyle.watch` to register peer equations without resizing them, and
+`align_rows` for a shared left anchor. When a call moves into a deliberately
+larger answer role, put it in that role's group and build replacements with
+`math_like`; do not insert smaller arguments into an enlarged function.
+Recheck both the construction and proof/reference layouts. A correctly sized
+base case must not shrink again when it joins the proof rail.
+
+Compare typeset parts after a local substitution, rather than treating the
+whole expression's height as its font size. A taller fraction is not a bigger
+font. Copy transfers and there-and-back focus effects must preserve the
+destination's inspection metadata. Check the rigid copy's actual hierarchy,
+including when a selected term lands in a differently grouped formula.
+Registering metadata does not certify unregistered content, semantic color
+meaning, or the visual quality of a complete composition.
+
 For an overview of a completed build, sample the relevant animation's end, not
 the end of the cue's inherited pause: the latter can put the sample into the
 next transition. Use the actual animation records and neighboring frames to

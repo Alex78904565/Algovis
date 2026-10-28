@@ -13,7 +13,7 @@ import json
 from pathlib import Path
 import re
 
-from .inspection import semantic_objects, typography_findings
+from .inspection import semantic_objects, typography_findings, alignment_findings
 
 ATTENTION = {"Pulse", "Indicate", "Circumscribe", "ShowPassingFlash", "Flash",
              "Highlight", "FocusOn", "Wiggle"}
@@ -183,9 +183,9 @@ def audit_section(manifest, cue_document, transcript, *, attention_tolerance=Non
     # Report the first occurrence of each mismatch, not the same flag per hold.
     seen_type = set()
     for snapshot in manifest.get("snapshots", []):
-        for finding in typography_findings(snapshot):
-            signature = (finding["group"], finding["typeRole"],
-                         tuple((o["id"],o["fontSize"]) for o in finding["objects"]))
+        for finding in typography_findings(snapshot) + alignment_findings(snapshot):
+            signature = (finding["kind"], finding["group"], finding.get("typeRole"),
+                         tuple((o["id"],o.get("fontSize"),o.get("left")) for o in finding["objects"]))
             if signature not in seen_type:
                 seen_type.add(signature)
                 findings.append(finding)

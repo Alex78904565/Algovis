@@ -185,6 +185,29 @@ reusable authoring toolkit.
 
 ## Documentation
 
+For a stable explanation layout, use `ColumnLayout` to reserve rows at their
+final size and `LessonStyle` for semantic colors and consistent type sizes.
+Existing scenes can opt into the same checks without moving their objects:
+
+```python
+from algovis import LessonStyle
+
+style = LessonStyle()
+style.watch("recurrence", meaning, recurrence, base_case)
+style.align_rows("definition-column", meaning, recurrence, base_case)
+next_call = style.math_like(current_call, "f", "(", "i+1,w", ")",
+                            role="current", peers="recurrence")
+```
+
+`watch` checks declared peers at settled animation boundaries; it does not
+resize them. Give intentionally different roles, such as notes or a larger
+answer call, their own groups. `align_rows` checks a shared left edge without
+changing geometry; travelling copies do not join that contract. `math_like`
+matches the current type size, so adding a fraction or new arguments does not
+require matching the height of unlike expressions. Render-time failures keep
+the previous good review video available. These checks supplement visual
+review of spacing, continuity, and the meaning of each cue.
+
 The detailed component guide is in [algovis/README.md](algovis/README.md).
 `library_features_demo.py` contains compact, renderable examples of the major
 visual components.

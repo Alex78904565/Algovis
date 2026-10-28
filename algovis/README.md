@@ -72,6 +72,24 @@ the previous video. This catches accidental scaling, but does not replace visual
 `ApplyDefinition` for a visible definition carried to its application; planning
 a target does not choose or schedule an animation for you.
 
+The same contracts can watch an established layout without changing it:
+
+```python
+style.watch("recurrence", meaning, recurrence, base_case)
+style.align_rows("function-column", meaning, recurrence, base_case)
+new_call = style.math_like(old_call, "f", "(", "i+1,w", ")",
+                           role="current", peers="recurrence")
+```
+
+`watch` registers mathematical text within the supplied objects. Use
+`kind="text"` for peer prose, and separate groups for deliberate changes of
+role or hierarchy. `align_rows` declares an existing shared left edge; it does
+not reposition the rows or register their travelling copies. `math_like`
+matches the reference's current type size, independent of fraction height or
+argument length. Declared alignment drift also blocks publication. These
+contracts cover their registered objects at settled boundaries; inspect
+intermediate motion and the rest of the composition visually.
+
 For complete algorithm lessons, `AlgorithmLessonScene` accepts declarative
 `ProblemLesson` specifications:
 

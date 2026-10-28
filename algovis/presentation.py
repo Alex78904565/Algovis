@@ -11,13 +11,13 @@ from pathlib import Path
 from manim import (
     AnimationGroup, Arrow, Circumscribe, DOWN, FadeIn, FadeOut, GrowArrow, Group,
     Indicate, MathTex, ORIGIN, RoundedRectangle, Succession, Text, UP, VGroup,
-    Wait, config,
+    Wait, config, TransformFromCopy,
 )
 
 from .theme import DEFAULT_SPACING, DEFAULT_THEME
 from .narration import NarrationTrack
 from .core.math import ApplyDefinition
-from .review.inspection import capture_snapshot, semantic_objects
+from .review.inspection import capture_snapshot, semantic_objects, measured_font_size
 from .utils.effects import Pulse
 
 
@@ -235,15 +235,38 @@ class SlideSceneMixin:
         Preserve source labels separately for event records, while updating
         review-only semantic labels to describe what the viewer now sees.
         """
-        def update(source, destination):
+        def update(source, destination, inherited_size=None):
+            # Transform changes geometry but keeps the source's initial SVG
+            # height. Recalibrate the review-only font reference to the target
+            # so a new fraction is not mistaken for a larger font.
+            if getattr(source, "_algovis_typography_group", None):
+                size = measured_font_size(destination)
+                size = inherited_size if size is None else size
+                if isinstance(size, (int,float)) and np.isfinite(size):
+                    source._algovis_font_reference = (float(size),float(source.height))
+                source._algovis_font_container = any(
+                    isinstance(getattr(child,"tex_string",None),str) for child in destination.submobjects)
+            else:
+                size = measured_font_size(destination)
+                size = inherited_size if size is None else size
             for attribute in ("_algovis_label", "text", "tex_string"):
                 label = getattr(destination, attribute, None)
                 if isinstance(label, str) and label.strip():
                     source._algovis_label = label
                     break
             for old, new in zip(source.submobjects, destination.submobjects):
-                update(old, new)
+                update(old, new, size)
         for animation in animations:
+            # TransformFromCopy internally reverses source/destination and
+            # runs the interpolation backwards. Its visible destination keeps
+            # its own text and font; copying the source metadata would lie.
+            if isinstance(animation, TransformFromCopy):
+                continue
+            rate_func = getattr(animation,"rate_func",None)
+            if rate_func is not None and abs(float(rate_func(1))) < 1e-7:
+                # Indicate and other there-and-back effects finish at their
+                # original geometry, not at the enlarged focus target.
+                continue
             destination = getattr(animation, "target_mobject", None)
             source = getattr(animation, "mobject", None)
             if source is not None and destination is not None:

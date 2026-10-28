@@ -220,21 +220,21 @@ class StateReframing(VGroup):
         super().__init__(**kwargs)
         self.theme = theme
 
-        def card(label, equation, meaning, bound, runtime, color):
+        def card(label, equation, meaning, bound, runtime):
             frame = RoundedRectangle(
                 width=panel_width, height=3.45, corner_radius=0.14,
-                stroke_color=color, stroke_width=2.3,
+                stroke_color=theme.primary, stroke_width=2.3,
                 fill_color=theme.surface, fill_opacity=0.96,
             )
-            heading = Text(label, font_size=16, color=color)
-            formula = MathTex(equation, color=theme.foreground).scale(0.82)
+            heading = Text(label, font_size=16, color=theme.foreground)
+            formula = MathTex(equation, color=theme.primary).scale(0.82)
             explanation = Text(
                 meaning, font_size=19, color=theme.foreground,
                 line_spacing=0.9,
             )
             explanation.scale_to_fit_width(min(panel_width - 0.55, explanation.width))
-            domain = MathTex(bound, color=theme.accent).scale(0.72) if bound else None
-            cost = MathTex(runtime, color=color).scale(0.86) if runtime else None
+            domain = MathTex(bound, color=theme.primary).scale(0.72) if bound else None
+            cost = MathTex(runtime, color=theme.success).scale(0.86) if runtime else None
             body = VGroup(heading, formula, explanation,
                           *[part for part in (domain, cost) if part is not None]).arrange(
                 DOWN, buff=0.25,
@@ -251,11 +251,11 @@ class StateReframing(VGroup):
 
         self.original = card(
             labels[0], original_tex, original_meaning, original_bound,
-            original_runtime, theme.primary,
+            original_runtime,
         )
         self.alternate = card(
             labels[1], alternate_tex, alternate_meaning, alternate_bound,
-            alternate_runtime, theme.success,
+            alternate_runtime,
         )
         self.cards = VGroup(self.original, self.alternate).arrange(
             RIGHT, buff=0.55, aligned_edge=UP,

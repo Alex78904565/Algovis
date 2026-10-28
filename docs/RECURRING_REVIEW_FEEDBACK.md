@@ -458,6 +458,11 @@ Check the actual frames immediately before the cue as well as after it.
   Use the same math scale and reserve space for both. A comparison's headings,
   function calls, and conclusions should have corresponding anchors across
   its two columns; do not shrink one whole argument to make a split layout.
+  Register existing equations with `LessonStyle.watch`, not just newly built
+  scenes. Retag a deliberate answer/reference hierarchy when the role changes;
+  keep new arguments at the call's current size with `math_like`. Verify the
+  base case again after it moves into the proof. A second whole-row shrink can
+  silently undo an otherwise consistent construction.
 - **Keep a small set of familiar layouts.** Center the main equation and its
   parameter-definition block, or align them to an explicit shared column.
   Avoid unrelated labels in opposite corners. A recurrence introduced on one

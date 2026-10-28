@@ -3,10 +3,126 @@ from types import SimpleNamespace
 
 from manim import Rectangle, Scene
 from algovis import ColumnLayout, LessonStyle, SlideRegion
-from algovis.review.inspection import capture_snapshot, typography_findings
+from algovis.review.inspection import capture_snapshot, typography_findings, alignment_findings
 
 
 class LessonLayoutTests(unittest.TestCase):
+    def test_identical_selected_definition_preserves_rigid_copy_structure(self):
+        from algovis import ApplyDefinition
+        style=LessonStyle()
+        source=style.math(r'\#\text{ operations}',r'\ge',peers='proof')
+        destination=style.math(r'\#\text{ operations}',peers='proof')
+        transfer=ApplyDefinition(source[0],None,destination)
+        self.assertEqual(len(destination.submobjects),len(source[0].submobjects))
+        scene=object.__new__(Scene);scene.mobjects=[source,destination]
+        scene._review_object_ids={};scene._review_next_object_id=1
+        scene._review_object_label=lambda obj:getattr(obj,'tex_string','')
+        scene.renderer=SimpleNamespace(time=2)
+        self.assertEqual(typography_findings(capture_snapshot(scene,14,8)),[])
+
+    def test_partial_fraction_substitution_retains_surrounding_type_size(self):
+        from manim import Transform
+        from algovis import SlideScene
+        style=LessonStyle()
+        source=style.math('f(k)','=', 'k',peers='proof')
+        target=style.math(r'{k(k+1)\over2}',peers='proof')
+        animation=Transform(source[2],target)
+        animation.begin();animation.interpolate(1);animation.finish()
+        SlideScene._refresh_review_labels((animation,))
+        scene=object.__new__(Scene);scene.mobjects=[source]
+        scene._review_object_ids={};scene._review_next_object_id=1
+        scene._review_object_label=lambda obj:getattr(obj,'tex_string','')
+        scene.renderer=SimpleNamespace(time=2)
+        self.assertEqual(typography_findings(capture_snapshot(scene,14,8)),[])
+
+    def test_identical_transfer_preserves_destination_group_and_absent_contract(self):
+        from manim import MathTex, VGroup
+        from algovis import ApplyDefinition
+        style=LessonStyle()
+        source=style.math('f','(', 'i',')',peers='reference')
+        answer=style.watch('answer',VGroup(*source.copy()).scale(1.2))
+        ApplyDefinition(VGroup(*source),None,answer)
+        self.assertEqual({part._algovis_typography_group for part in answer
+                          if hasattr(part,'_algovis_typography_group')},{'answer'})
+        from algovis.review.inspection import measured_font_size
+        self.assertAlmostEqual(measured_font_size(answer[0]),33.6*1.2)
+        footer=MathTex('f(i)').scale(.5)
+        ApplyDefinition(source,None,footer)
+        self.assertFalse(any(hasattr(part,'_algovis_typography_group')
+                             for part in footer.get_family()))
+
+    def test_math_like_matches_type_size_rather_than_fraction_height(self):
+        style=LessonStyle()
+        reference=style.math('f(k)',peers='reference').scale(.8)
+        result=style.math_like(reference,r'{k(k+1)\over2}',peers='reference')
+        self.assertAlmostEqual(result.font_size,reference.font_size)
+        self.assertGreater(result.height,reference.height)
+
+    def test_a_pulse_does_not_change_the_recorded_type_size(self):
+        from algovis import SlideScene
+        from manim import Indicate
+        from algovis.review.inspection import measured_font_size
+        value=LessonStyle().math('f(k)',peers='formula')
+        pulse=Indicate(value,scale_factor=1.08)
+        pulse.begin();pulse.interpolate(1);pulse.finish()
+        SlideScene._refresh_review_labels((pulse,))
+        self.assertAlmostEqual(measured_font_size(value),33.6)
+
+    def test_a_copy_transfer_keeps_the_destinations_type_size_and_label(self):
+        from manim import TransformFromCopy
+        from algovis import SlideScene
+        from algovis.review.inspection import measured_font_size
+        style=LessonStyle()
+        source=style.math('n',peers='source').scale(.7)
+        target=style.math('191',peers='target')
+        transfer=TransformFromCopy(source,target)
+        transfer.begin();transfer.interpolate(1);transfer.finish()
+        SlideScene._refresh_review_labels((transfer,))
+        self.assertAlmostEqual(measured_font_size(target),33.6)
+        self.assertFalse(hasattr(target,'_algovis_label'))
+
+    def test_a_substituted_fraction_does_not_enlarge_peer_font_measurement(self):
+        from manim import Transform
+        from algovis import SlideScene
+        style=LessonStyle()
+        source=style.math('f(k)','=', 'k',peers='proof')
+        target=style.math('f(k)','=',r'{k(k+1)\over2}',peers='proof')
+        animation=Transform(source,target)
+        animation.begin();animation.interpolate(1);animation.finish()
+        SlideScene._refresh_review_labels((animation,))
+        scene=object.__new__(Scene);scene.mobjects=[source,target]
+        scene._review_object_ids={};scene._review_next_object_id=1
+        scene._review_object_label=lambda obj:getattr(obj,'tex_string','')
+        scene.renderer=SimpleNamespace(time=2)
+        self.assertEqual(typography_findings(capture_snapshot(scene,14,8)),[])
+        source.scale(.8)
+        self.assertTrue(typography_findings(capture_snapshot(scene,14,8)))
+
+    def test_existing_rows_are_watched_without_resizing_them(self):
+        from manim import MathTex, Text, VGroup
+        style=LessonStyle();formula=MathTex('f(n)').scale(.7)
+        heading=Text('definition',font_size=20);row=VGroup(heading,formula)
+        before=formula.width
+        self.assertIs(style.watch('definition',row),row)
+        self.assertEqual(formula._algovis_typography_group,'definition')
+        self.assertFalse(hasattr(heading,'_algovis_typography_group'))
+        self.assertAlmostEqual(formula.width,before)
+
+    def test_travelling_copies_do_not_join_an_alignment_contract(self):
+        from manim import VGroup, RIGHT
+        first,second=Rectangle(width=3,height=1),Rectangle(width=5,height=1)
+        first.shift(RIGHT);second.align_to(first,[-1,0,0])
+        LessonStyle.align_rows('definitions',first,second)
+        travelling=first.copy().shift(RIGHT*3)
+        scene=object.__new__(Scene);scene.mobjects=[first,second,travelling]
+        scene._review_object_ids={};scene._review_next_object_id=1
+        scene._review_object_label=lambda obj:'row'
+        scene.renderer=SimpleNamespace(time=2)
+        self.assertEqual(alignment_findings(capture_snapshot(scene,14,8)),[])
+        second.shift(RIGHT)
+        self.assertEqual(alignment_findings(capture_snapshot(scene,14,8))[0]['kind'],
+                         'declared_left_edge_mismatch')
+
     def test_nested_columns_share_parent_bounds_and_requested_gutter(self):
         parent = SlideRegion((1, 2, 0), 10, 6)
         left, right = parent.split_columns(1, 3, gutter=2)
@@ -65,7 +181,7 @@ class LessonLayoutTests(unittest.TestCase):
         findings=typography_findings(snapshot)
         self.assertEqual(len(findings),1)
         self.assertEqual(findings[0]['typeRole'],'equation')
-        self.assertEqual(len(findings[0]['objects']),2)
+        self.assertEqual({o['fontSize'] for o in findings[0]['objects']},{33.6,26.88})
         second.scale(1/.8)
         self.assertEqual(typography_findings(capture_snapshot(scene,14,8)),[])
 

@@ -14,6 +14,15 @@ from algovis.review.server import ReviewCatalog, ReviewHTTPServer, ReviewServer
 
 
 class ReviewServerTests(unittest.TestCase):
+    def test_declared_alignment_drift_is_rejected_before_publication(self):
+        self.review.manifest_path.parent.mkdir(parents=True,exist_ok=True)
+        self.review.manifest_path.write_text(json.dumps({'animations':[],
+            'snapshots':[{'time':2,'objects':[
+                {'id':'a','label':'meaning','alignmentGroup':'definition','region':{'x':.1}},
+                {'id':'b','label':'base','alignmentGroup':'definition','region':{'x':.2}}]}]}),encoding='utf-8')
+        with self.assertRaisesRegex(RuntimeError,'row alignment rejected'):
+            self.review._validate_render_timing()
+
     def test_peer_font_size_error_preserves_the_last_published_video(self):
         self.review.manifest_path.parent.mkdir(parents=True,exist_ok=True)
         self.review.manifest_path.write_text(json.dumps({'animations':[],

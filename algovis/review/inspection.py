@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import numpy as np
+from ..layout import measured_font_size
 
 
 def semantic_objects(snapshot):
@@ -105,9 +106,11 @@ def capture_snapshot(scene, width, height):
             item["paintColors"] = sorted(colors)
             if len(colors) == 1:
                 item["color"] = next(iter(colors))
-        font_size = getattr(mobject, "font_size", None)
+        font_size = measured_font_size(mobject)
         if isinstance(font_size, (int, float)) and np.isfinite(font_size):
             item["fontSize"] = round(float(font_size), 4)
+        if getattr(mobject, "_algovis_font_container", False):
+            item["fontContainer"] = True
         for attribute, key in (("_algovis_semantic_role", "semanticRole"),
                                ("_algovis_type_role", "typeRole"),
                                ("_algovis_typography_group", "typographyGroup"),
@@ -116,6 +119,8 @@ def capture_snapshot(scene, width, height):
             value = getattr(mobject, attribute, None)
             if isinstance(value, str):
                 item[key] = value
+        if getattr(mobject, "_algovis_alignment_owner", None) == id(mobject):
+            item["alignmentGroup"] = mobject._algovis_alignment_group
         if right <= left or bottom <= top:
             offscreen.append(item)
         else:
@@ -133,7 +138,8 @@ def typography_findings(snapshot, *, relative_tolerance=.025):
     """
     groups = {}
     for obj in snapshot.get("objects", []):
-        if obj.get("typographyGroup") and obj.get("fontSize", 0) > 0:
+        if (obj.get("typographyGroup") and obj.get("fontSize", 0) > 0
+                and not obj.get("fontContainer")):
             key = (obj["typographyGroup"], obj.get("typeRole", ""))
             groups.setdefault(key, []).append(obj)
     findings = []
@@ -144,4 +150,21 @@ def typography_findings(snapshot, *, relative_tolerance=.025):
                              "group":group, "typeRole":role,
                              "objects":[{"id":obj["id"],"label":obj["label"],"fontSize":obj["fontSize"]}
                                         for obj in objects]})
+    return findings
+
+
+def alignment_findings(snapshot, *, tolerance=.0035):
+    """Check declared left edges in frame-relative units at settled snapshots."""
+    groups = {}
+    for obj in snapshot.get("objects", []):
+        if obj.get("alignmentGroup") and obj.get("opacity", 1) > .12:
+            groups.setdefault(obj["alignmentGroup"], []).append(obj)
+    findings = []
+    for group, objects in groups.items():
+        lefts = [(obj.get("rawRegion") or obj["region"])["x"] for obj in objects]
+        if max(lefts)-min(lefts) > tolerance:
+            findings.append({"kind":"declared_left_edge_mismatch", "time":snapshot.get("time",0),
+                             "group":group,"objects":[
+                                 {"id":obj["id"],"label":obj["label"],"left":left}
+                                 for obj,left in zip(objects,lefts)]})
     return findings

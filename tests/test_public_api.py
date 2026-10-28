@@ -95,6 +95,14 @@ class PublicApiTests(unittest.TestCase):
         self.assertIsNone(comparison.alternate.bound)
         self.assertIsNone(comparison.alternate.runtime)
         self.assertIsNotNone(comparison.alternate.meaning)
+        for card in comparison.cards:
+            heading_paint={part.get_fill_color().to_hex()
+                           for part in card.heading.family_members_with_points()}
+            self.assertEqual(heading_paint,{comparison.theme.foreground.to_hex()})
+            self.assertEqual(card[0].get_stroke_color(),comparison.theme.primary)
+            self.assertEqual(card.equation.get_color(),comparison.theme.primary)
+        self.assertEqual(comparison.original.bound.get_color(),comparison.theme.primary)
+        self.assertEqual(comparison.original.runtime.get_color(),comparison.theme.success)
 
     def test_attention_pulse_preserves_mixed_semantic_colors(self):
         group = VGroup(Square(color=GREEN), Square(color=BLUE).shift(3*RIGHT))

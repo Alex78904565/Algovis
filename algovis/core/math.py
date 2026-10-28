@@ -129,6 +129,20 @@ class ApplyDefinition(AnimationGroup):
         source_text = ''.join(formula_text(definition).split())
         target_text = ''.join(formula_text(result).split())
         if source_text and source_text == target_text:
+            # Inspection contracts belong to the destination's role, even
+            # when its glyphs come from a differently sized reference row.
+            contracts = {
+                (getattr(part, '_algovis_typography_group', None),
+                 getattr(part, '_algovis_type_role', 'equation'))
+                for part in result.get_family()
+                if getattr(part, '_algovis_typography_group', None)
+            }
+            typed_terms = {
+                getattr(part, 'tex_string', None):
+                    (part._algovis_typography_group, part._algovis_type_role)
+                for part in result.get_family()
+                if getattr(part, '_algovis_typography_group', None)
+            }
             # An identical formula must travel as a rigid copy. Manim's
             # hierarchy matching can otherwise pair the zero in f(0) with
             # the zero after '=' when a VGroup lands in a MathTex object.
@@ -140,7 +154,29 @@ class ApplyDefinition(AnimationGroup):
                              for part in result.family_members_with_points()}
             if len(result_colors) == 1:
                 destination.set_color(next(iter(result_colors)))
+            # become() aligns mismatched families, padding a single MathTex
+            # part into several copies when the source is a selected term.
+            # Preserve the rigid copy's actual hierarchy as well as its paint.
             result.become(destination)
+            result.submobjects = [child.copy() for child in destination.submobjects]
+            for part in result.get_family():
+                # The rigid copy's calibrated font reference still measures
+                # its scaled geometry. A selected MathTexPart may have no
+                # native font_size, so keep that reference while retagging.
+                for attribute in ('_algovis_typography_group', '_algovis_type_role'):
+                    if hasattr(part, attribute):
+                        delattr(part, attribute)
+            if contracts:
+                from ..layout import LessonStyle
+                style = LessonStyle()
+                if len(contracts) == 1:
+                    peers, role = next(iter(contracts))
+                    style.watch(peers, result, type_role=role)
+                else:
+                    for part in result.get_family():
+                        contract = typed_terms.get(getattr(part, 'tex_string', None))
+                        if contract:
+                            style.watch(contract[0], part, type_role=contract[1])
         # Carry only the actual glyphs. A backing rectangle looked like a
         # chunk of the slide being picked up and could obscure other rows.
         # Keep a visible copy throughout arrival and local substitution;
