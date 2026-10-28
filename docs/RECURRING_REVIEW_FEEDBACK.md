@@ -689,3 +689,27 @@ Read all notes, including drafts and follow-ups, across all sections. Apply the
 same correction wherever the pattern occurs. Ask yourself whether the problem
 is actually solved, using the rendered frames and word-level ledger as evidence.
 Do not pass the agent's unresolved diagnostic work to the viewer as a final pass.
+
+Shared safeguards must reach existing production scenes. Installing a helper
+or enabling a publication check is not the same as migrating all clips. Keep a
+section inventory of editable math, attention lifetimes, and timing coverage;
+record when an existing static equation or brief pulse correctly needs no
+replacement. Rebuild and inspect the actual dependent compositions.
+
+Local argument substitutions need the complete native mathematical layout.
+Do not replace a letter with a centered digit, or manually splice children into
+an editable row. Keep semantic term names stable as parameters are introduced.
+Worked additions retain their intermediate expression and reveal the total
+after the child value, with a numerical consistency check where appropriate.
+
+A repeated phrase can resolve to the same spoken occurrence twice. Coordinate
+mechanical continuation as one declared sequence instead of pretending there
+are two separate word triggers. Recover estimated mathematical word timing
+from the recording or forced alignment of the reviewed wording; retain that
+evidence. Do not remove approximation flags to make a strict check pass.
+
+Check the first visible state change, not only the declared animation. Direct
+recoloring or unhiding before `play_on_cue` evaluates its arguments can paint
+during its wait. Put the verified word wait before that preparation, or animate
+the change inside the cued operation. Inspect a frame before the trigger to
+confirm the old state is still present.

@@ -71,11 +71,65 @@ one argument off its baseline creates an error in the real render manifest.
 numerical examples, call `require_sum()` with named immediate/future/total terms.
 This checks completed equalities while allowing symbolic and incomplete stages.
 
+For a simple replacement, let the scene handle planning and adoption together:
+
+```python
+self.substitute_on_cue("first_item", call, item="1", run_time=.7,
+                       reason="Substitute the first item into the call")
+```
+
+`MathRow.tokens("f", "(", "i,w", ")")` supports migration of existing
+tokenized equations, retaining `MathTex`'s 48-point default. Its terms have
+string names `"0"`, `"1"`, etc. The last
+two children are invisible baseline anchors; use explicit term indices or
+`part("3")`, rather than `[-1]` or an unrestricted slice. Native static
+`MathTex` equations need no conversion. Migrate editable arguments, delimiters,
+and numerical arithmetic; do not break a working diagram merely to change its
+class. After adding parameters, use the row's motions and commit rather than
+assigning a new `submobjects` list, which discards its baseline contract.
+
 Use `focus_on_cue("take_reference", take_call, until="skip_reference", reason=...)`
 for an extended spoken reference. Separate targets receive separate boxes. The
 next named `play_on_cue` releases them; its absence is a publication error.
+`extra=(FadeIn(range_label),)` can reveal the associated explanation in the
+same slot; `buff` preserves the established outline spacing. A brief spoken
+name can still use `Pulse`. A selected branch's permanent success outline is
+semantic state, not automatically a transient attention box.
 Use `play_on_cue(..., edge="end")` when an action must wait for the whole phrase
 to finish, such as returning an item after explaining why it does not fit.
+
+### Require timing coverage, including older animations
+
+Set `require_word_timing = True` on a narrated scene after migrating it. A raw
+content `play` then fails at render time, and undeclared changes in its manifest
+fail the publication audit. A successful shared-helper test alone does not
+establish that every older scene uses that helper.
+
+- `play_opening(..., reason=...)` establishes the initial composition at time
+  zero. It cannot be used later in the section.
+- `play_on_cue` starts one change on verified words.
+- `transition_on_cue` clears and reveals one composition on verified words,
+  preserving the existing transition's internal phases.
+- `play_phase("same_cue", ..., reason=...)` completes a dependent mechanical
+  phase of the most recent declared process. Its real offset is recorded. It
+  cannot name an unrelated or superseded cue.
+- `with self.cue_sequence("collapse", reason=...):` starts a multi-step process
+  such as folding repeated subtrees. Its phases share one verified start;
+  they are not falsely reported as separate animations all starting on that word.
+
+Use a new spoken cue for a new caption, explanation, or attention effect. A
+phase is appropriate for carrying and settling the same copied value, or the
+next fold of an already introduced collapse. It must not become the old
+pattern of letting arbitrary later actions inherit a broad cue. Attention
+effects retain their independently checked exact spoken referents.
+
+Prepare new targets offscreen. If a helper needs to directly recolor or unhide
+an **already visible** object before construction, call `wait_for_word(cue)`
+before that preparation, then use `play_on_cue` as usual. Python evaluates the
+arguments before entering `play_on_cue`; its wait cannot undo an earlier
+`set_color`, `set_opacity`, or `add`. Otherwise a color can appear early even
+though the pulse itself is correctly timed. Prefer `.animate` inside the cued
+operation when possible. A preparation wait does not authorize a raw `play`.
 
 ## Existing production migration
 
@@ -94,6 +148,15 @@ components. Standard panel styling also reaches the pseudocode helper.
 Headings already use `Slide`; every narrated clip uses `ChapterMarker`.
 Concrete story props, maps, plots and attention outlines retain their specialized
 components: a graph axis or a bag is not a comparison-panel background.
+
+All 17 narrated DP sections now require declared word timing. Editable call
+arguments, delimiter changes and numerical recovery rows use `MathRow`; extended
+references use held focus with a named release. Complete static equations and
+brief, explicitly spoken-name pulses retain their existing components. The
+migration preserves the established proof rails, equation frames, state rows,
+story illustrations and native section handoffs. Rebuild and inspect every
+dependent section after changing these shared components; an installed helper
+is not evidence that an older scene actually uses it.
 
 ## Rebuild every dependent section
 

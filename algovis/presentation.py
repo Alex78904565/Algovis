@@ -1,6 +1,7 @@
 """Presentation primitives for authoring educational Manim videos."""
 
 from dataclasses import dataclass
+from contextlib import contextmanager
 import inspect
 import json
 import numpy as np
@@ -151,6 +152,7 @@ class SlideSceneMixin:
     theme = DEFAULT_THEME
     slide_layout = None
     default_transition_time = 0.55
+    require_word_timing = False
 
     def setup(self):
         super().setup()
@@ -170,6 +172,7 @@ class SlideSceneMixin:
         self._review_compiled_animations = None
         self._review_is_compiling_play = False
         self._held_focus = []
+        self._last_word_event = None
 
     def tear_down(self):
         try:
@@ -180,6 +183,10 @@ class SlideSceneMixin:
                 Text.set_default()
 
     def play(self, *animations, **kwargs):
+        if self.require_word_timing and any(not isinstance(a, Wait) for a in animations):
+            evidence = getattr(self, '_review_active_cue', {})
+            if not any(key in evidence for key in ('wordTiming','wordSequence','opening')):
+                raise RuntimeError('Narrated content needs play_on_cue, an explicit phase, or an opening composition')
         animations = self._filter_cleanup_animations(animations)
         if not animations:
             # Repeated cleanup is a timed no-op, not an invitation to add an
@@ -449,6 +456,7 @@ class SlideSceneMixin:
         temporary.write_text(
             json.dumps({
                 "scene": type(self).__name__,
+                "requireWordTiming": bool(getattr(self,'require_word_timing',False)),
                 "frameRate": float(config.frame_rate),
                 "frame": {
                     "width": float(config.frame_width),
@@ -489,12 +497,111 @@ class SlideSceneMixin:
         }
         return result
 
+    def wait_for_word(self, name, *, edge="start"):
+        """Reach verified words before directly preparing an already visible object.
+
+        Prefer animation builders inside play_on_cue. This is needed when a
+        helper requires a direct style/opacity change before it is constructed;
+        performing that change before play_on_cue's wait would reveal it early.
+        It does not authorize a later unanchored play.
+        """
+        return self.narration.wait_for_word(self,name,edge=edge)
+
     def play_to_cue(self, name, *animations, minimum=0.05, offset=0.0):
         if self.narration is None:
             raise RuntimeError("Call begin_narration() before play_to_cue().")
         return self.narration.play_until(
             self, name, *animations, minimum=minimum, offset=offset,
         )
+
+    def substitute_on_cue(self, name, row, *, run_time=.6, reason, parts=None, **changes):
+        """Typeset, animate and adopt a complete named mathematical row.
+
+        Keeping adoption here prevents a scene from leaving its editable terms
+        or baseline metadata attached to a retired intermediate expression.
+        """
+        from .core.math_row import MathRow
+        if not isinstance(row, MathRow):
+            raise TypeError('Substitution requires a MathRow')
+        target = row.next_layout(parts, **changes)
+        self.play_on_cue(name, *row.motions_to(target), run_time=run_time, reason=reason)
+        row.commit(target, self)
+        return row
+
+    @contextmanager
+    def cue_sequence(self, name, *, reason, edge="start"):
+        """A measured word starts one multi-phase process, such as folding a tree.
+
+        This explicit scope is for dependent mechanical phases of that process,
+        not a license for later attention effects to inherit an earlier word.
+        Every phase records its real offset from the opening word.
+        """
+        if not reason.strip():
+            raise ValueError('A cue sequence needs an instructional reason')
+        anchor = self.narration.wait_for_word(self, name, edge=edge)
+        self._last_word_event = {'cue':name, 'trigger':self.narration.cues[name].phrase,
+                                'time':anchor[edge], 'edge':edge,
+                                'narrationStart':self.narration.start_time}
+        previous = getattr(self, '_review_active_cue', {})
+        self._review_active_cue = {
+            'cue': name, 'cueTime': anchor[edge], 'cueOffset': 0.,
+            'wordSequence': {'trigger': self.narration.cues[name].phrase,
+                'time': anchor[edge], 'edge': edge, 'reason': reason,
+                'narrationStart': self.narration.start_time},
+        }
+        try:
+            yield
+        finally:
+            self._review_active_cue = previous
+
+    def transition_on_cue(self, name, *animations, run_time, reason, edge="start"):
+        """Retire and reveal a composition as one word-anchored transition."""
+        with self.cue_sequence(name, reason=reason, edge=edge):
+            return self.transition(*animations, run_time=run_time)
+
+    def play_opening(self, *animations, run_time, reason):
+        """Establish a section's opening composition at the narration start."""
+        if not reason.strip() or self.narration.elapsed(self) > 1/self.camera.frame_rate+.015:
+            raise ValueError('An opening composition must start with the section')
+        self._review_active_cue = {'opening': {'reason':reason,'narrationStart':self.narration.start_time}}
+        try:
+            return self.play(*animations, run_time=run_time)
+        finally:
+            self._review_active_cue = {}
+
+    def play_phase(self, name, *animations, run_time, reason):
+        """Continue a declared word-timed process with an explicit phase.
+
+        For example: reveal a pair, carry its sum, then settle the result. A
+        phase cannot silently inherit an unrelated or already superseded cue.
+        Attention still needs its own spoken trigger, independently audited.
+        """
+        with self.animation_phase(name,reason=reason):
+            return self.play(*animations,run_time=run_time)
+
+    def transition_phase(self, name, *animations, run_time, reason):
+        """Retire and reveal within an already declared explanatory process."""
+        with self.animation_phase(name,reason=reason):
+            return self.transition(*animations,run_time=run_time)
+
+    @contextmanager
+    def animation_phase(self, name, *, reason):
+        event = self._last_word_event
+        if (not event or event['cue'] != name or not reason.strip()
+                or event.get('narrationStart') != self.narration.start_time):
+            raise ValueError('A phase must name the most recent word-timed process and its purpose')
+        start = self.narration.start_time + event['time']
+        if self.renderer.time < start - .001:
+            raise ValueError('A phase cannot precede its opening word')
+        previous = self._review_active_cue
+        self._review_active_cue = {
+            'cue':name, 'cueTime':event['time'], 'cueOffset':self.renderer.time-start,
+            'wordSequence':{**event, 'reason':reason, 'phase':True},
+        }
+        try:
+            yield
+        finally:
+            self._review_active_cue = previous
 
     def play_on_cue(self, name, *animations, run_time, reason, edge="start"):
         """Schedule one content change on verified words, or fail the render.
@@ -509,6 +616,9 @@ class SlideSceneMixin:
         if not str(reason).strip():
             raise ValueError("A word-timed content change needs an instructional reason")
         anchor = self.narration.wait_for_word(self, name, edge=edge)
+        self._last_word_event = {'cue':name, 'trigger':self.narration.cues[name].phrase,
+                                'time':anchor[edge], 'edge':edge,
+                                'narrationStart':self.narration.start_time}
         retiring = [span for span in getattr(self,'_held_focus',[]) if span['active'] and span['until']==name]
         for span in retiring:
             span['active'] = False
@@ -529,7 +639,7 @@ class SlideSceneMixin:
             # A later play cannot inherit this operation's strict declaration.
             self._review_active_cue.pop("wordTiming", None)
 
-    def focus_on_cue(self, name, *targets, until, reason, run_time=.55, color=None):
+    def focus_on_cue(self, name, *targets, until, reason, run_time=.55, color=None, extra=(), buff=.05):
         """Hold separate term boxes through a spoken reference, then retire them.
 
         The release is attached to the named next cue, rather than to an
@@ -541,13 +651,13 @@ class SlideSceneMixin:
         end=self.narration.word_anchor(until)['start']
         if end<=start+run_time:
             raise ValueError('Held focus must finish appearing before its release cue')
-        boxes=[FocusBox(target,color=color or self.theme.primary,buff=.05) for target in targets]
+        boxes=[FocusBox(target,color=color or self.theme.primary,buff=buff) for target in targets]
         offset=self.narration.start_time
         for target,box in zip(targets,boxes):
             self._held_focus.append({'box':box,'active':True,'start':start+offset,'end':end+offset,
                 'revealDuration':run_time,'until':until,'cue':name,'reason':reason,
                 'target':self._review_object_label(target)})
-        self.play_on_cue(name,*[Create(box) for box in boxes],
+        self.play_on_cue(name,*[Create(box) for box in boxes],*extra,
                          run_time=run_time,reason=reason)
         return boxes
 

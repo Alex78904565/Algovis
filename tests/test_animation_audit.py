@@ -4,6 +4,26 @@ from algovis.review.audit import audit_section, content_change, phrase_anchor, t
 
 
 class WordLevelAuditTests(unittest.TestCase):
+    def test_migrated_scene_cannot_pass_an_undeclared_content_change(self):
+        manifest=self.manifest(3,'f of five')
+        manifest['requireWordTiming']=True
+        report=audit_section(manifest,{'cues':[]},{'words':[{'word':'f(5)','start':3,'end':3.6}]})
+        self.assertIn('content_without_word_declaration',report['changes'][0]['findings'])
+
+    def test_sequence_phases_share_one_verified_opening_and_keep_real_offsets(self):
+        declaration={'trigger':'five','time':3,'edge':'start','reason':'Carry and settle the value'}
+        manifest={'frameRate':15,'requireWordTiming':True,
+            'animations':[{'id':'a','play':0,'kind':'Transform','start':3,'end':3.5},
+                          {'id':'b','play':1,'kind':'Transform','start':3.5,'end':4}],
+            'plays':[{'cue':'value','start':t,'end':t+.5,'before':[],'after':[],
+                      'wordSequence':declaration} for t in (3,3.5)]}
+        words={'words':[{'word':'five','start':3,'end':3.2}]}
+        self.assertEqual(audit_section(manifest,{'cues':[]},words)['findings'],[])
+        for play in manifest['plays']:play['start']+=.4;play['end']+=.4
+        for event in manifest['animations']:event['start']+=.4;event['end']+=.4
+        findings=audit_section(manifest,{'cues':[]},words)['findings']
+        self.assertTrue(any(f['kind']=='content_sequence_missed_word' for f in findings))
+
     def test_declared_peer_size_regression_is_included_once(self):
         snapshot={'time':2,'objects':[
             {'id':'a','label':'general','typographyGroup':'runtime','typeRole':'equation','fontSize':34},

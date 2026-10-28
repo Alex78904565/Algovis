@@ -14,6 +14,19 @@ class MathRow(MathTex):
     """
     _algovis_preserve_structure = True
 
+    @classmethod
+    def tokens(cls, *tex, **kwargs):
+        """Adopt an existing tokenized equation without inventing term names.
+
+        Numeric token indices remain usable. Prefer named parts for new code;
+        use ``part(str(index))`` rather than negative indices (the final two
+        children are invisible baseline anchors).
+        """
+        # This adapter replaces MathTex(...).scale(...), whose default is 48.
+        # The named-row authoring API keeps its own 33.6-point default.
+        kwargs.setdefault('font_size',48)
+        return cls({str(i): value for i, value in enumerate(tex)}, **kwargs)
+
     def __init__(self, parts, *, font_size=33.6, **kwargs):
         self.slot_tex = dict(parts)
         super().__init__(*self.slot_tex.values(), 'H', arg_separator='', font_size=font_size, **kwargs)
@@ -51,6 +64,18 @@ class MathRow(MathTex):
 
     def part(self, name):
         return self.parts[name]
+
+    def get_part_by_tex(self, tex, **kwargs):
+        if 'parts' not in self.__dict__:
+            return super().get_part_by_tex(tex,**kwargs)
+        return next((self.parts[name] for name,value in self.slot_tex.items() if value==tex),None)
+
+    def set_color_by_tex(self, tex, color, **kwargs):
+        if 'parts' not in self.__dict__:
+            return super().set_color_by_tex(tex,color,**kwargs)
+        for name,value in self.slot_tex.items():
+            if value==tex:self.parts[name].set_color(color)
+        return self
 
     def _scale(self):
         return float(np.linalg.norm(self._axis_unit.get_center()-self._axis_origin.get_center())/.01)
@@ -99,13 +124,17 @@ class MathRow(MathTex):
                 part.become(new)
                 part.submobjects = [child.copy() for child in new.submobjects]
             part._algovis_label = target.slot_tex[name]
+            part.tex_string = target.slot_tex[name]
             if part.height>0:
                 part.initial_height = part.height/(target.font_size*SCALE_FACTOR_PER_FONT_POINT)
             adopted[name] = part
         self.parts = adopted; self.slot_tex = target.slot_tex.copy()
-        self._axis_origin = target._axis_origin.copy(); self._axis_unit = target._axis_unit.copy()
+        self._axis_origin = target._axis_origin.copy()
+        direction=target._axis_unit.get_center()-target._axis_origin.get_center()
+        direction=direction/np.linalg.norm(direction)
+        self._axis_unit = VectorizedPoint(self._axis_origin.get_center()+direction*.01)
         self.submobjects = [*adopted.values(),self._axis_origin,self._axis_unit]
-        self._native_size = target._native_size*target._scale()
+        self._native_size = target.font_size
         self._remember_layout()
         self._algovis_label = ''.join(self.slot_tex.values())
         self.tex_string = self._algovis_label

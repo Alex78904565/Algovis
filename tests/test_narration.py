@@ -74,6 +74,41 @@ class NarrationTrackTests(unittest.TestCase):
         self.assertEqual(captured[0]['wordTiming']['time'], 2.3)
         self.assertEqual(captured[0]['wordTiming']['edge'], 'end')
 
+    def test_dependent_phase_names_its_actual_origin_without_reusing_word_timing(self):
+        track,state=self.strict_track()
+        scene=object.__new__(SlideScene)
+        scene.narration,scene.renderer=track,state.renderer
+        scene.renderer.camera=state.camera;scene.wait=state.wait
+        captured=[]
+        scene.play=lambda *args,**kwargs:captured.append(dict(scene._review_active_cue))
+        scene.play_on_cue('answer',object(),run_time=.5,reason='Introduce the answer')
+        scene.renderer.time=2.5
+        scene.play_phase('answer',object(),run_time=.2,reason='Settle its carried value')
+        self.assertNotIn('wordTiming',captured[-1])
+        self.assertEqual(captured[-1]['wordSequence']['time'],2)
+        self.assertEqual(captured[-1]['cueOffset'],.5)
+        with self.assertRaisesRegex(ValueError,'most recent'):
+            scene.play_phase('unrelated',object(),run_time=.2,reason='Wrong origin')
+
+    def test_sequence_checks_its_opening_word_and_restores_the_prior_scope(self):
+        track,state=self.strict_track()
+        scene=object.__new__(SlideScene)
+        scene.narration,scene.renderer=track,state.renderer
+        scene.renderer.camera=state.camera;scene.wait=state.wait
+        scene._review_active_cue={'previous':'kept'}
+        with scene.cue_sequence('answer',reason='Fold repeated branches'):
+            self.assertEqual(scene.renderer.time,2)
+            self.assertEqual(scene._review_active_cue['wordSequence']['time'],2)
+        self.assertEqual(scene._review_active_cue,{'previous':'kept'})
+
+    def test_opening_composition_cannot_be_used_mid_sentence(self):
+        track,state=self.strict_track()
+        scene=object.__new__(SlideScene)
+        scene.narration,scene.renderer=track,state.renderer
+        scene.renderer.camera=state.camera
+        with self.assertRaisesRegex(ValueError,'start with the section'):
+            scene.play_opening(object(),run_time=.5,reason='Late opening')
+
     def write_cues(self, directory: Path, cues: list[dict[str, object]]) -> Path:
         path = directory / "cues.json"
         path.write_text(

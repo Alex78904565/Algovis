@@ -105,8 +105,8 @@ def audit_section(manifest, cue_document, transcript, *, attention_tolerance=Non
                 event["findings"].append("trigger_not_found_in_words")
             elif anchor["approximate"]:
                 event["findings"].append("trigger_word_timing_is_approximate")
-            elif abs(start-anchor["start"]) > tolerance:
-                event["findings"].append("attention_before_word" if start<anchor["start"] else "attention_after_word")
+            elif abs(start-anchor[timing.get('edge','start')]) > tolerance:
+                event["findings"].append("attention_before_word" if start<anchor[timing.get('edge','start')] else "attention_after_word")
         for finding in event["findings"]:
             findings.append({"kind": finding, "event": event["id"], "time": start,
                              "cue": event.get("cue"), "target": event.get("label")})
@@ -130,6 +130,15 @@ def audit_section(manifest, cue_document, transcript, *, attention_tolerance=Non
                           "before":semantic_objects(before),"after":semantic_objects(after),
                           "source":group[0].get("source", {})})
 
+    # A multi-phase process is anchored once. Later mechanical phases record
+    # their actual intervals; they must not pretend each phase starts on that
+    # word. Attention remains independently checked above.
+    sequence_starts = {}
+    for play in plays:
+        declaration = play.get('wordTiming') or play.get('wordSequence')
+        if declaration:
+            key = (play.get('cue'),declaration['time'],declaration.get('edge','start'))
+            sequence_starts[key] = min(sequence_starts.get(key,float('inf')),play['start'])
     changes, removed_history = [], []
     for index, play in enumerate(plays):
         if not any(event['start'] < play['end']-.0001 and
@@ -156,6 +165,20 @@ def audit_section(manifest, cue_document, transcript, *, attention_tolerance=Non
                 change["findings"].append(
                     "content_before_word" if play["start"]<anchor[timing.get('edge','start')]+offset else "content_after_word"
                 )
+        elif play.get('wordSequence'):
+            sequence = play['wordSequence']
+            offset = sequence.get('narrationStart',0)
+            anchor = phrase_anchor(sequence.get('trigger',''),words,sequence['time'])
+            key = (play.get('cue'),sequence['time'],sequence.get('edge','start'))
+            if not anchor or anchor['approximate'] or not sequence.get('reason','').strip():
+                change['findings'].append('content_without_verified_word')
+            elif abs(sequence_starts[key]-anchor[sequence.get('edge','start')]-offset)>tolerance:
+                change['findings'].append('content_sequence_missed_word')
+        elif manifest.get('requireWordTiming'):
+            opening = play.get('opening')
+            if (not opening or not opening.get('reason','').strip()
+                    or abs(play['start']-opening.get('narrationStart',0))>tolerance):
+                change['findings'].append('content_without_word_declaration')
         if len(change["before"]) >= 4 and change["retainedFraction"] < .45:
             change["findings"].append("large_content_clear")
         candidates = removed_history + [(play["start"], obj) for obj in change["removed"]]

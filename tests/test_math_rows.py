@@ -5,6 +5,40 @@ from algovis import ApplyDefinition, MathRow
 
 
 class MathRowTests(unittest.TestCase):
+    def test_partial_call_adoption_does_not_unhide_future_arguments(self):
+        row=MathRow({'f':'f','open':'(','state':'s','close':')'})
+        target=MathRow({'f':'f','open':'(','i':'i+1','comma':',','w':'w','close':')'})
+        for name in ('i','comma','w'):target.part(name).set_opacity(0)
+        scene=Scene();scene.add(row);row.commit(target,scene)
+        for name in ('i','comma','w'):
+            self.assertTrue(all(np.max(p.get_fill_opacity())==0 for p in row.part(name).family_members_with_points()))
+        self.assertEqual(row.native_layout_findings(),[])
+        self.assertTrue(any(np.max(p.get_fill_opacity())>0 for p in row.part('f').family_members_with_points()))
+
+    def test_tex_selection_follows_the_adopted_terms_rather_than_retired_glyphs(self):
+        row=MathRow({'call':'f(','argument':'i','close':')'})
+        target=row.next_layout(argument='1')
+        scene=Scene();scene.add(row);row.commit(target,scene)
+        self.assertIs(row.get_part_by_tex('1'),row.part('argument'))
+        self.assertIsNone(row.get_part_by_tex('i'))
+        row.set_color_by_tex('1',BLUE)
+        self.assertEqual(row.part('argument').get_color(),BLUE)
+
+    def test_token_adapter_matches_existing_mathtex_default_and_explicit_sizes(self):
+        self.assertAlmostEqual(MathRow.tokens('f(','i',')').scale(.7).font_size,33.6)
+        self.assertAlmostEqual(MathRow.tokens('f(','i',')',font_size=40).scale(.7).font_size,28)
+
+    def test_adopting_a_scaled_target_does_not_apply_its_scale_twice(self):
+        row=MathRow.tokens('f(','i',')',font_size=48).scale(.7)
+        target=MathRow.tokens('f(','1',')',font_size=48).scale(.7).aligned_to(row)
+        scene=Scene();scene.add(row)
+        row.commit(target,scene)
+        self.assertAlmostEqual(row.font_size,33.6)
+        following=row.next_layout(parts={**row.slot_tex,'1':'0'})
+        self.assertAlmostEqual(following.font_size,33.6)
+        self.assertAlmostEqual(following.part('0').height,row.part('0').height)
+        self.assertEqual(row.native_layout_findings(),[])
+
     def test_argument_substitutions_preserve_the_actual_painted_color(self):
         row=MathRow({'f':'f(','i':'i','comma':',','w':'w','close':')'},color=BLUE)
         scene=Scene();scene.add(row)
