@@ -144,16 +144,25 @@ class ColumnLayout:
     An overflow raises an error; rows are never independently shrunk to fit.
     ``place`` can prepare a replacement in the same slot without moving its peers.
     The layout deliberately has no Manim parent/child ownership side effects.
+    Pass ``content_width=max(row.width for row in completed_rows)`` to center
+    a left-aligned block within the region. Measure final populated rows, so
+    shorter incremental reveals keep their anchor instead of drifting.
     """
 
-    def __init__(self, region, *, padding=0, gap=DEFAULT_SPACING.relaxed, name="column"):
+    def __init__(self, region, *, padding=0, gap=DEFAULT_SPACING.relaxed, name="column",
+                 content_width=None):
         if padding < 0 or gap < 0 or 2*padding >= min(region.width, region.height):
             raise ValueError("Column padding and gap must leave a positive content area")
+        available_width = region.width - 2*padding
+        if content_width is not None and (
+                not math.isfinite(content_width) or content_width <= 0
+                or content_width > available_width+1e-7):
+            raise ValueError("Centered content width must fit inside the padded region")
         self.region, self.padding, self.gap, self.name = region, padding, gap, name
-        self.left = region.center[0] - region.width/2 + padding
+        self.width = available_width if content_width is None else content_width
+        self.left = region.center[0] - self.width/2
         self.top = region.center[1] + region.height/2 - padding
         self.bottom = region.center[1] - region.height/2 + padding
-        self.width = region.width - 2*padding
         self._cursor = self.top
         self._slots = {}
 

@@ -7,6 +7,24 @@ from algovis.review.inspection import capture_snapshot, typography_findings, ali
 
 
 class LessonLayoutTests(unittest.TestCase):
+    def test_centered_column_balances_completed_content_without_centering_each_row(self):
+        region=SlideRegion((2,0,0),12,6)
+        short,long=Rectangle(width=3,height=.5),Rectangle(width=7,height=.5)
+        column=ColumnLayout(region,padding=.5,content_width=max(short.width,long.width))
+        column.add('short',short);column.add('long',long)
+        self.assertAlmostEqual(short.get_left()[0],long.get_left()[0])
+        self.assertAlmostEqual(long.get_center()[0],region.center[0])
+        self.assertAlmostEqual(short.width,3)
+        self.assertAlmostEqual(long.width,7)
+        self.assertAlmostEqual(short.get_left()[0]-(region.center[0]-region.width/2),
+                               region.center[0]+region.width/2-long.get_right()[0])
+
+    def test_centered_column_rejects_invalid_or_oversized_content_width(self):
+        region=SlideRegion((0,0,0),8,6)
+        for width in (0,-1,float('nan'),float('inf'),7.1):
+            with self.subTest(width=width),self.assertRaisesRegex(ValueError,'content width'):
+                ColumnLayout(region,padding=.5,content_width=width)
+
     def test_identical_copy_does_not_register_a_smaller_supporting_condition(self):
         from manim import MathTex, VGroup
         from algovis import ApplyDefinition

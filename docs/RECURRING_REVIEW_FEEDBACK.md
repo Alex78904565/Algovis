@@ -277,6 +277,30 @@ declared timing; it does not certify legible glyphs, occlusion, or semantic valu
 
 ### Center the composition deliberately and keep plot styling meaningful
 
+  - **Left-aligned does not mean left-heavy.** Measure the completed rows as
+    one block and center that block in its allotted region, retaining a common
+    left edge inside it. A full-width region is available space, not a reason
+    to pin short content to its far left. `ColumnLayout(content_width=...)`
+    reserves the final measured width without shrinking or separately centering
+    rows. Check both the shared edge and the outer margins.
+  - Use compact, deliberate gaps between a definition, its application, and its
+    assumption. Reserved future content must not leave unexplained empty bands
+    in the completed frame. Inspect the final populated block as a whole.
+  - A requested count needs visible counting evidence: number the relevant
+    leaves in a clear spatial order, attached to those leaves as they move.
+    Keep starting values in the same notation as the recurrence they justify.
+  - Label a plotted expression honestly. `exp(n)` conventionally means `e^n`;
+    prefer the actual base, such as `phi^n`, and use that same expression on the
+    graph. Do not label a reference exponential as an exact operation count.
+  - A concept's name is a neutral heading, not a computed answer. Introducing
+    "dynamic programming" does not by itself justify success green.
+  - "After this phrase" is a timing contract too. Derive the phrase's end from
+    verified word times and reserve a real narration pause for its application;
+    do not squeeze the copy, substitution, and simplification under the next idea.
+    Keep speech samples intact and retime subsequent words/captions/cues together.
+    The viewer specifically liked clip 6's rule-copy, substitution, cancellation,
+    and simplification sequence; preserve that sequence when repairing its timing.
+
 - Decide whether the main plot, the complete labeled graph, or a deliberate split
   composition is being centered. Include tick labels and axis labels in the layout,
   but check the visible plotting area's balance separately.
