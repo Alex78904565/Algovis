@@ -10,6 +10,19 @@ from algovis import frames
 
 
 class SharedLessonFrameTests(unittest.TestCase):
+    def test_proof_label_alignment_is_planned_without_moving_live_content(self):
+        frame=algovis.ProofFrame('detailed')
+        label=frame.labels_by_name['INDUCTION HYPOTHESIS']
+        original=label.get_center().copy()
+        first=Rectangle(width=3,height=.3).move_to([0,1,0])
+        second=Rectangle(width=3,height=.3).move_to([0,.4,0])
+        body=VGroup(first,second);points=body.get_all_points().copy()
+        target=frame.label_target('induction_hypothesis',first)
+        self.assertAlmostEqual(target.get_top()[1],first.get_top()[1])
+        self.assertAlmostEqual(target.get_left()[0],label.get_left()[0])
+        np.testing.assert_allclose(label.get_center(),original)
+        np.testing.assert_allclose(body.get_all_points(),points)
+
     def test_every_proof_rail_includes_its_final_conclusion(self):
         for profile in frames.ProofFrame.PROFILES:
             frame=algovis.ProofFrame(profile)

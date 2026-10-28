@@ -29,6 +29,23 @@ label and content columns. Equation profiles (`stacked`, `split`, `inline`)
 express the orientation chosen before construction; they are not separate
 visual styles for different algorithms.
 
+Align proof labels with the first line of their content, rather than the
+center of a multiline block. `ProofFrame.label_target(row, first_line)` plans a
+label copy while leaving live artwork untouched; reveal or move the real label
+on the corresponding content cue. Preserve the content's existing geometry.
+
+## Resolve competing color meanings
+
+Follow the [semantic precedence](../VISUAL_LANGUAGE.md): good/bad evaluation
+outranks known/completed status, then operation, structure and neutral context.
+Use `theme.role_color('retained', 'bad')` for a correctly derived poor runtime,
+or `style.math(..., role='bad')` for an explicitly unfavorable statement.
+`good` overrides lower roles with the success color; `bad` overrides them with
+the danger color. The order of arguments does not choose the winner.
+Conflicting explicit good/bad evaluations raise an error and need a clear
+comparison context. `AlgorithmComparison` and `RecurrenceComparison` apply this
+rule to their slow/improved runtime labels; their headings remain neutral.
+
 ## Write the content, then reveal it
 
 ```python

@@ -57,6 +57,9 @@ Viewer-endorsed patterns from this lesson's reviews:
 - **Equations built in place:** keep the function definition and useful work
   visible as the explanation develops. Preserve the existing orientation and
   refine the affected term rather than replacing the whole composition.
+- **Goal-based green/red contrast:** the viewer likes the necklace/toilet-paper
+  comparison. Good versus bad takes precedence over every other semantic role;
+  preserve that contrast when adding status or attention styling.
 - **Knapsack fit condition:** the viewer specifically liked the existing
   condition explanation in clip 7, requesting only `if` and removal of its
   parentheses. Preserve that explanation and its local highlights when fixing
@@ -151,10 +154,16 @@ or diagram labels need an explicit role in the hierarchy. Do not squeeze one
 formula to repair a layout that needs more room. Use the reusable column and
 typography helpers so later parameter additions cannot silently undo the plan.
 
-Blue identifies structure or the current state. Yellow identifies an operation
-or active choice. Green means known, stored, valid, or complete. Red means
-invalid or wasted repeated work. White is neutral; gray is supporting material.
+Good/bad evaluation overrides every other color meaning: favorable green and
+unfavorable red. Next come known/completed status (green), active operation or
+choice (yellow), structure or current state (blue), and neutral/supporting
+content (white/gray). Thus a valid but poor runtime is red. Without an explicit
+negative judgment, a known, stored, valid or complete result can remain green.
 Do not cycle these roles merely to emphasize a spoken mention.
+The viewer likes the necklace/toilet-paper green/red contrast. Preserve it as
+a favorable/unfavorable comparison relative to the thief's stated goal, as
+specified in [the visual language](../VISUAL_LANGUAGE.md). It does not establish
+that choosing the individually most attractive item is optimal.
 Punctuation does not gain an operator or stored-answer color just because its
 shape changes. In a parentheses-to-brackets conversion, preserve its neutral
 color and let the notation change carry the explanation.
@@ -630,10 +639,11 @@ proof rails and successful local explanatory devices while making these repairs.
 - Put an explanatory caption next to its named referent. A note about the
   growth of the upper operation bound belongs beside that bound, not above a
   different expression lower on the slide. Axis labels must remain readable.
-- A valid slow runtime is still a valid result. Use green for both derived
-  runtime bounds; red means an invalid choice, a violated condition, or wasted
-  repeated work. Keep comparison headings neutral. Distinguish plotted series
-  with a consistent legend; a series color is not a correctness judgment.
+- Good/bad evaluation takes precedence over a runtime bound being correctly
+  derived. Use red for the impractical recursive runtime and green for the
+  improved DP runtime in a performance comparison. Keep headings neutral and
+  use the same corresponding colors in plotted series and labels. Color judges
+  the stated performance comparison, rather than the correctness of the math.
 - In a correctness proof, the desired optimal-value interpretation is part of
   the claim being established. Keep the actual recurrence under definitions.
   Retain the familiar proof rail and place the interpretation with `P(k)`.

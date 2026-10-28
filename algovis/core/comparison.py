@@ -24,10 +24,10 @@ class AlgorithmComparison(VGroup):
             font_size=font_size, theme=theme,
         )
         self.panels = VGroup(self.naive, self.optimized).arrange(RIGHT, buff=gap, aligned_edge=UP)
-        self.naive_runtime = MathTex(naive_runtime, color=theme.success).next_to(
+        self.naive_runtime = MathTex(naive_runtime, color=theme.role_color('retained','bad')).next_to(
             self.naive, DOWN, buff=DEFAULT_SPACING.normal,
         )
-        self.optimized_runtime = MathTex(optimized_runtime, color=theme.success).next_to(
+        self.optimized_runtime = MathTex(optimized_runtime, color=theme.role_color('retained','good')).next_to(
             self.optimized, DOWN, buff=DEFAULT_SPACING.normal,
         )
         self.runtime_labels = VGroup(self.naive_runtime, self.optimized_runtime)
@@ -115,10 +115,10 @@ class RecurrenceComparison(VGroup):
         self.panels = VGroup(self.recursive, self.array).arrange(
             RIGHT, buff=DEFAULT_SPACING.section, aligned_edge=UP,
         )
-        self.naive_runtime = MathTex(naive_runtime, color=theme.success).next_to(
+        self.naive_runtime = MathTex(naive_runtime, color=theme.role_color('retained','bad')).next_to(
             self.recursive, DOWN, buff=DEFAULT_SPACING.normal,
         )
-        self.optimized_runtime = MathTex(optimized_runtime, color=theme.success).next_to(
+        self.optimized_runtime = MathTex(optimized_runtime, color=theme.role_color('retained','good')).next_to(
             self.array, DOWN, buff=DEFAULT_SPACING.normal,
         )
         self.runtime_labels = VGroup(self.naive_runtime, self.optimized_runtime)

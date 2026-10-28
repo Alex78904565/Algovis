@@ -45,7 +45,7 @@ class PublicApiTests(unittest.TestCase):
         np.testing.assert_allclose(destination.get_all_points(), points)
         self.assertIn(destination, scene.get_mobject_family_members())
 
-    def test_computed_runtime_color_does_not_judge_algorithm_quality(self):
+    def test_performance_evaluation_overrides_computed_runtime_status(self):
         comparisons = (
             algovis.RecurrenceComparison(
                 'f(n)=f(n-1)', 'f[n]=f[n-1]', 'O(2^n)', 'O(n)', 'n=1,2,3'),
@@ -53,17 +53,41 @@ class PublicApiTests(unittest.TestCase):
                 ['return f(n-1)'], ['return f[n-1]'], 'O(2^n)', 'O(n)'),
         )
         for comparison in comparisons:
-            for runtime in (comparison.naive_runtime, comparison.optimized_runtime):
+            for runtime,color in ((comparison.naive_runtime,comparison.theme.danger),
+                                  (comparison.optimized_runtime,comparison.theme.success)):
                 for glyph in runtime.family_members_with_points():
-                    self.assertEqual(glyph.get_fill_color(), comparison.theme.success)
+                    self.assertEqual(glyph.get_fill_color(), color)
 
-    def test_bit_length_explanation_preserves_valid_result_semantics(self):
+    def test_bit_length_limitation_overrides_its_valid_derivation(self):
         explanation = algovis.BitLengthRuntime()
-        for runtime in (explanation.runtimes[0], explanation.runtimes[2], explanation.rewritten):
+        for runtime in (explanation.runtimes[0], explanation.runtimes[2]):
             for glyph in runtime.family_members_with_points():
                 self.assertEqual(glyph.get_fill_color(), explanation.theme.success)
-        for glyph in explanation.warning.family_members_with_points():
-            self.assertEqual(glyph.get_fill_color(), explanation.theme.foreground)
+        for negative in (explanation.rewritten,explanation.warning):
+            for glyph in negative.family_members_with_points():
+                self.assertEqual(glyph.get_fill_color(), explanation.theme.danger)
+
+    def test_good_bad_evaluation_wins_over_all_other_roles_in_any_order(self):
+        theme=algovis.DEFAULT_THEME
+        for role in ('retained','success','operation','current','structure','muted','neutral'):
+            for evaluation,color in (('good',theme.success),('bad',theme.danger)):
+                self.assertEqual(theme.role_color(role,evaluation),color)
+                self.assertEqual(theme.role_color(evaluation,role),color)
+
+    def test_lower_priority_roles_are_resolved_by_the_same_hierarchy(self):
+        theme=algovis.DEFAULT_THEME
+        self.assertEqual(theme.role_color('current','operation','retained'),theme.success)
+        self.assertEqual(theme.role_color('neutral','current','operation'),theme.accent)
+        self.assertEqual(theme.role_color('muted','structure'),theme.primary)
+        self.assertEqual(theme.role_color('neutral','muted'),theme.muted)
+
+    def test_conflicting_evaluations_are_not_decided_by_argument_order(self):
+        theme=algovis.DEFAULT_THEME
+        for roles in (('good','bad'),('danger','good'),('good','repeated')):
+            with self.assertRaisesRegex(ValueError,'Conflicting'):
+                theme.role_color(*roles)
+        with self.assertRaisesRegex(ValueError,'Unknown'):
+            theme.role_color('good','misspelled')
 
     def test_comparison_headings_do_not_use_stored_answer_color(self):
         comparison=algovis.RecurrenceComparison(

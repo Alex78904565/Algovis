@@ -103,6 +103,16 @@ class ProofFrame:
         mobject._algovis_layout_row = row
         return mobject
 
+    def label_target(self, row, first_line):
+        """Plan a top-aligned row label without moving live artwork early.
+
+        Supply the first line, rather than the full multiline body. The scene
+        can adopt this target before the label's reveal or animate it on the
+        same cue as a changed row. Existing content keeps its position.
+        """
+        key = str(row).upper().replace('_', ' ')
+        return self.labels_by_name[key].copy().align_to(first_line, UP)
+
 
 class EquationFrame:
     """Stable, named anchors for an explanation that grows into equations.

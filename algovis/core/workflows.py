@@ -379,11 +379,11 @@ class BitLengthRuntime(VGroup):
             rf"{runtime_tex}=" + runtime_tex.replace(
                 parameter, rf"2^{{\log_2 {parameter}}}", 1,
             ),
-            color=theme.success,
+            color=theme.role_color('retained', 'bad'),
         ).scale(0.82)
         self.warning = Text(
             f"polynomial in numeric {parameter} · potentially exponential in its bit length",
-            font_size=18, color=theme.foreground,
+            font_size=18, color=theme.role_color('bad'),
         )
         self.parallel = Text(
             f"The same reasoning applies to {parallel_parameter}.",

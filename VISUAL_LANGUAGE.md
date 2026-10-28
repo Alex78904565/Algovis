@@ -4,6 +4,33 @@ This document is the authoritative semantic color convention for the video and
 the reusable Algovis components. Color should explain an object's role. It
 should not change merely to make a frame look more varied.
 
+## Precedence when meanings overlap
+
+Apply the first applicable meaning, in this order:
+
+1. **Good versus bad for the stated goal:** green for favorable, red for
+   unfavorable. This overrides every other role, including mathematical
+   validity, storage, selection, active attention and structural blue.
+2. **Known or completed status:** green for a computed, stored, valid or
+   completed result when no unfavorable judgment is being made.
+3. **Active operation or choice:** yellow.
+4. **Structure or current state:** blue.
+5. **Neutral content or supporting context:** white or gray.
+
+Thus a correctly derived impractical runtime is red: its validity does not
+override its poor performance. In a naive-versus-DP performance comparison,
+use red for the slow bound and green for the improved bound. State the relevant
+comparison: TSP's DP can be an improvement over factorial work while still
+being exponential. When explaining that limitation, red expresses that concern.
+Do not classify one of two alternative parameterizations as worse without the
+input bounds needed to compare them.
+
+The library resolves competing roles with
+`theme.role_color('retained', 'bad')`, which returns red regardless of argument
+order. New single-role content can simply use `good` or `bad`. Contradictory
+explicit good/bad judgments require clarifying the context instead of choosing
+whichever color was applied last.
+
 ## Semantic palette
 
 - **Blue (`theme.primary`) — structure and state.** Current subproblems,
@@ -15,17 +42,30 @@ should not change merely to make a frame look more varied.
 - **Yellow (`theme.accent`) — the decision currently under discussion.** Use it
   for the active choice, optimizer, question, or piece of algebra presently
   receiving attention.
-- **Green (`theme.success`) — known, stored, selected, or valid.** Use it for
+- **Green (`theme.success`) — favorable; otherwise known, stored, selected, or valid.** Use it for
   computed array cells, cached answers, accepted choices, satisfied
-  constraints, and derived runtime results. Both a slow recursive bound and a
-  faster DP bound are valid results; speed alone does not justify red.
-- **Red (`theme.danger`) — invalid, rejected, or wasteful.** Use it for
+  constraints, and favorable runtime results. A negative evaluation overrides
+  these status meanings.
+- **Red (`theme.danger`) — unfavorable, invalid, rejected, or wasteful.** Use it for
   constraint violations, rejected choices, and duplicated work that will be
-  eliminated.
+  eliminated, as well as impractical runtime results.
 - **White (`theme.foreground`) — neutral content.** Ordinary prose, operators,
   and mathematical material without a special semantic role remain white.
 - **Gray (`theme.muted`) — scaffolding.** Secondary labels, inactive edges,
   dividers, and supporting explanations use gray.
+
+### Favorable and unfavorable story choices
+
+In a narrated comparison, green and red can also mean favorable and unfavorable
+relative to the stated goal. In the knapsack introduction, the green necklace
+outline marks a compact, valuable item; the red toilet-paper outline marks a
+bulky item with little resale value. Preserve this contrast.
+
+This is an intuitive comparison, not a proof that an item belongs in an optimal
+solution. The later recurrence compares complete immediate-plus-future values.
+The same precedence applies in mathematical reasoning: an unfavorable result
+can be correct and still be red. A known answer without an unfavorable
+evaluation remains green.
 
 ## Attention without changing meaning
 
@@ -57,10 +97,10 @@ Before publishing a clip:
 1. The same symbol retains the same semantic color across a layout change.
 2. Related fixed inputs such as `v_i`, `w_i`, and `C` share one neutral style;
    distinguish them from blue current-state arguments when both are shown.
-3. Green never means merely “currently mentioned”; it means known, stored,
-   selected, valid, or complete.
-4. Red never decorates neutral content; it identifies a real error, rejection,
-   violation, or repeated waste.
+3. Good/bad evaluation takes precedence over stored/valid status and attention.
+   Green never means merely “currently mentioned.”
+4. Red never decorates neutral content; it identifies a specific disadvantage,
+   error, rejection, violation, or repeated waste.
 5. A screenshot taken at any point should be interpretable without relying on
    a transient flash to explain the colors.
 
@@ -86,7 +126,7 @@ do not independently center the rows of a developing explanation.
 | Comparison panels and columns | `PanelFrame`, `ComparisonFrame` | Shared border, heading inset, columns and divider |
 | Peer mathematical statements | `LessonStyle.math`, `math_like`, `watch` | The same rendered type size after moves and substitutions |
 | Recursive calls and duplicate states | `RecursiveTree` | One node/edge lifecycle and the same node shape and status colors |
-| Recursion/DP comparison | `RecurrenceComparison`, `AlgorithmComparison` | Matched columns, neutral headings, derived bounds green |
+| Recursion/DP comparison | `RecurrenceComparison`, `AlgorithmComparison` | Matched columns, neutral headings, poor runtime red and improved runtime green |
 | Applying a definition | `ApplyDefinition` | Retain source; rigid travel; local substitution; one visible result |
 | Section frame and heading | `Slide`, `SlideLayout`, `ChapterMarker` | Fixed heading and safe-content regions |
 

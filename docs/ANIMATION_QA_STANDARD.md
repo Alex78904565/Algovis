@@ -65,12 +65,15 @@ hidden by a fill or removed child is a failure even when the border pulses on ti
 
 ## 4. Color is semantic
 
-Follow [the visual language](../VISUAL_LANGUAGE.md). In particular:
+Follow [the visual language and its precedence order](../VISUAL_LANGUAGE.md).
+Good/bad evaluation comes first, then known/completed status, active operation,
+structure, and neutral/supporting context. In particular:
 
 - Blue means structure, state, or the current object.
 - Yellow means the active operation, choice, or optimizer.
-- Green means known, stored, selected, valid, or complete.
-- Red means invalid, rejected, or repeated waste.
+- Green means favorable; otherwise known, stored, selected, valid, or complete.
+- Red means unfavorable, invalid, rejected, or repeated waste. A correctly
+  derived poor runtime is red; correctness does not override the evaluation.
 - White is neutral content; gray is supporting scaffolding.
 
 A temporary mention does not change an object's meaning. Use an outline or
