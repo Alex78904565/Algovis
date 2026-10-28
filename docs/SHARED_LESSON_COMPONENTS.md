@@ -21,6 +21,7 @@ another copy of a proof rail or inventing another column position.
 | Page heading and safe regions | `Slide`, `SlideLayout` | Heading placement and frame regions |
 | State/value row | `StateCell`, `StateRow` | Fixed cell geometry and value placement |
 | Peer typesetting and substitutions | `LessonStyle`, `math_like` | Role-based sizes/colors and inheritance of the current rendered type size |
+| Editable mathematical row | `MathRow` | One native TeX baseline, named terms, consistent substitutions and optional numeric sum check |
 
 Proof profiles (`worked`, `detailed`, `compact`, `diagram`) reserve different
 vertical space for algebra or an adjacent diagram. They use the same shared
@@ -51,6 +52,30 @@ when the scene adopts a refined expression.
 An oversized equation raises an error. Revise the composition or use the
 appropriate profile; do not shrink one peer formula until it fits. Continue
 using `LessonStyle.watch` and `align_rows` for the existing type/alignment gates.
+
+For changing arguments or arithmetic, typeset the complete next row instead of
+centering individual replacement glyphs on the old glyph boxes:
+
+```python
+call = MathRow({"f": "f(", "item": "i", "comma": ",", "weight": "w", "close": ")"})
+next_call = call.next_layout(item="1")
+self.play_on_cue("first_item", *call.motions_to(next_call), run_time=.7,
+                 reason="Substitute the first item into the call")
+call.commit(next_call, self)
+```
+
+Names remain stable through the substitution. `part("weight")` selects that
+term. Uniform movement and scaling preserve the row's layout contract; moving
+one argument off its baseline creates an error in the real render manifest.
+`ApplyDefinition` preserves this structured destination. For explicitly additive
+numerical examples, call `require_sum()` with named immediate/future/total terms.
+This checks completed equalities while allowing symbolic and incomplete stages.
+
+Use `focus_on_cue("take_reference", take_call, until="skip_reference", reason=...)`
+for an extended spoken reference. Separate targets receive separate boxes. The
+next named `play_on_cue` releases them; its absence is a publication error.
+Use `play_on_cue(..., edge="end")` when an action must wait for the whole phrase
+to finish, such as returning an item after explaining why it does not fit.
 
 ## Existing production migration
 

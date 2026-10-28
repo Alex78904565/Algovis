@@ -77,6 +77,11 @@ Play or seek the video, select an actual Manim object, and attach a note to it.
 Edit the source or click **Render section** to refresh the render and object
 map while retaining the current playback position.
 
+The **Speed** menu supports 0.5× through 3× playback and remembers your choice
+across sections and reloads. Voice and background music follow the same clock.
+Use **[** / **]** to change speed, **Space** to play or pause, and **← / →** to
+step one second (**Shift** for ten seconds), outside text-entry controls.
+
 Use `python -m algovis.review.server` if the `algovis-review` command is not on
 your path. For your own project, copy the example catalog and provide each
 section's Manim source, scene name, video, cues, and transcript. Narration and

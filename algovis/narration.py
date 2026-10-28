@@ -64,12 +64,15 @@ class NarrationTrack:
             raise ValueError(f"Word cue {name!r} has no verified word alignment: {cue.phrase!r}")
         return anchor
 
-    def wait_for_word(self, scene, name):
+    def wait_for_word(self, scene, name, *, edge="start"):
         """Fail on a missed word instead of silently playing an animation late."""
         anchor = self.word_anchor(name)
+        if edge not in ('start','end'):
+            raise ValueError('Word timing edge must be start or end')
+        target = anchor[edge]
         fps = float(scene.camera.frame_rate)
         tolerance = 1 / fps + 0.015
-        remaining = float(anchor["start"]) - self.elapsed(scene)
+        remaining = float(target) - self.elapsed(scene)
         if remaining < -tolerance:
             raise RuntimeError(
                 f"Word cue {name!r} missed by {-remaining:.3f}s; "
@@ -77,7 +80,7 @@ class NarrationTrack:
             )
         if remaining > 0:
             scene.wait(remaining)
-        if abs(self.elapsed(scene) - anchor["start"]) > tolerance:
+        if abs(self.elapsed(scene) - target) > tolerance:
             raise RuntimeError(f"Word cue {name!r} did not land within one video frame")
         return anchor
 

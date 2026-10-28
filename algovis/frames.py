@@ -83,7 +83,7 @@ class ProofFrame:
         ])
         self.labels_by_name = dict(zip(self.LABELS, self.labels))
         self.divider = Line([self.style.proof_divider_x, 2.63, 0],
-                            [self.style.proof_divider_x, -2.93, 0],
+                            [self.style.proof_divider_x, min(-2.93,self.rows['conclusion']-.28), 0],
                             color=theme.muted, stroke_width=1.2)
         self.chrome = VGroup(self.divider, self.labels)
         if any(label.get_right()[0] > self.style.proof_divider_x-.12 for label in self.labels):

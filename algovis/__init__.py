@@ -29,6 +29,7 @@ from .frames import (
 )
 from .narration import NarrationCue, NarrationTrack
 from .continuity import SectionHandoff
+from .core.math_row import MathRow
 from .storyboard import (
     ACTION_VERBS, ATTENTION_STYLES, ENTRY_STYLES, EXIT_STYLES,
     SEMANTIC_ROLES, StoryAction, StoryAnimation,

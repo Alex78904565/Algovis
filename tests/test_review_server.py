@@ -14,6 +14,14 @@ from algovis.review.server import ReviewCatalog, ReviewHTTPServer, ReviewServer
 
 
 class ReviewServerTests(unittest.TestCase):
+    def test_native_math_drift_is_rejected_even_when_peer_fonts_match(self):
+        self.review.manifest_path.parent.mkdir(parents=True,exist_ok=True)
+        self.review.manifest_path.write_text(json.dumps({'animations':[],
+            'snapshots':[{'time':2,'objects':[{'id':'call','label':'f(1,0)',
+                'fontSize':33.6,'nativeMathRowErrors':[{'part':'w','positionError':.12}]}]}]}),encoding='utf-8')
+        with self.assertRaisesRegex(RuntimeError,'Native mathematical alignment rejected'):
+            self.review._validate_render_timing()
+
     def test_mismatched_section_cut_keeps_the_previous_published_video(self):
         self.review._continuation_parent = Mock(video_path=self.review.video_path)
         self.review._continuation_parent.render_status.state = 'ready'

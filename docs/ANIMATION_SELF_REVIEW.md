@@ -205,3 +205,21 @@ Preserve the earlier record as history and attach the new note IDs, failed
 acceptance criterion, and required new evidence. Record successes just as
 specifically: viewer praise for a domino fall does not approve an unrelated
 substitution, and resolving earlier notes is not approval of the whole section.
+
+For local math changes, inspect a native baseline as well as font size. Use the
+named-term `MathRow` contract for arguments and numeric branch calculations.
+Check the intermediate arithmetic and both alternatives side by side; one
+correct total does not certify the other. The publication gate rejects recorded
+native-layout drift and explicitly declared incorrect additive equalities.
+
+For sustained spoken references, declare the start and release cues with
+`focus_on_cue`. Check the whole lifetime, including a settled frame during the
+explanation and the release at the next referent. The manifest gate rejects a
+box that disappears early or remains after release. Neither this gate nor the
+math contract certifies an undeclared object or a complete composition. Inspect
+the actual video for clutter, meaningful grouping, proof retention, and motion.
+
+Review controls are part of the authoring workflow: verify playback speed while
+playing and seeking, persistence across section changes and reloads, and music
+tracking the same media clock. Use pitch preservation when the browser supports
+it. Check the toolbar at the ordinary reviewer width, not just a wide desktop.

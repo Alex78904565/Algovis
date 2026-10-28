@@ -16,6 +16,29 @@ def semantic_objects(snapshot):
             and obj.get("opacity", 1) > .12]
 
 
+def focus_span_findings(manifest):
+    """Check the visible lifetime of a declared explanation box."""
+    findings=[];tolerance=1/float(manifest.get('frameRate',15))+.015
+    for span in manifest.get('focusSpans',[]):
+        if not span.get('object'):
+            findings.append({'kind':'focus_never_rendered','cue':span['cue'],'target':span['target']})
+            continue
+        if 'releaseDuration' not in span:
+            findings.append({'kind':'focus_release_cue_not_executed','cue':span['cue'],'target':span['target']})
+        for snapshot in manifest.get('snapshots',[]):
+            time=snapshot['time']
+            if span['start']+span['revealDuration']+tolerance<time<span['end']-tolerance:
+                present=any(o['id']==span['object'] and o.get('opacity',0)>.8 for o in snapshot.get('objects',[]))
+                if not present:
+                    findings.append({'kind':'focus_removed_before_explanation_ends','cue':span['cue'],'time':time,'target':span['target']})
+                    break
+            if time>span['end']+span.get('releaseDuration',0)+tolerance:
+                if any(o['id']==span['object'] and o.get('opacity',0)>.12 for o in snapshot.get('objects',[])):
+                    findings.append({'kind':'focus_lingers_after_release','cue':span['cue'],'time':time,'target':span['target']})
+                    break
+    return findings
+
+
 def visible_opacity(mobject, cache=None):
     """Maximum painted opacity, ignoring zero-width strokes and hidden layers."""
     cache = {} if cache is None else cache
@@ -86,6 +109,8 @@ def capture_snapshot(scene, width, height):
             "region": {"x": left, "y": top, "width": max(0., right-left),
                        "height": max(0., bottom-top)},
         }
+        if hasattr(type(mobject), 'native_layout_findings'):
+            item['nativeMathRowErrors'] = mobject.native_layout_findings()
         try:
             item["color"] = mobject.get_color().to_hex()
         except (AttributeError, ValueError, TypeError):

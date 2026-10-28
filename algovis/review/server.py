@@ -1128,10 +1128,19 @@ class ReviewServer:
     def _validate_render_timing(self) -> None:
         """Reject timing and declared peer-type errors, keeping the last good video."""
         from .audit import audit_section
-        from .inspection import typography_findings, alignment_findings
+        from .inspection import typography_findings, alignment_findings, focus_span_findings
         if self.manifest_path is None or not self.manifest_path.is_file():
             return
         manifest = json.loads(self.manifest_path.read_text(encoding="utf-8"))
+        focus_errors=focus_span_findings(manifest)
+        if focus_errors:
+            raise RuntimeError('Held focus rejected before publication: '+str(focus_errors[0]))
+        math_errors = [{'time':snapshot['time'],'label':obj.get('label',''),
+                        'errors':obj['nativeMathRowErrors']}
+                       for snapshot in manifest.get('snapshots', [])
+                       for obj in snapshot.get('objects', []) if obj.get('nativeMathRowErrors')]
+        if math_errors:
+            raise RuntimeError('Native mathematical alignment rejected: '+str(math_errors[0]))
         type_problems = [finding for snapshot in manifest.get("snapshots", [])
                          for finding in typography_findings(snapshot)]
         if type_problems:

@@ -132,7 +132,8 @@ class ApplyDefinition(AnimationGroup):
 
         source_text = ''.join(formula_text(definition).split())
         target_text = ''.join(formula_text(result).split())
-        if source_text and source_text == target_text and not preserve_destination_layout:
+        if (source_text and source_text == target_text and not preserve_destination_layout
+                and not getattr(result, '_algovis_preserve_structure', False)):
             # Inspection contracts belong to the destination's role, even
             # when its glyphs come from a differently sized reference row.
             contracts = defaultdict(deque)

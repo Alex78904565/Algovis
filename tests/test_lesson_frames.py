@@ -10,6 +10,11 @@ from algovis import frames
 
 
 class SharedLessonFrameTests(unittest.TestCase):
+    def test_every_proof_rail_includes_its_final_conclusion(self):
+        for profile in frames.ProofFrame.PROFILES:
+            frame=algovis.ProofFrame(profile)
+            self.assertLess(frame.divider.get_bottom()[1],frame.anchor('conclusion')[1]-.2)
+
     def test_one_style_change_reaches_every_proof_profile(self):
         standard = frames.DEFAULT_FRAME_STYLE
         changed = replace(standard, proof_content_left=-2.55,

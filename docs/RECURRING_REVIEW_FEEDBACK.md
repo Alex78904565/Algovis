@@ -57,6 +57,10 @@ Viewer-endorsed patterns from this lesson's reviews:
 - **Equations built in place:** keep the function definition and useful work
   visible as the explanation develops. Preserve the existing orientation and
   refine the affected term rather than replacing the whole composition.
+- **Knapsack fit condition:** the viewer specifically liked the existing
+  condition explanation in clip 7, requesting only `if` and removal of its
+  parentheses. Preserve that explanation and its local highlights when fixing
+  the notation; this praise does not approve the later proof or worked sums.
 - **Copy, substitute, cancel:** the viewer called the refresher's repaired
   definition application "great" and requested an earlier spoken trigger.
   Preserve that specific mathematical motion while changing its cue; the
@@ -581,10 +585,43 @@ proof rails and successful local explanatory devices while making these repairs.
   call makes that numeral too large. Do not resize a whole definition to a
   target width or height when it enters a proof or becomes a reference. Use a
   common scale for the complete reference block and reserve enough room.
+  Font-size equality alone is insufficient: centering `0` on `w` or `3` on
+  a subscript can lower the replacement. Use `MathRow` for changing arguments
+  and worked arithmetic. Plan the complete native TeX row, animate its named
+  terms, then commit that layout. Its baseline/spacing contract is checked in
+  the actual render manifest before publication. Never repair this by nudging
+  a particular digit until it looks approximately right.
 - Keep a definition's focus box through the explanation that refers to it.
   Change only the `1` in `P(1)` when it becomes `P(0)`. Make moving beyond the
   last item visible before deriving zero additional value. End a completed
   induction with its quantified conclusion, using the induction variable k.
+  Use `focus_on_cue(..., until=...)` for these sustained references. Its next
+  spoken cue releases the box; the audit rejects missing, prematurely removed,
+  or lingering boxes. When two calls are named, use a separate box around each
+  call, excluding the immediate value beside it. Give the assumption and its
+  stated consequence equivalent attention on their respective spoken words.
+  Show the proof's row labels when entering the proof, rather than leaving an
+  already visible base case unnamed until much later. Move retained material
+  deliberately; available silence is room for comprehensible movement.
+- Changing the meaning of an induction index is a local revision of the
+  completed proof. Retain the conclusion and working rows. Update every
+  dependent index, base, and quantified statement when showing the alternative;
+  restore them together when returning. A backward proof may assume `P(k+1)`
+  to prove `P(k)`. Demonstrations about the base belong beside that row, not
+  over the proof's conclusion.
+- Worked alternatives use the same evaluation grammar. Replace the child
+  value first, retain the immediate value, then append the evaluated total.
+  For example, `5 + f(2,3)` becomes `5 + 0`, then `5 + 0 = 5`; its peer
+  becomes `0 + 6 = 6`. Compare both complete chains before choosing. Declare
+  `MathRow.require_sum()` for additive numeric examples so a wrong completed
+  equality cannot publish. Inspect every intermediate stage, including the
+  spacing of newly inserted operators. Keep helpful take/skip labels with
+  the recurrence in construction, proof, and later copies.
+- A pause requested after a sentence belongs after its last spoken word.
+  `play_on_cue(..., edge="end")` supports that distinction explicitly. Returning
+  a rejected item during "so it doesn't fit" is different from returning it
+  after those words. Retiming must preserve the raw recording and shift all
+  downstream word, cue, and assembly times together.
 
 - Establish a conclusion before extending it. Keep `# base-case calls in
   f(n) = f(n)` readable, then append the total-call inequality when the narration

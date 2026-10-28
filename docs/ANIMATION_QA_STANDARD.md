@@ -242,5 +242,11 @@ A section is ready only when all answers are yes:
 - Are equations and labels aligned, readable, and free of raw markup?
 - Are transitions free of pop-ins, duplicates, lingering edges, and overlaps?
 - Does every paused frame make visual sense?
+- Do local substitutions preserve their native mathematical baseline, spacing,
+  and semantic colors, as well as font size? Use `MathRow` for editable calls
+  and worked arithmetic; inspect each intermediate result.
+- Do attention boxes remain for the complete spoken reference and disappear
+  at its declared release cue? Prefer `focus_on_cue(..., until=...)` to a
+  short transient pulse when explaining a term for several seconds.
 - Are dialogue levels and edit boundaries clean?
 - Are all fixes awaiting review or resolved, with no unhandled queued notes?

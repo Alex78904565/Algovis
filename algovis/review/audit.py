@@ -13,7 +13,7 @@ import json
 from pathlib import Path
 import re
 
-from .inspection import semantic_objects, typography_findings, alignment_findings
+from .inspection import semantic_objects, typography_findings, alignment_findings, focus_span_findings
 
 ATTENTION = {"Pulse", "Indicate", "Circumscribe", "ShowPassingFlash", "Flash",
              "Highlight", "FocusOn", "Wiggle"}
@@ -95,7 +95,7 @@ def audit_section(manifest, cue_document, transcript, *, attention_tolerance=Non
             anchor = {**anchor, "start":anchor["start"]+offset, "end":anchor["end"]+offset}
         event.update({"duration": end-start, "contextPhrase": context_phrase,
                       "triggerPhrase": explicit, "anchor": anchor,
-                      "wordOffset": start-anchor["start"] if anchor else None,
+                      "wordOffset": start-anchor[timing.get('edge','start')] if anchor else None,
                       "spokenDuring": [word for word in words if word["end"]+offset>start and word["start"]+offset<end],
                       "findings": []})
         if event.get("kind") in ATTENTION:
@@ -152,9 +152,9 @@ def audit_section(manifest, cue_document, transcript, *, attention_tolerance=Non
             anchor = phrase_anchor(timing.get("trigger", ""), words, play["start"]-offset)
             if anchor is None or anchor["approximate"]:
                 change["findings"].append("content_without_verified_word")
-            elif abs(play["start"]-anchor["start"]-offset) > tolerance:
+            elif abs(play["start"]-anchor[timing.get('edge','start')]-offset) > tolerance:
                 change["findings"].append(
-                    "content_before_word" if play["start"]<anchor["start"]+offset else "content_after_word"
+                    "content_before_word" if play["start"]<anchor[timing.get('edge','start')]+offset else "content_after_word"
                 )
         if len(change["before"]) >= 4 and change["retainedFraction"] < .45:
             change["findings"].append("large_content_clear")
@@ -189,6 +189,15 @@ def audit_section(manifest, cue_document, transcript, *, attention_tolerance=Non
             if signature not in seen_type:
                 seen_type.add(signature)
                 findings.append(finding)
+    findings.extend(focus_span_findings(manifest))
+    seen_math = set()
+    for snapshot in manifest.get('snapshots', []):
+        for obj in snapshot.get('objects', []):
+            errors = obj.get('nativeMathRowErrors', [])
+            if errors and obj['id'] not in seen_math:
+                seen_math.add(obj['id'])
+                findings.append({'kind':'native_math_layout_error', 'time':snapshot['time'],
+                                 'object':obj['id'], 'label':obj.get('label',''), 'errors':errors})
     return {"events":events,"changes":changes,"findings":findings,
             "wordCount":len(words), "frameTolerance":tolerance,
             "status":"requires_agent_review" if findings else "automated_checks_passed"}

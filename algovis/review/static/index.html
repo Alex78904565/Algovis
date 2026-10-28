@@ -109,6 +109,8 @@
     .status.error .status-dot { background: var(--red); }
 
     .render-button { padding: 8px 12px; flex: none; white-space: nowrap; }
+    .playback-speed { display: flex; align-items: center; gap: 6px; font-size: 13px; white-space: nowrap; }
+    .playback-speed select { padding: 6px; border: 1px solid var(--line); border-radius: 7px; background: var(--panel-2); color: var(--text); }
 
     .audit-button {
       padding: 8px 11px;
@@ -493,6 +495,7 @@
 
     .viewer-toolbar {
       display: flex;
+      flex-wrap: wrap;
       align-items: center;
       gap: 9px;
       width: 100%;
@@ -500,7 +503,10 @@
       margin: 0 auto auto;
     }
 
-    .viewer-toolbar button { padding: 9px 13px; }
+    .viewer-toolbar button { padding: 9px 13px; flex: 0 0 auto; }
+    .viewer-toolbar .playback-speed { flex: 0 0 auto; }
+    .viewer-toolbar .current-cue { flex: 1 1 190px; }
+    .viewer-toolbar .hint { flex: 1 1 100%; white-space: normal; }
     .viewer-toolbar .primary {
       background: var(--blue);
       border-color: var(--blue);
@@ -882,8 +888,17 @@
           <button class="primary" id="selectButton">Select something to change</button>
           <button id="timeNoteButton">Add audio/timing note</button>
           <button id="clearButton" disabled>Clear selection</button>
+          <label class="playback-speed" title="Playback speed, remembered across sections. [ slower, ] faster.">
+            Speed
+            <select id="playbackSpeed" aria-label="Playback speed">
+              <option value="0.5">0.5×</option><option value="0.75">0.75×</option>
+              <option value="1" selected>1×</option><option value="1.25">1.25×</option>
+              <option value="1.5">1.5×</option><option value="1.75">1.75×</option>
+              <option value="2">2×</option><option value="2.5">2.5×</option><option value="3">3×</option>
+            </select>
+          </label>
           <div class="current-cue" id="currentCue">Choose a transcript cue or scrub the video.</div>
-          <div class="hint">Space: play/pause · ←/→: 1 second</div>
+          <div class="hint">Space: play/pause · ←/→: 1s · Shift: 10s · [ / ]: speed</div>
         </div>
         <div class="mix-toolbar" id="musicToolbar" hidden>
           <button id="musicToggle">Music on</button>
@@ -980,6 +995,7 @@
       approvalBusy: false,
       mediaLoading: true,
       musicSavePending: false,
+      playbackRate: 1,
       auditIssueId: null,
       auditFinished: false,
       auditBusy: false,
@@ -995,6 +1011,25 @@
     const annotationList = document.getElementById("annotationList");
     const composer = document.getElementById("composer");
     const comment = document.getElementById("comment");
+    const playbackSpeed = document.getElementById("playbackSpeed");
+    const playbackRates = [...playbackSpeed.options].map(option => Number(option.value));
+    const playbackStorageKey = "algovis-review-playback-rate";
+    function setPlaybackSpeed(rate, persist = true) {
+      if (!playbackRates.includes(Number(rate))) rate = 1;
+      state.playbackRate = Number(rate);
+      video.defaultPlaybackRate = state.playbackRate;
+      video.playbackRate = state.playbackRate;
+      music.playbackRate = state.playbackRate;
+      video.preservesPitch = true;
+      music.preservesPitch = true;
+      playbackSpeed.value = String(state.playbackRate);
+      if (persist) {
+        try { localStorage.setItem(playbackStorageKey, String(state.playbackRate)); } catch (_) {}
+      }
+    }
+    try { setPlaybackSpeed(Number(localStorage.getItem(playbackStorageKey)) || 1, false); }
+    catch (_) { setPlaybackSpeed(1, false); }
+    playbackSpeed.addEventListener("change", event => setPlaybackSpeed(Number(event.target.value)));
 
     function formatTime(seconds) {
       const minutes = Math.floor(seconds / 60);
@@ -2321,6 +2356,7 @@
     }
 
     video.addEventListener("loadedmetadata", () => {
+      setPlaybackSpeed(state.playbackRate, false);
       state.mediaLoading = false;
       renderApproval(state.project?.approval);
       state.auditSignature = null;
@@ -2351,7 +2387,14 @@
       updateTranscriptPlayback(true);
       followTransition(video.currentTime);
     });
-    video.addEventListener("ratechange", () => { music.playbackRate = video.playbackRate; });
+    video.addEventListener("ratechange", () => {
+      music.playbackRate = video.playbackRate;
+      if (!state.mediaLoading && playbackRates.includes(video.playbackRate)) {
+        state.playbackRate = video.playbackRate;
+        playbackSpeed.value = String(state.playbackRate);
+        try { localStorage.setItem(playbackStorageKey, String(state.playbackRate)); } catch (_) {}
+      }
+    });
     video.addEventListener("ended", () => { music.pause(); finishAuditPlayback(); });
 
     document.getElementById("musicToggle").addEventListener("click", async () => {
@@ -2455,8 +2498,13 @@
         video.paused ? video.play() : video.pause();
       } else if (event.code === "ArrowLeft" || event.code === "ArrowRight") {
         event.preventDefault();
-        video.currentTime = Math.max(0, Math.min(video.duration || Infinity, video.currentTime + (event.code === "ArrowRight" ? 1 : -1)));
+        video.currentTime = Math.max(0, Math.min(video.duration || Infinity, video.currentTime + (event.code === "ArrowRight" ? 1 : -1) * (event.shiftKey ? 10 : 1)));
         video.pause();
+      } else if (event.code === "BracketLeft" || event.code === "BracketRight") {
+        event.preventDefault();
+        const index = playbackRates.indexOf(state.playbackRate);
+        const next = Math.max(0, Math.min(playbackRates.length - 1, index + (event.code === "BracketRight" ? 1 : -1)));
+        setPlaybackSpeed(playbackRates[next]);
       }
     });
 

@@ -9,7 +9,7 @@ import time
 from pathlib import Path
 
 from manim import (
-    AnimationGroup, Arrow, Circumscribe, DOWN, FadeIn, FadeOut, GrowArrow, Group,
+    AnimationGroup, Arrow, Circumscribe, Create, DOWN, FadeIn, FadeOut, GrowArrow, Group,
     Indicate, MathTex, ORIGIN, RoundedRectangle, Succession, Text, UP, VGroup,
     Wait, config, TransformFromCopy,
 )
@@ -18,7 +18,7 @@ from .theme import DEFAULT_SPACING, DEFAULT_THEME
 from .narration import NarrationTrack
 from .core.math import ApplyDefinition
 from .review.inspection import capture_snapshot, semantic_objects, measured_font_size
-from .utils.effects import Pulse
+from .utils.effects import Pulse, FocusBox
 
 
 @dataclass(frozen=True)
@@ -169,6 +169,7 @@ class SlideSceneMixin:
         self._review_next_object_id = 1
         self._review_compiled_animations = None
         self._review_is_compiling_play = False
+        self._held_focus = []
 
     def tear_down(self):
         try:
@@ -456,6 +457,9 @@ class SlideSceneMixin:
                 "snapshots": self._review_snapshots,
                 "animations": self._review_animations,
                 "plays": self._review_plays,
+                "focusSpans": [{k:v for k,v in span.items() if k not in ('box','active')}
+                               | {'object':self._review_object_ids.get(id(span['box']))}
+                for span in getattr(self, '_held_focus', [])],
             }, indent=2) + "\n",
             encoding="utf-8",
         )
@@ -492,7 +496,7 @@ class SlideSceneMixin:
             self, name, *animations, minimum=minimum, offset=offset,
         )
 
-    def play_on_cue(self, name, *animations, run_time, reason):
+    def play_on_cue(self, name, *animations, run_time, reason, edge="start"):
         """Schedule one content change on verified words, or fail the render.
 
         Unlike a separate wait/play pair, this operation cannot inherit an
@@ -504,11 +508,19 @@ class SlideSceneMixin:
             raise RuntimeError("Call begin_narration() before play_on_cue().")
         if not str(reason).strip():
             raise ValueError("A word-timed content change needs an instructional reason")
-        anchor = self.narration.wait_for_word(self, name)
+        anchor = self.narration.wait_for_word(self, name, edge=edge)
+        retiring = [span for span in getattr(self,'_held_focus',[]) if span['active'] and span['until']==name]
+        for span in retiring:
+            span['active'] = False
+            span['releaseDuration'] = min(.25,float(run_time))
+        exits=[Succession(FadeOut(span['box'],run_time=span['releaseDuration']),
+                          Wait(max(.001,float(run_time)-span['releaseDuration'])),run_time=float(run_time))
+               for span in retiring]
+        animations = (*animations,*exits)
         self._review_active_cue = {
-            "cue": name, "cueTime": anchor["start"], "cueOffset": 0.0,
+            "cue": name, "cueTime": anchor[edge], "cueOffset": 0.0,
             "wordTiming": {"trigger": self.narration.cues[name].phrase,
-                           "time": anchor["start"], "reason": str(reason),
+                           "time": anchor[edge], "edge": edge, "reason": str(reason),
                            "narrationStart": self.narration.start_time},
         }
         try:
@@ -516,6 +528,28 @@ class SlideSceneMixin:
         finally:
             # A later play cannot inherit this operation's strict declaration.
             self._review_active_cue.pop("wordTiming", None)
+
+    def focus_on_cue(self, name, *targets, until, reason, run_time=.55, color=None):
+        """Hold separate term boxes through a spoken reference, then retire them.
+
+        The release is attached to the named next cue, rather than to an
+        arbitrary pulse duration. Its rendered lifetime is part of the audit.
+        """
+        if not targets or not reason.strip():
+            raise ValueError('A held focus needs targets and an instructional reason')
+        start=self.narration.word_anchor(name)['start']
+        end=self.narration.word_anchor(until)['start']
+        if end<=start+run_time:
+            raise ValueError('Held focus must finish appearing before its release cue')
+        boxes=[FocusBox(target,color=color or self.theme.primary,buff=.05) for target in targets]
+        offset=self.narration.start_time
+        for target,box in zip(targets,boxes):
+            self._held_focus.append({'box':box,'active':True,'start':start+offset,'end':end+offset,
+                'revealDuration':run_time,'until':until,'cue':name,'reason':reason,
+                'target':self._review_object_label(target)})
+        self.play_on_cue(name,*[Create(box) for box in boxes],
+                         run_time=run_time,reason=reason)
+        return boxes
 
     def spoken_focus(self, target, kind="object", *, source=None, color=None,
                      scale_factor=1.04, buff=0.08, arrow_hold=0.18,
