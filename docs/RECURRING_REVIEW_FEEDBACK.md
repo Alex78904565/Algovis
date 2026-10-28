@@ -57,6 +57,10 @@ Viewer-endorsed patterns from this lesson's reviews:
 - **Equations built in place:** keep the function definition and useful work
   visible as the explanation develops. Preserve the existing orientation and
   refine the affected term rather than replacing the whole composition.
+- **Copy, substitute, cancel:** the viewer called the refresher's repaired
+  definition application "great" and requested an earlier spoken trigger.
+  Preserve that specific mathematical motion while changing its cue; the
+  praise does not approve other substitutions or their timing.
 - **Contact-based domino motion:** the viewer called the repaired fall a
   "phenomenal fix." Preserve its contact geometry and resting positions. Dense
   motion sampling and an explicit geometric model worked for this repair.
@@ -531,6 +535,67 @@ substitution, cancellation, and final adoption separately. Keep established
 proof rails and successful local explanatory devices while making these repairs.
 
 ## Before returning the work
+
+### Latest proof and runtime review
+
+- Repeated objects must share their implementation, not merely resemble one
+  another. Use `StateCell` / `StateRow` for the separated numerical/state rows
+  in the introduction, Fibonacci construction, hand calculation, and stored
+  array. Keep border, corner, fill, value size, and gap consistent. A miniature
+  recap scales the same component. `card()` is a content-sized callout, not an
+  array cell. When a component changes, inventory earlier uses too; inspecting
+  only the newest section leaves obsolete designs in the finished lesson.
+  Keep proof rails, headings, comparison frames, and equation columns on their
+  established shared formats unless their different purpose warrants a change.
+- A new worked instance reuses the earlier problem's actual cards, artwork,
+  names, metric slots, bag and capacity gauge. Changing the numbers is not a
+  reason to put metrics outside the cards or omit the gauge. Inspect both
+  instances together. Keep take/skip tags in a shared label column, independent
+  of how long their mathematical expressions are.
+- Write the induction hypothesis as an assumption: "Assume P(k) holds", with
+  its implication beneath it when needed. Adjust the index to the proof's
+  actual child size. Mark the changing arguments inside the child calls on the
+  words explaining progress, rather than briefly boxing the claim instead.
+- Typography must survive local substitutions. Build digits and changed calls
+  with `LessonStyle.math_like`; matching a numeral's height to a parenthesized
+  call makes that numeral too large. Do not resize a whole definition to a
+  target width or height when it enters a proof or becomes a reference. Use a
+  common scale for the complete reference block and reserve enough room.
+- Keep a definition's focus box through the explanation that refers to it.
+  Change only the `1` in `P(1)` when it becomes `P(0)`. Make moving beyond the
+  last item visible before deriving zero additional value. End a completed
+  induction with its quantified conclusion, using the induction variable k.
+
+- Establish a conclusion before extending it. Keep `# base-case calls in
+  f(n) = f(n)` readable, then append the total-call inequality when the narration
+  explains that these are only some calls. Carry the complete predicate from
+  the retained argument. Label a numerical example with its actual input.
+- Put an explanatory caption next to its named referent. A note about the
+  growth of the upper operation bound belongs beside that bound, not above a
+  different expression lower on the slide. Axis labels must remain readable.
+- A valid slow runtime is still a valid result. Use green for both derived
+  runtime bounds; red means an invalid choice, a violated condition, or wasted
+  repeated work. Keep comparison headings neutral. Distinguish plotted series
+  with a consistent legend; a series color is not a correctness judgment.
+- In a correctness proof, the desired optimal-value interpretation is part of
+  the claim being established. Keep the actual recurrence under definitions.
+  Retain the familiar proof rail and place the interpretation with `P(k)`.
+- When a claim changes, check its base by carrying the general formula down,
+  substituting the base input, and simplifying. Return to the existing base
+  row. Substitute into the working equality already on screen rather than
+  erasing and re-copying an earlier recursive step.
+- For numbered spoken instructions, show the number on “First” or “Step two”
+  and its description on the phrase stating the action. A whole condition
+  introduced as a condition appears together; separate token introductions
+  are useful only when the narration actually derives those tokens.
+- Preserve the praised copy/substitute/cancel motion. Its latest requested
+  trigger is “except”; the old extra pause after “by definition” is superseded.
+  Cue choices belong to the current recording and must not become general
+  timing rules. Finish each scene play before mutating copied math glyphs.
+- Keep a worked example's complete weight and value calculation visible when
+  identifying its best feasible choice. If a requested reading pause is added,
+  shift words, cues, captions, and assembly metadata together. Preserve raw
+  recordings and reject an insertion point that cuts through voiced speech.
 
 Ready-for-review notes need a repair starting point, separate from the original
 annotation evidence. Set `reviewAt` to the first cue where the change is visible;

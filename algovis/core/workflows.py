@@ -362,9 +362,9 @@ class BitLengthRuntime(VGroup):
         super().__init__(**kwargs)
         self.theme = theme
         self.runtimes = VGroup(
-            MathTex(runtime_tex, color=theme.primary),
+            MathTex(runtime_tex, color=theme.success),
             Text("and", font_size=17, color=theme.muted),
-            MathTex(parallel_runtime_tex, color=theme.accent),
+            MathTex(parallel_runtime_tex, color=theme.success),
         ).arrange(RIGHT, buff=0.18)
         self.encoding = VGroup(
             MathTex(rf"{parameter}=(110101\ldots)_2", color=theme.foreground),
@@ -382,15 +382,15 @@ class BitLengthRuntime(VGroup):
             rf"{runtime_tex}=" + runtime_tex.replace(
                 parameter, rf"2^{{\log_2 {parameter}}}", 1,
             ),
-            color=theme.danger,
+            color=theme.success,
         ).scale(0.82)
         self.warning = Text(
             f"polynomial in numeric {parameter} · potentially exponential in its bit length",
-            font_size=18, color=theme.danger,
+            font_size=18, color=theme.foreground,
         )
         self.parallel = Text(
             f"The same reasoning applies to {parallel_parameter}.",
-            font_size=20, color=theme.accent,
+            font_size=20, color=theme.muted,
         )
         self.body = VGroup(
             self.encoding, self.substitution, self.rewritten,

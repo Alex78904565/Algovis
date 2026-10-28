@@ -106,10 +106,13 @@ class ApplyDefinition(AnimationGroup):
     The definition and application must already be visible in the scene.
     Pass ``None`` for application when filling a previously blank position.
     Optional ``via`` points route the rigid copy around intervening content.
+    ``preserve_destination_layout`` keeps an explicitly arranged result, useful
+    when selected terms have gaps because intermediate terms were omitted.
     """
 
     def __init__(self, definition, application, result, *, path_arc=-PI / 8, via=(),
-                 definition_label=None, result_label=None, **kwargs):
+                 definition_label=None, result_label=None,
+                 preserve_destination_layout=False, **kwargs):
         if definition is application:
             raise ValueError("The definition and its application must be distinct")
         if result is definition or result is application:
@@ -129,7 +132,7 @@ class ApplyDefinition(AnimationGroup):
 
         source_text = ''.join(formula_text(definition).split())
         target_text = ''.join(formula_text(result).split())
-        if source_text and source_text == target_text:
+        if source_text and source_text == target_text and not preserve_destination_layout:
             # Inspection contracts belong to the destination's role, even
             # when its glyphs come from a differently sized reference row.
             contracts = defaultdict(deque)

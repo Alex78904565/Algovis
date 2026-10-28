@@ -5,6 +5,66 @@ from manim import BLUE, GREEN, RIGHT, Scene, Square, VGroup
 
 
 class PublicApiTests(unittest.TestCase):
+    def test_state_rows_reuse_the_same_cell_geometry_and_neutral_value_ink(self):
+        import numpy as np
+        row = algovis.StateRow([1, 13, 191])
+        reference = algovis.StateCell(1)
+        for cell in row:
+            self.assertIs(cell[0], cell.box)
+            self.assertIs(cell[1], cell.label)
+            self.assertAlmostEqual(cell.box.width, reference.box.width)
+            self.assertAlmostEqual(cell.box.height, reference.box.height)
+            self.assertEqual(cell.box.get_stroke_color(), cell.theme.primary)
+            self.assertEqual(cell.label.get_color(), cell.theme.foreground)
+            np.testing.assert_allclose(cell.label.get_center(), cell.box.get_center(), atol=1e-10)
+        self.assertAlmostEqual(row[1].get_left()[0]-row[0].get_right()[0], .42)
+        with self.assertRaisesRegex(ValueError, 'reserve a wider cell'):
+            algovis.StateCell('12345678901234567890')
+
+    def test_selected_definition_terms_can_land_in_an_explicit_compact_layout(self):
+        import numpy as np
+        source = VGroup(Square(), Square().shift(5 * RIGHT))
+        source[0].tex_string, source[1].tex_string = 'a', '=b'
+        destination = VGroup(Square(), Square().shift(1.4 * RIGHT)).shift(3 * RIGHT)
+        destination[0].tex_string, destination[1].tex_string = 'a', '=b'
+        children = tuple(destination.submobjects)
+        points = destination.get_all_points().copy()
+        animation = algovis.ApplyDefinition(
+            source, None, destination, preserve_destination_layout=True)
+        self.assertEqual(tuple(destination.submobjects), children)
+        np.testing.assert_allclose(destination.get_all_points(), points)
+        scene = Scene()
+        scene.add(source)
+        scene.add_mobjects_from_animations([animation])
+        animation._setup_scene(scene)
+        animation.begin()
+        animation.interpolate(.35)
+        self.assertAlmostEqual(animation.traveller[1].get_x()-animation.traveller[0].get_x(), 5)
+        animation.finish()
+        animation.clean_up_from_scene(scene)
+        np.testing.assert_allclose(destination.get_all_points(), points)
+        self.assertIn(destination, scene.get_mobject_family_members())
+
+    def test_computed_runtime_color_does_not_judge_algorithm_quality(self):
+        comparisons = (
+            algovis.RecurrenceComparison(
+                'f(n)=f(n-1)', 'f[n]=f[n-1]', 'O(2^n)', 'O(n)', 'n=1,2,3'),
+            algovis.AlgorithmComparison(
+                ['return f(n-1)'], ['return f[n-1]'], 'O(2^n)', 'O(n)'),
+        )
+        for comparison in comparisons:
+            for runtime in (comparison.naive_runtime, comparison.optimized_runtime):
+                for glyph in runtime.family_members_with_points():
+                    self.assertEqual(glyph.get_fill_color(), comparison.theme.success)
+
+    def test_bit_length_explanation_preserves_valid_result_semantics(self):
+        explanation = algovis.BitLengthRuntime()
+        for runtime in (explanation.runtimes[0], explanation.runtimes[2], explanation.rewritten):
+            for glyph in runtime.family_members_with_points():
+                self.assertEqual(glyph.get_fill_color(), explanation.theme.success)
+        for glyph in explanation.warning.family_members_with_points():
+            self.assertEqual(glyph.get_fill_color(), explanation.theme.foreground)
+
     def test_comparison_headings_do_not_use_stored_answer_color(self):
         comparison=algovis.RecurrenceComparison(
             'f(n)=f(n-1)', 'f[n]=f[n-1]', 'O(2^n)', 'O(n)', 'n=1,2,3')

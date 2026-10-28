@@ -17,7 +17,8 @@ should not change merely to make a frame look more varied.
   receiving attention.
 - **Green (`theme.success`) — known, stored, selected, or valid.** Use it for
   computed array cells, cached answers, accepted choices, satisfied
-  constraints, and completed DP results.
+  constraints, and derived runtime results. Both a slow recursive bound and a
+  faster DP bound are valid results; speed alone does not justify red.
 - **Red (`theme.danger`) — invalid, rejected, or wasteful.** Use it for
   constraint violations, rejected choices, and duplicated work that will be
   eliminated.
@@ -72,3 +73,30 @@ the right; keep its first symbol anchored. Align equation continuations with
 their parent equals sign where that makes the algebra easier to follow.
 Centering remains useful for a standalone title, diagram, or single formula;
 do not independently center the rows of a developing explanation.
+
+## Reuse the component, not a hand-drawn imitation
+
+| Visual purpose | Shared implementation | Keep consistent |
+| --- | --- | --- |
+| Separated numeric/state cells | `StateCell`, `StateRow` | Fixed cell height, rounded corners, border/fill, value size, roomy gaps |
+| A content-sized callout | `SlideScene.card` | The shared callout treatment; do not use it to improvise array cells |
+| Related equation/meaning rows | `ColumnLayout`, `LessonStyle.align_rows` | Center the completed block; give its rows a shared left edge |
+| Peer mathematical statements | `LessonStyle.math`, `math_like`, `watch` | The same rendered type size after moves and substitutions |
+| Recursive calls and duplicate states | `RecursiveTree` | One node/edge lifecycle and the same node shape and status colors |
+| Recursion/DP comparison | `RecurrenceComparison`, `AlgorithmComparison` | Matched columns, neutral headings, derived bounds green |
+| Applying a definition | `ApplyDefinition` | Retain source; rigid travel; local substitution; one visible result |
+| Section frame and heading | `Slide`, `SlideLayout`, scene header | Fixed heading and safe-content regions |
+
+Reuse the established proof rail in every proof: definitions, claim, base case,
+induction hypothesis, inductive step. Keep the desired interpretation with the
+claim and the actual recurrence under definitions. Retain its rows when changing
+an induction parameter or base case.
+
+A miniature recap scales the same cells as a group. A wider symbolic expression
+may reserve a wider `StateCell`; it keeps the same height, ink, corners, and border.
+A contiguous two-dimensional table has a different purpose and uses `DPTable`.
+It is not a replacement for the dependency picture or parameter-count argument.
+
+Before changing a repeated visual, inventory its earlier and later occurrences.
+Check rendered representatives together. A component improvement is incomplete
+when the opening still contains an obsolete local version of that component.

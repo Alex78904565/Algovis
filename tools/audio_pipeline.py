@@ -144,6 +144,36 @@ def mute_clip_head(
     return cleaned
 
 
+def insert_verified_master_pauses(samples, rate, pauses):
+    """Insert pauses at reviewed quiet seams, never at detected speech.
+
+    Times refer to the unedited master. Only a four-millisecond quiet edge
+    fade changes existing samples; callers must translate later timing data.
+    The peak check rejects a stale edit if the recording has changed.
+    """
+    if samples.dtype != np.int16 or samples.ndim != 1:
+        raise ValueError("Pause edits require mono PCM16")
+    output=samples.copy();inserted=0;records=[];last=-1
+    for pause in sorted(pauses,key=lambda item:float(item['at'])):
+        at,seconds=float(pause['at']),float(pause['seconds'])
+        if not math.isfinite(at) or not math.isfinite(seconds) or at<=last or seconds<=0:
+            raise ValueError("Pause points must be distinct and durations positive")
+        point=round(at*rate);window=max(1,round(.01*rate));fade=max(1,round(.004*rate))
+        if point-window<0 or point+window>len(samples):
+            raise ValueError("Pause point needs a complete quiet window")
+        peak=float(np.max(np.abs(samples[point-window:point+window].astype(np.int32))))/32768
+        if peak>float(pause.get('maximum_quiet_peak',.004)):
+            raise ValueError(f"Pause at {at:.3f}s intersects speech or non-quiet audio")
+        position=point+inserted;length=round(seconds*rate)
+        if length<1:raise ValueError("Pause must contain at least one sample")
+        output[position-fade:position]=np.rint(output[position-fade:position]*np.linspace(1,0,fade)).astype(np.int16)
+        output[position:position+fade]=np.rint(output[position:position+fade]*np.linspace(0,1,fade)).astype(np.int16)
+        output=np.concatenate((output[:position],np.zeros(length,dtype=np.int16),output[position:]))
+        records.append({'at':at,'seconds':length/rate,'inserted_samples':length,'quiet_peak':peak})
+        inserted+=length;last=at
+    return output,records
+
+
 def mute_internal_artifacts(
     samples: np.ndarray,
     rate: int,
@@ -900,6 +930,14 @@ def assemble(
                 "choose a smaller gain"
             )
         master = np.rint(master.astype(np.float64) * gain).astype(np.int16)
+    master,pause_records=insert_verified_master_pauses(master,target_rate,edits.get('master_pause_insertions',[]))
+    if pause_records:
+        for chunk in assembly:
+            start,end=chunk['master_start'],chunk['master_end']
+            chunk['master_start']=round(start+sum(p['seconds'] for p in pause_records if p['at']<=start),6)
+            chunk['master_end']=round(end+sum(p['seconds'] for p in pause_records if p['at']<=end),6)
+            inside=[p for p in pause_records if start<p['at']<end]
+            if inside:chunk['master_pause_insertions']=inside
     master_path = AUDIO_ROOT / "masters" / f"{section}.wav"
     write_pcm16(master_path, master, target_rate)
 
@@ -914,6 +952,7 @@ def assemble(
         "master_gain_db": master_gain_db,
         "edits": edits,
         "duration": round(len(master) / target_rate, 6),
+        "master_pause_insertions": pause_records,
         "chunks": assembly,
     }
     (alignment_dir / f"{section}.assembly.json").write_text(

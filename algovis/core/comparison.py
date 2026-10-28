@@ -23,7 +23,7 @@ class AlgorithmComparison(VGroup):
             font_size=font_size, theme=theme,
         )
         self.panels = VGroup(self.naive, self.optimized).arrange(RIGHT, buff=gap, aligned_edge=UP)
-        self.naive_runtime = MathTex(naive_runtime, color=theme.danger).next_to(
+        self.naive_runtime = MathTex(naive_runtime, color=theme.success).next_to(
             self.naive, DOWN, buff=DEFAULT_SPACING.normal,
         )
         self.optimized_runtime = MathTex(optimized_runtime, color=theme.success).next_to(
@@ -60,9 +60,9 @@ class AlgorithmComparison(VGroup):
     def step(self, naive_line=None, optimized_line=None, *animations):
         parts = list(animations)
         if naive_line is not None:
-            parts.append(self.naive.highlight_line(naive_line, color=self.theme.danger))
+            parts.append(self.naive.highlight_line(naive_line, color=self.theme.primary))
         if optimized_line is not None:
-            parts.append(self.optimized.highlight_line(optimized_line, color=self.theme.success))
+            parts.append(self.optimized.highlight_line(optimized_line, color=self.theme.primary))
         return AnimationGroup(*parts)
 
 
@@ -121,7 +121,7 @@ class RecurrenceComparison(VGroup):
         self.panels = VGroup(self.recursive, self.array).arrange(
             RIGHT, buff=DEFAULT_SPACING.section, aligned_edge=UP,
         )
-        self.naive_runtime = MathTex(naive_runtime, color=theme.danger).next_to(
+        self.naive_runtime = MathTex(naive_runtime, color=theme.success).next_to(
             self.recursive, DOWN, buff=DEFAULT_SPACING.normal,
         )
         self.optimized_runtime = MathTex(optimized_runtime, color=theme.success).next_to(

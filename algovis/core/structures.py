@@ -12,6 +12,37 @@ class CellState(enum.Enum):
     CHOSEN = "chosen"
 
 
+class StateCell(VGroup):
+    """The standard separated state/value cell used throughout a lesson.
+
+    Keep the box and label independently addressable for staged population.
+    Scale a whole row for a miniature recap; do not invent a second cell style.
+    ``color`` controls the border, while the value keeps its neutral ink.
+    """
+
+    def __init__(self, value, *, width=1.06, height=.78, value_scale=.64,
+                 color=None, theme=DEFAULT_THEME, **kwargs):
+        self.theme = theme
+        self.box = RoundedRectangle(
+            width=width, height=height, corner_radius=.07,
+            stroke_color=color or theme.primary, stroke_width=2.2,
+            fill_color=theme.background, fill_opacity=.94)
+        self.label = MathTex(str(value), color=theme.foreground).scale(value_scale)
+        if self.label.width > width-.16:
+            raise ValueError("StateCell value exceeds its width; reserve a wider cell")
+        self.label.move_to(self.box)
+        super().__init__(self.box, self.label, **kwargs)
+
+
+class StateRow(VGroup):
+    """A row of the standard cells, with room for a plus or short arrow."""
+
+    def __init__(self, values, *, gap=.42, theme=DEFAULT_THEME, **cell_options):
+        super().__init__(*[StateCell(value, theme=theme, **cell_options)
+                           for value in values])
+        self.arrange(RIGHT, buff=gap)
+
+
 class DPTable(VGroup):
     """An indexed, value-aware dynamic-programming table."""
 
