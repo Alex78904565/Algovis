@@ -54,6 +54,40 @@ class CatalogRebuildTests(unittest.TestCase):
         self.assertFalse(review.request_render())
         self.assertTrue(review._render_requested)
 
+    def test_continuation_rebuilds_follow_the_artwork_dependency_order(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory); catalog = self.make_catalog(root)
+            catalog = ReviewCatalog(catalog.reviews, 'a', 'test', continuations={'b':'a','c':'b'})
+            catalog.active_section = 'c'
+            self.assertEqual(catalog.queue_source_changes([root/'a.json']), ['a','b','c'])
+            self.assertIs(catalog.reviews['c']._continuation_parent, catalog.reviews['b'])
+            self.assertEqual(self.requests, ['a','b','c'])
+
+    def test_continuation_cycles_or_reversed_dependencies_are_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            catalog = self.make_catalog(Path(directory))
+            with self.assertRaisesRegex(ValueError, 'catalog order'):
+                ReviewCatalog(catalog.reviews, 'a', 'test', continuations={'a':'b'})
+
+    def test_successor_waits_outside_manim_lock_until_predecessor_finishes(self):
+        parent_entered, release_parent, child_entered = threading.Event(), threading.Event(), threading.Event()
+        parent, child = object.__new__(ReviewServer), object.__new__(ReviewServer)
+        for review in (parent, child):
+            review._render_lock = threading.Lock()
+            review.render_status = SimpleNamespace(state='rendering', message='', started_at=None)
+        child._continuation_parent = parent
+        def parent_work():
+            parent_entered.set(); release_parent.wait(2); parent.render_status.state = 'ready'
+        parent._render_once, child._render_once = parent_work, child_entered.set
+        one, two = threading.Thread(target=parent._render_worker), threading.Thread(target=child._render_worker)
+        two.start(); one.start()
+        self.assertTrue(parent_entered.wait(2))
+        try:
+            self.assertFalse(child_entered.wait(.05))
+        finally:
+            release_parent.set(); one.join(2); two.join(2)
+        self.assertTrue(child_entered.is_set())
+
     def test_manual_and_catalog_renders_cannot_enter_manim_at_the_same_time(self):
         first_entered, release_first, second_entered = threading.Event(), threading.Event(), threading.Event()
         first, second = object.__new__(ReviewServer), object.__new__(ReviewServer)

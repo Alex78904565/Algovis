@@ -14,6 +14,22 @@ from algovis.review.server import ReviewCatalog, ReviewHTTPServer, ReviewServer
 
 
 class ReviewServerTests(unittest.TestCase):
+    def test_mismatched_section_cut_keeps_the_previous_published_video(self):
+        self.review._continuation_parent = Mock(video_path=self.review.video_path)
+        self.review._continuation_parent.render_status.state = 'ready'
+        previous = self.review.video_path
+        with patch.object(self.review, '_render_command', return_value=['fake']), \
+             patch('algovis.review.server.subprocess.run', return_value=subprocess.CompletedProcess([],0,'','')), \
+             patch.object(self.review, '_validate_render_timing'), \
+             patch.object(self.review, '_rendered_source', return_value=previous), \
+             patch('algovis.review.boundaries.compare_video_cut', return_value={'status':'fail'}), \
+             patch.object(self.review, '_publish_render') as publish:
+            self.review._render_worker()
+        publish.assert_not_called()
+        self.assertEqual(self.review.video_path, previous)
+        self.assertEqual(self.review.render_status.state, 'error')
+        self.assertIn('opening frame does not match', self.review.render_status.log_tail)
+
     def test_declared_alignment_drift_is_rejected_before_publication(self):
         self.review.manifest_path.parent.mkdir(parents=True,exist_ok=True)
         self.review.manifest_path.write_text(json.dumps({'animations':[],

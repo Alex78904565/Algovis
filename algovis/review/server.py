@@ -1054,6 +1054,18 @@ class ReviewServer:
         raise ValueError("Set --source (or a catalog section's source) to its Manim Python file")
 
     def _render_worker(self) -> None:
+        predecessor = getattr(self, '_continuation_parent', None)
+        if predecessor is not None:
+            # Wait before taking the global Manim lock: otherwise a successor
+            # can block the predecessor whose freshly saved artwork it needs.
+            while predecessor.render_status.state == 'rendering':
+                time.sleep(.1)
+            if predecessor.render_status.state == 'error':
+                with self._render_lock:
+                    self.render_status = RenderStatus(
+                        state='error', message='Waiting for the preceding section to render successfully',
+                        completed_at=_utc_now())
+                return
         with _MANIM_RENDER_LOCK:
             with self._render_lock:
                 self._render_started = True
@@ -1081,6 +1093,7 @@ class ReviewServer:
             if completed.returncode:
                 raise RuntimeError(log or f"Render exited {completed.returncode}")
             self._validate_render_timing()
+            self._validate_render_continuity()
             self._publish_render()
             self._refresh_preflight()
             with self._render_lock:
@@ -1204,7 +1217,7 @@ class ReviewServer:
                 "status": "audit_failed", "error": str(exc),
             })
 
-    def _publish_render(self) -> None:
+    def _rendered_source(self) -> Path:
         source = self.rendered_video_path
         if source is None:
             quality_dir = {
@@ -1218,6 +1231,22 @@ class ReviewServer:
             )
         if not source.exists():
             raise FileNotFoundError(f"Manim output was not created: {source}")
+        return source
+
+    def _validate_render_continuity(self) -> None:
+        predecessor = getattr(self, '_continuation_parent', None)
+        if predecessor is None:
+            return
+        from .boundaries import compare_video_cut
+        result = compare_video_cut(predecessor.video_path, self._rendered_source(),
+                                   self.review_dir/'continuity',
+                                   ignore_regions=getattr(self, '_continuity_ignore_regions', ()))
+        _atomic_json(self.review_dir/'continuity.json', result)
+        if result['status'] != 'pass':
+            raise ValueError('The opening frame does not match the preceding section; the previous preview is still available')
+
+    def _publish_render(self) -> None:
+        source = self._rendered_source()
         # Browsers can keep an open MP4 locked on Windows. Publishing each
         # revision to a fresh filename lets the old preview keep playing while
         # the server atomically switches new requests to the completed render.
@@ -1275,12 +1304,20 @@ class ReviewCatalog:
     reviews: dict[str, ReviewServer]
     default_section: str
     token: str
+    continuations: dict[str, str] = field(default_factory=dict)
+    continuity_ignore_regions: tuple = ()
 
     def __post_init__(self) -> None:
         if self.default_section not in self.reviews:
             raise ValueError(f"Unknown default review section: {self.default_section}")
         for review in self.reviews.values():
             review.token = self.token
+        positions = {sid: index for index, sid in enumerate(self.reviews)}
+        for sid, predecessor in self.continuations.items():
+            if sid not in positions or predecessor not in positions or positions[predecessor] >= positions[sid]:
+                raise ValueError('Section continuations must follow catalog order without cycles')
+            self.reviews[sid]._continuation_parent = self.reviews[predecessor]
+            self.reviews[sid]._continuity_ignore_regions = self.continuity_ignore_regions
         self.active_section = self.default_section
         self._lock = threading.RLock()
 
@@ -1325,8 +1362,16 @@ class ReviewCatalog:
                     direct.setdefault(Path(path).resolve(), set()).add(sid)
         affected = set(self.reviews) if paths-direct.keys() else set().union(
             *(direct[path] for path in paths))
+        # A changed ending also changes its successor's first frame. Carry the
+        # invalidation through the declared chain, even for an audio/cue edit.
+        while True:
+            expanded = affected | {sid for sid, parent in self.continuations.items() if parent in affected}
+            if expanded == affected:
+                break
+            affected = expanded
         with self._lock:
-            order = [self.active_section, *[sid for sid in self.reviews if sid != self.active_section]]
+            order = (list(self.reviews) if self.continuations else
+                     [self.active_section, *[sid for sid in self.reviews if sid != self.active_section]])
         requested = []
         for sid in order:
             if sid not in affected or not self.reviews[sid].scene_name:
@@ -1766,7 +1811,12 @@ def main(argv=None) -> None:
         reviews = {review.section_id: review}
         default_section = review.section_id
 
-    catalog = ReviewCatalog(reviews, default_section, token)
+    continuations = ({str(item['id']): str(item['continues'])
+                      for item in catalog_data['sections'] if item.get('continues')}
+                     if args.catalog else {})
+    ignore_regions = tuple(catalog_data.get('continuityIgnoreRegions', ())) if args.catalog else ()
+    catalog = ReviewCatalog(reviews, default_section, token, continuations=continuations,
+                            continuity_ignore_regions=ignore_regions)
     server = ReviewHTTPServer((args.host, args.port), ReviewRequestHandler)
     server.catalog = catalog  # type: ignore[attr-defined]
     stop = threading.Event()

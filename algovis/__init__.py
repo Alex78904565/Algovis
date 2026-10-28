@@ -28,6 +28,7 @@ from .frames import (
     LessonFrameStyle, PanelFrame, ProofFrame,
 )
 from .narration import NarrationCue, NarrationTrack
+from .continuity import SectionHandoff
 from .storyboard import (
     ACTION_VERBS, ATTENTION_STYLES, ENTRY_STYLES, EXIT_STYLES,
     SEMANTIC_ROLES, StoryAction, StoryAnimation,

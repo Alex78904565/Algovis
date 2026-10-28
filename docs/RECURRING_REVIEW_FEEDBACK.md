@@ -538,6 +538,16 @@ proof rails and successful local explanatory devices while making these repairs.
 
 ### Latest proof and runtime review
 
+- Independent clips still form one continuous lesson. Compare the actual last
+  frame with the next first frame; do not erase an array or tree at the end and
+  redraw it in a different position after the cut. The introduction carries an
+  empty Fibonacci row into the calculation. Shared factories own continued
+  objects; native `SectionHandoff` artwork carries a completed composition into
+  a deliberate topic change. Keep narration on its existing clock and rebuild
+  successors when their predecessor's ending changes. A matching cut alone does
+  not excuse clearing reasoning that the next sentence still uses. See
+  [section continuity](SECTION_CONTINUITY.md).
+
 - Sharing an array primitive is insufficient. The proof rails, developing
   equation columns, cases, comparison frames and chapter markers must also
   instantiate shared implementations. Use `ProofFrame`, `EquationFrame`,

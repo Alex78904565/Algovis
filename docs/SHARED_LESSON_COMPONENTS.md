@@ -1,5 +1,10 @@
 # Shared lesson components
 
+For artwork that continues across independently rendered sections, use the same
+factory on both sides and verify the actual cut. `SectionHandoff` also carries
+native artwork into a deliberate topic transition without changing narration
+time. See [section continuity](SECTION_CONTINUITY.md).
+
 Repeated visual formats are implemented in `algovis/frames.py`. Change
 `LessonFrameStyle` there to update the defaults for every caller on its next
 render. Scenes supply mathematical content and spoken cues, rather than drawing

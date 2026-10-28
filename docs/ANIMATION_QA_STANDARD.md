@@ -29,6 +29,10 @@ editorial checklist. An inherited cue is context, not a justification for a puls
 
 ## 2. Prefer one stable composition per idea
 
+- Treat independently rendered sections as one visual sequence. Inspect the
+  last/first frames together and the surrounding motion. Retain shared artwork
+  across the cut; make genuine topic changes deliberately within the narration
+  clock. Check the encoded assembly too. See [section continuity](SECTION_CONTINUITY.md).
 - Build an argument in place. Avoid turning consecutive clauses into separate
   slides.
 - Keep earlier useful work visible when the next line depends on it.
