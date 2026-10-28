@@ -1,6 +1,7 @@
 from manim import *
 
 from ..theme import DEFAULT_SPACING, DEFAULT_THEME
+from ..frames import PanelFrame
 
 
 class PseudocodePanel(VGroup):
@@ -20,11 +21,7 @@ class PseudocodePanel(VGroup):
             for line in lines
         ]).arrange(DOWN, aligned_edge=LEFT, buff=line_buff)
         panel_width = width or self.lines.width + 0.65
-        self.background = RoundedRectangle(
-            corner_radius=0.12, width=panel_width,
-            height=self.lines.height + 0.82, stroke_color=theme.muted,
-            fill_color=theme.surface, fill_opacity=0.95,
-        )
+        self.background = PanelFrame(panel_width, self.lines.height + 0.82, theme=theme, role="muted")
         self.lines.move_to(self.background).align_to(self.background, LEFT)
         self.lines.shift(RIGHT * 0.3 + DOWN * 0.12)
         self.title = Text(title, font_size=18, color=theme.primary)

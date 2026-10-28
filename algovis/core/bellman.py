@@ -6,6 +6,7 @@ from manim import (
 )
 
 from ..theme import DEFAULT_SPACING, DEFAULT_THEME
+from ..frames import CaseEquation
 
 
 class BellmanDerivation:
@@ -44,11 +45,9 @@ class BellmanDerivation:
         choice_lines = VGroup(*[
             Text(choice, font_size=22, color=theme.foreground)
             for choice in choices
-        ]).arrange(DOWN, aligned_edge=LEFT, buff=DEFAULT_SPACING.normal)
-        choice_brace = Brace(choice_lines, LEFT, color=theme.foreground)
+        ])
         lhs = MathTex(lhs_tex, color=theme.foreground)
-        lhs.next_to(choice_brace, LEFT, buff=DEFAULT_SPACING.tight)
-        english_equation = VGroup(lhs, choice_brace, choice_lines)
+        english_equation = CaseEquation(lhs, choice_lines, theme=theme)
         self.choices = self._prompt(self.QUESTIONS["choices"], english_equation)
         self.decomposition = self._prompt(
             self.QUESTIONS["recursion"], MathTex(decomposition, color=theme.foreground)

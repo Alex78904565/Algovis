@@ -36,6 +36,9 @@ from .preflight import finding_evidence, finding_id, legacy_id, store_decision
 
 MAX_JSON_BYTES = 8 * 1024 * 1024
 MAX_COMMENT_LENGTH = 4_000
+# All catalog scenes share Manim's media/TeX cache. Keep manual requests and
+# automatic catalog rebuilds on the same serial execution lane.
+_MANIM_RENDER_LOCK = threading.Lock()
 
 
 class ReviewHTTPServer(ThreadingHTTPServer):
@@ -175,6 +178,7 @@ class ReviewServer:
         self._transition_cache = []
         self._finding_evidence_cache = {}
         self._render_requested = False
+        self._render_started = False
         self.render_status = RenderStatus()
         self.revision = self._video_revision()
         self._watch_snapshot = self._watch_mtimes()
@@ -1015,10 +1019,13 @@ class ReviewServer:
             raise ValueError("No Manim scene is configured for rendering")
         with self._render_lock:
             if self.render_status.state == "rendering":
-                self._render_requested = True
+                # A queued scene has not imported its source yet. It will
+                # already see the newest edit when its turn begins.
+                if self._render_started:
+                    self._render_requested = True
                 return False
             self.render_status = RenderStatus(
-                state="rendering", message="Rendering with Manim…",
+                state="rendering", message="Queued for rendering…",
                 started_at=_utc_now(),
             )
         threading.Thread(target=self._render_worker, daemon=True).start()
@@ -1047,6 +1054,18 @@ class ReviewServer:
         raise ValueError("Set --source (or a catalog section's source) to its Manim Python file")
 
     def _render_worker(self) -> None:
+        with _MANIM_RENDER_LOCK:
+            with self._render_lock:
+                self._render_started = True
+                self.render_status.message = "Rendering with Manim…"
+                self.render_status.started_at = _utc_now()
+            try:
+                self._render_once()
+            finally:
+                with self._render_lock:
+                    self._render_started = False
+
+    def _render_once(self) -> None:
         try:
             command = self._render_command()
             completed = subprocess.run(
@@ -1086,6 +1105,7 @@ class ReviewServer:
         finally:
             rerender = False
             with self._render_lock:
+                self._render_started = False
                 if self._render_requested:
                     self._render_requested = False
                     rerender = True
@@ -1286,22 +1306,53 @@ class ReviewCatalog:
             })
         return summaries
 
+    def queue_source_changes(self, changed_paths) -> list[str]:
+        """Rebuild all dependents, not just the currently displayed section.
+
+        A declared scene file may serve many sections. An imported helper or
+        library change conservatively invalidates the full catalog; guessing
+        narrower dependencies could leave a clip with an obsolete component.
+        Requests coalesce while queued and execute under the shared render lock.
+        """
+        paths = {Path(path).resolve() for path in changed_paths}
+        if not paths:
+            return []
+        direct = {}
+        for sid, review in self.reviews.items():
+            for attribute in ("scene_source", "cue_path", "transcript_path", "audio_path"):
+                path = getattr(review, attribute, None)
+                if path is not None:
+                    direct.setdefault(Path(path).resolve(), set()).add(sid)
+        affected = set(self.reviews) if paths-direct.keys() else set().union(
+            *(direct[path] for path in paths))
+        with self._lock:
+            order = [self.active_section, *[sid for sid in self.reviews if sid != self.active_section]]
+        requested = []
+        for sid in order:
+            if sid not in affected or not self.reviews[sid].scene_name:
+                continue
+            self.reviews[sid].request_render()
+            requested.append(sid)
+        return requested
+
     def watch(self, stop: threading.Event) -> None:
         reference = self.reviews[self.default_section]
         dirty_at = None
+        changed_paths = set()
         snapshot = reference._watch_mtimes()
         while not stop.wait(0.5):
             current = reference._watch_mtimes()
             if current != snapshot:
+                changed_paths.update(path for path in current.keys() | snapshot.keys()
+                                     if current.get(path) != snapshot.get(path))
                 snapshot = current
                 dirty_at = time.monotonic()
             if dirty_at is not None and time.monotonic() - dirty_at >= 1.0:
-                with self._lock:
-                    review = self.reviews[self.active_section]
                 try:
-                    review.request_render()
+                    self.queue_source_changes(changed_paths)
                 except ValueError:
                     pass
+                changed_paths.clear()
                 dirty_at = None
 
 

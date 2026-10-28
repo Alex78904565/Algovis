@@ -80,12 +80,15 @@ do not independently center the rows of a developing explanation.
 | --- | --- | --- |
 | Separated numeric/state cells | `StateCell`, `StateRow` | Fixed cell height, rounded corners, border/fill, value size, roomy gaps |
 | A content-sized callout | `SlideScene.card` | The shared callout treatment; do not use it to improvise array cells |
-| Related equation/meaning rows | `ColumnLayout`, `LessonStyle.align_rows` | Center the completed block; give its rows a shared left edge |
+| Proof rail | `ProofFrame` | Shared labels, label/content columns and named row anchors |
+| Related equation/meaning rows | `EquationFrame`, `ColumnLayout`, `LessonStyle.align_rows` | Center the completed block; give its rows a shared left edge |
+| Cases and alternatives | `CaseEquation` | Shared neutral brace and left-aligned rows; keep existing mathematical objects |
+| Comparison panels and columns | `PanelFrame`, `ComparisonFrame` | Shared border, heading inset, columns and divider |
 | Peer mathematical statements | `LessonStyle.math`, `math_like`, `watch` | The same rendered type size after moves and substitutions |
 | Recursive calls and duplicate states | `RecursiveTree` | One node/edge lifecycle and the same node shape and status colors |
 | Recursion/DP comparison | `RecurrenceComparison`, `AlgorithmComparison` | Matched columns, neutral headings, derived bounds green |
 | Applying a definition | `ApplyDefinition` | Retain source; rigid travel; local substitution; one visible result |
-| Section frame and heading | `Slide`, `SlideLayout`, scene header | Fixed heading and safe-content regions |
+| Section frame and heading | `Slide`, `SlideLayout`, `ChapterMarker` | Fixed heading and safe-content regions |
 
 Reuse the established proof rail in every proof: definitions, claim, base case,
 induction hypothesis, inductive step. Keep the desired interpretation with the
@@ -100,3 +103,8 @@ It is not a replacement for the dependency picture or parameter-count argument.
 Before changing a repeated visual, inventory its earlier and later occurrences.
 Check rendered representatives together. A component improvement is incomplete
 when the opening still contains an obsolete local version of that component.
+
+See [shared component authoring and rebuild behavior](docs/SHARED_LESSON_COMPONENTS.md).
+Repeated geometry belongs in those components, rather than copied scene code.
+The reviewer rebuilds every dependent section after a watched shared-source
+change; it must not refresh only the section currently open.

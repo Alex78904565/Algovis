@@ -44,6 +44,12 @@ animations.
 
 See `slide_authoring_demo.py` for a complete renderable example.
 
+Use `ProofFrame`, `EquationFrame`, `CaseEquation`, `PanelFrame`, and
+`ComparisonFrame` for repeated lesson formats. They provide shared geometry
+without scheduling reveals or taking ownership of future objects. The chapter
+marker is `ChapterMarker`. See [the component guide](../docs/SHARED_LESSON_COMPONENTS.md)
+for the migration inventory and automatic catalog rebuild behavior.
+
 ### Plan columns without silently shrinking text
 
 `ColumnLayout` places named rows relative to a safe region. It never adds future

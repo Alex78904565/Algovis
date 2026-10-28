@@ -1,6 +1,7 @@
 from manim import *
 from .pseudocode import PseudocodePanel
 from ..theme import DEFAULT_SPACING, DEFAULT_THEME
+from ..frames import PanelFrame
 
 
 class AlgorithmComparison(VGroup):
@@ -96,16 +97,9 @@ class RecurrenceComparison(VGroup):
                 order.scale_to_fit_width(min(panel_width - 0.55, order.width))
                 content.add(order)
             content.arrange(DOWN, buff=DEFAULT_SPACING.normal)
-            background = RoundedRectangle(
-                corner_radius=0.12, width=panel_width,
-                height=max(1.75, content.height + 0.95), stroke_color=color,
-                fill_color=theme.surface, fill_opacity=0.95,
-            )
+            background = PanelFrame(panel_width, max(1.75, content.height + 0.95), theme=theme)
             content.move_to(background).shift(DOWN * 0.08)
-            heading = Text(title, font_size=18, color=theme.foreground)
-            heading.next_to(
-                background.get_top(), DOWN, buff=DEFAULT_SPACING.tight,
-            )
+            heading = background.heading(title)
             panel = VGroup(background, heading, content)
             panel.equation = equation
             panel.content = content

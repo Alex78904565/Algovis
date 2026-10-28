@@ -538,6 +538,16 @@ proof rails and successful local explanatory devices while making these repairs.
 
 ### Latest proof and runtime review
 
+- Sharing an array primitive is insufficient. The proof rails, developing
+  equation columns, cases, comparison frames and chapter markers must also
+  instantiate shared implementations. Use `ProofFrame`, `EquationFrame`,
+  `CaseEquation`, `PanelFrame`, `ComparisonFrame` and `ChapterMarker`; keep
+  their common geometry in `LessonFrameStyle`. Profile differences reserve
+  space for the content rather than creating another local visual style.
+  Check all dependents when a component changes. The source watcher must
+  queue all affected clips, with Manim executions serialized, rather than
+  leave earlier clips stale because another section was open.
+
 - Repeated objects must share their implementation, not merely resemble one
   another. Use `StateCell` / `StateRow` for the separated numerical/state rows
   in the introduction, Fibonacci construction, hand calculation, and stored

@@ -1,4 +1,5 @@
 """Reusable inductive-correctness proof visuals."""
+import textwrap
 
 from manim import (
     Create, DOWN, FadeIn, LaggedStart, LEFT, MathTex,
@@ -6,6 +7,7 @@ from manim import (
 )
 
 from ..theme import DEFAULT_SPACING, DEFAULT_THEME
+from ..frames import ProofFrame
 from .state_space import BinaryStateVector
 
 
@@ -16,29 +18,28 @@ class InductiveProof(VGroup):
                  claim="",
                  theme=DEFAULT_THEME, width=11.5, **kwargs):
         super().__init__(**kwargs)
+        self.frame = ProofFrame(theme=theme)
         entries = [
-            ("CLAIM", claim or conclusion, theme.primary),
-            ("INDUCTION MEASURE", measure, theme.primary),
+            ("DEFINITIONS", measure, theme.foreground),
+            ("CLAIM", claim or conclusion, theme.foreground),
             ("BASE CASE", base_case, theme.success),
-            ("INDUCTIVE HYPOTHESIS", hypothesis, theme.foreground),
-            ("INDUCTIVE STEP", step, theme.accent),
-            ("THEREFORE", conclusion, theme.success),
+            ("INDUCTION HYPOTHESIS", hypothesis, theme.foreground),
+            ("INDUCTIVE STEP", step, theme.foreground),
         ]
         self.rows = VGroup()
         for label, body, color in entries:
-            heading = Text(label, font_size=14, color=theme.muted)
             explanation = Text(body, font_size=21, color=color)
-            row = VGroup(heading, explanation).arrange(
-                DOWN, aligned_edge=LEFT, buff=DEFAULT_SPACING.tight,
-            )
-            if row.width > width:
-                row.scale_to_fit_width(width)
-            self.rows.add(row)
-        self.rows.arrange(
-            DOWN, aligned_edge=LEFT, buff=DEFAULT_SPACING.normal,
-        )
-        if self.rows.height > 5.1:
-            self.rows.scale_to_fit_height(5.1)
+            # Wrap words at the same type size instead of shrinking a long row.
+            line_length = len(body)
+            while explanation.width > min(width, 9.6) and line_length > 1:
+                line_length -= 1
+                explanation = Text(textwrap.fill(body, width=line_length), font_size=21, color=color)
+            if explanation.width > min(width, 9.6):
+                raise ValueError("Proof text exceeds its content column")
+            self.frame.place(label, explanation)
+            self.rows.add(VGroup(self.frame.labels_by_name[label], explanation))
+        self.conclusion = self.frame.place("conclusion",Text(conclusion,font_size=21,color=theme.success))
+        self.rows.add(self.conclusion)
         self.add(self.rows)
 
     def reveal(self, lag_ratio=0.16):

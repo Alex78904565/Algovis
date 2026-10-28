@@ -8,6 +8,7 @@ from manim import (
 
 from .trees import RecursiveTree
 from ..theme import DEFAULT_THEME
+from ..frames import PanelFrame
 from ..utils.effects import Pulse
 
 
@@ -221,11 +222,7 @@ class StateReframing(VGroup):
         self.theme = theme
 
         def card(label, equation, meaning, bound, runtime):
-            frame = RoundedRectangle(
-                width=panel_width, height=3.45, corner_radius=0.14,
-                stroke_color=theme.primary, stroke_width=2.3,
-                fill_color=theme.surface, fill_opacity=0.96,
-            )
+            frame = PanelFrame(panel_width, 3.45, theme=theme)
             heading = Text(label, font_size=16, color=theme.foreground)
             formula = MathTex(equation, color=theme.primary).scale(0.82)
             explanation = Text(
