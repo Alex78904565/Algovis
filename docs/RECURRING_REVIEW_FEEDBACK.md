@@ -23,6 +23,14 @@ spoken word timing in the review even when endpoints pass.
 
 Shared timeline checks from the migration:
 
+- Identical TeX can have different container hierarchies (a group of references
+  versus an editable `MathRow`). Inspect the final part of the copy, not only its
+  travel and settled endpoints. Match corresponding glyphs for the temporary
+  copy; never turn baseline anchors or term wrappers into letters. Adopt the
+  original destination with its named parts intact. Keep numerical parameters
+  and unit labels in separate named parts, so substituting `n = 191` retains
+  `states` and the work calculation still reads states times additions per state.
+
 - Verify the cue's meaning before its timing. Compare the actual visible text or
   action with the first word of the matched phrase. Leading filler can be aligned
   precisely and still reveal an answer too early: "is just zero" starts before

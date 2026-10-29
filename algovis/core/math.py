@@ -186,7 +186,33 @@ class ApplyDefinition(AnimationGroup):
         # chunk of the slide being picked up and could obscure other rows.
         # Keep a visible copy throughout arrival and local substitution;
         # fading it out before revealing the result caused a blank frame.
-        self.travelling_formula = definition.copy()
+        # Editable rows intentionally keep their named terms and baseline
+        # anchors. Their hierarchy need not resemble the reference's VGroup
+        # hierarchy, even when both paint the identical formula. Match the
+        # actual TeX glyphs for the transient copy instead of making Manim
+        # pad term containers/anchors into duplicate letters on arrival.
+        def ink(mobject):
+            return [part for part in mobject.family_members_with_points()
+                    if not isinstance(part, VectorizedPoint)]
+
+        source_ink, target_ink = ink(definition), ink(result)
+        self._glyph_aligned_copy = bool(
+            source_text and source_text == target_text
+            and getattr(result, '_algovis_preserve_structure', False)
+            and len(source_ink) == len(target_ink)
+            and all(len(a.points) == len(b.points)
+                    for a, b in zip(source_ink, target_ink))
+        )
+
+        def copy_formula(mobject):
+            if not self._glyph_aligned_copy:
+                return mobject.copy()
+            copied = VGroup(*[part.copy() for part in ink(mobject)])
+            copied._algovis_label = formula_text(mobject)
+            return copied
+
+        self._copy_formula = copy_formula
+        self.travelling_formula = copy_formula(definition)
         self.traveller = self.travelling_formula.set_z_index(30)
         landing = self.traveller.copy().move_to(result)
         self.landing = landing
@@ -201,9 +227,10 @@ class ApplyDefinition(AnimationGroup):
         arrival = [Succession(*travel, run_time=0.70)]
         if application is not None:
             arrival.append(Succession(Wait(0.55), FadeOut(application, run_time=0.15)))
+        self._arrival_target = copy_formula(result) if self._glyph_aligned_copy else result
         transfer = Succession(
             AnimationGroup(*arrival, lag_ratio=0, run_time=0.70),
-            Transform(self.traveller, result, run_time=0.30),
+            Transform(self.traveller, self._arrival_target, run_time=0.30),
         )
         super().__init__(
             transfer,
@@ -217,7 +244,9 @@ class ApplyDefinition(AnimationGroup):
         # starts. Copy its visible geometry now, rather than reviving the
         # position it had when the animation sequence was constructed.
         self._adopted = False
-        self.traveller.become(self.definition.copy()).set_z_index(30)
+        self.traveller.become(self._copy_formula(self.definition)).set_z_index(30)
+        if self._glyph_aligned_copy:
+            self._arrival_target.become(self._copy_formula(self.result))
         self.landing.become(self.traveller.copy().move_to(self.result))
         for waypoint, position in zip(self.waypoints, self.waypoint_positions):
             waypoint.become(self.traveller.copy().move_to(position))

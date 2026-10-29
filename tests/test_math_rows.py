@@ -1,6 +1,6 @@
 import unittest
 import numpy as np
-from manim import BLUE, Scene, Transform
+from manim import BLUE, DOWN, MathTex, Scene, Transform, VGroup, VectorizedPoint
 from algovis import ApplyDefinition, MathRow
 
 
@@ -84,6 +84,53 @@ class MathRowTests(unittest.TestCase):
         ApplyDefinition(source,None,destination)
         self.assertEqual(destination.parts,parts)
         self.assertEqual(destination.native_layout_findings(),[])
+
+    def test_equivalent_group_to_editable_row_copy_keeps_glyphs_stable_on_arrival(self):
+        source = VGroup(
+            MathTex('(', 'n', r'\ \text{states}', ')'),
+            MathTex(r'\times'),
+            MathTex(r'(\le1\ \text{addition per state})'),
+        ).arrange(buff=.16).scale(.72)
+        destination = MathRow({
+            'open': '(', 'n': 'n', 'units': r'\ \text{states})', 'times': r'\times',
+            'work': r'(\le1\ \text{addition per state})',
+        }, font_size=48*.72).shift(2*DOWN)
+        parts = dict(destination.parts)
+        glyphs = lambda mob: [p for p in mob.family_members_with_points()
+                             if not isinstance(p, VectorizedPoint)]
+        expected = [p.points.copy() for p in glyphs(destination)]
+        transfer = ApplyDefinition(source, None, destination)
+        # A composed sequence may move the reference before activating its copy.
+        source.shift([1, .3, 0])
+        original = source.get_all_points().copy()
+        scene = Scene(); scene.add(source)
+        transfer._setup_scene(scene); transfer.begin(); transfer.interpolate(0)
+        for actual, reference in zip(glyphs(transfer.traveller), glyphs(source)):
+            np.testing.assert_allclose(actual.points, reference.points)
+        transfer.interpolate(.70)
+        landed = [p.points.copy() for p in glyphs(transfer.traveller)]
+        for alpha in (.75, .85, .95):
+            transfer.interpolate(alpha)
+            actual = glyphs(transfer.traveller)
+            self.assertEqual(len(actual), len(expected))
+            progress = transfer.animations[0].animations[1].rate_func((alpha-.7)/.3)
+            for glyph, start, end in zip(actual, landed, expected):
+                np.testing.assert_allclose(glyph.points, (1-progress)*start+progress*end, atol=1e-7)
+        transfer.finish(); transfer.clean_up_from_scene(scene)
+        np.testing.assert_allclose(source.get_all_points(), original)
+        self.assertEqual(destination.parts, parts)
+        self.assertEqual(destination.native_layout_findings(), [])
+        self.assertNotIn(transfer.traveller, scene.get_mobject_family_members())
+        for actual, points in zip(glyphs(destination), expected):
+            np.testing.assert_allclose(actual.points, points)
+        numerical = destination.next_layout(n='191')
+        for motion in destination.motions_to(numerical):
+            motion.begin(); motion.finish()
+        destination.commit(numerical, scene)
+        self.assertEqual(destination.slot_tex['n'], '191')
+        self.assertEqual(destination.slot_tex['units'], r'\ \text{states})')
+        self.assertIs(destination.part('units'), parts['units'])
+        self.assertEqual(destination.native_layout_findings(), [])
 
     def test_additive_worked_examples_cannot_publish_an_incorrect_equality(self):
         row=MathRow({'immediate':'5','plus':'+','future':'0','eq':'=','total':'0'}).require_sum()

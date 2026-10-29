@@ -69,6 +69,12 @@ in the next view. Ordinary Manim `mobject.copy()` remains an unrelated copy;
 explicit provenance avoids accidentally turning every cloned style or target
 into an instructional transfer.
 
+`ApplyDefinition` also supports equivalent TeX landing in an editable `MathRow`.
+Its travelling copy matches visible glyphs rather than incompatible term/group
+wrappers and invisible baseline anchors. The destination keeps its named parts
+and native layout, so later substitutions remain editable. Name the parameter
+separately from its units; replacing a count should not replace `states` as well.
+
 The transition rules are:
 
 - The same object in both views stays present and moves only if needed.
