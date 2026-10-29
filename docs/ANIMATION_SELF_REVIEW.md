@@ -7,6 +7,19 @@ approval status, and willingness to watch another preview do not limit it.
 
 ## Required evidence
 
+Before checking timing differences, review each active cue as a semantic pair:
+**spoken referent/action → visible target/change**. Read the surrounding words,
+not only the cue name. Record why the first matched word introduces that target.
+Literal values should not appear on earlier filler words. A compound expression
+may need separate cues for its factors and its final result. Then check the
+specific word occurrence and the actual encoded start. These are two independent
+checks; clock accuracy cannot establish semantic correctness.
+
+For each changed cue, inspect encoded frames before, during and after its start.
+Include the gap between consecutive repeated-word reveals. Preserve valid action
+cues and definition-copy routes that already follow the explanation. Do not
+replace them indiscriminately with the last noun or the final result's timestamp.
+
 Generate a ledger from the **rendered timeline**, the narration cues, and the
 timestamped spoken words:
 

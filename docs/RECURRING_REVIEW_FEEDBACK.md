@@ -23,6 +23,16 @@ spoken word timing in the review even when endpoints pass.
 
 Shared timeline checks from the migration:
 
+- Verify the cue's meaning before its timing. Compare the actual visible text or
+  action with the first word of the matched phrase. Leading filler can be aligned
+  precisely and still reveal an answer too early: "is just zero" starts before
+  "zero", and "your car" does not introduce the capacity symbol T. Use the
+  measured referent word and its specific occurrence. Inspect the encoded frames
+  on both sides of it. For runtime products, retain the final layout but reveal
+  each factor and then the result as each is explained. Keep legitimate action
+  introductions and copied-definition applications; this is a semantic review,
+  not a blanket ban on conjunctions or sentence-level cues.
+
 - Layout containers can already be dissolved into child roots when a section
   handoff is retired. Remove the retiring family's actual artwork, not only its
   old container. Inspect the first move and the later clear: a leftover empty

@@ -23,6 +23,19 @@ editorial checklist. An inherited cue is context, not a justification for a puls
 - A visual may remain visible after its trigger, but it may not anticipate a
   claim the viewer has not heard yet.
 - Silence is usable pacing room. Do not fill it with unrelated motion.
+- Check semantic anchoring separately from clock alignment. First read the target
+  text or intended action and select the word that introduces that specific thing;
+  then verify that the encoded change starts on that word. A perfectly timed
+  reveal on "we'll say" still anticipates "whole numbers" later in the sentence.
+- A phrase cue starts on its **first word**. Narrow a literal value, symbol or
+  name to its spoken referent rather than preceding filler ("is just zero" versus
+  "zero"). For repeated words, verify the measured occurrence as well as the text.
+- Keep meaningful action introductions: "plus" may introduce a plus sign, and
+  applying a copied definition can start on the instruction to apply it so that
+  the copy arrives as the resulting expression is spoken. Do not mechanically
+  strip every conjunction or delay a whole derivation until its final answer.
+- When factors are explained separately, reveal the corresponding factors in
+  that order; do not reveal the final runtime on the first factor's cue.
 - Check that the chosen phrase introduces the thought, rather than merely
   containing a matching word later in the sentence. Measure the actual reveal
   after any cleanup; a correctly timestamped cue alone is insufficient.

@@ -26,6 +26,22 @@ class NarrationTrackTests(unittest.TestCase):
         self.assertEqual(anchor["start"], 2)
         self.assertEqual(scene.renderer.time, 2)
 
+    def test_repeated_values_use_their_own_spoken_occurrence(self):
+        track = NarrationTrack("unused.wav", 6, [
+            NarrationCue("first_cell", 3.14, "one"),
+            NarrationCue("second_cell", 3.92, "one"),
+            NarrationCue("leading_conjunction", 3.92, "and one"),
+        ], words=[
+            {"word": "one", "start": 3.14, "end": 3.40},
+            {"word": "and", "start": 3.44, "end": 3.66},
+            {"word": "one", "start": 3.92, "end": 4.15},
+        ])
+        self.assertEqual(track.word_anchor("first_cell")["start"], 3.14)
+        self.assertEqual(track.word_anchor("second_cell")["start"], 3.92)
+        # A numeric hint selects the occurrence; it cannot skip a phrase's
+        # first word. Authors must select the referent rather than its lead-in.
+        self.assertEqual(track.word_anchor("leading_conjunction")["start"], 3.44)
+
     def test_missed_word_fails_instead_of_silently_playing_late(self):
         track, scene = self.strict_track(2.4)
         with self.assertRaisesRegex(RuntimeError, "shorten or reschedule"):
