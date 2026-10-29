@@ -33,6 +33,10 @@ Shared timeline checks from the migration:
   Checking only the final color misses a distracting temporary color reversal.
 - Resolve each verified word once. Nested animation preparation must not add a
   second, frame-rounded wait; delayed phases cannot introduce future labels.
+- A phrase cue starts on its first word. For repeated values, anchor each
+  reveal to the value word at its own measured time: "and one" starts on
+  "and", even when its numeric cue time points to the second "one". Check
+  the frames between consecutive reveals as well as after both are visible.
 - Test component motion on mixed image/vector groups too. Detached planning must
   support the same artwork as the actual interpolation, without a scene bypass.
 
