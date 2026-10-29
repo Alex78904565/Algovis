@@ -41,11 +41,23 @@ class Move(Transform):
         super().begin()
         from .layout import measured_font_size
         self._font_motions = []
+        target_sizes = {}
+        def collect_sizes(node, inherited=None):
+            size = measured_font_size(node)
+            if size is None:
+                size = inherited
+            target_sizes[id(node)] = size
+            for child in node.submobjects:
+                collect_sizes(child, size)
+        collect_sizes(self.target_mobject)
         for live, start, end in zip(self.mobject.get_family(),
                                     self.starting_mobject.get_family(),
                                     self.target_mobject.get_family()):
             if hasattr(start, '_algovis_font_reference'):
-                a, b = measured_font_size(start), measured_font_size(end)
+                # A new ordinary MathTex can supply the common font size on
+                # its parent, while its individual TeX pieces have no font
+                # property. Retained peers still need that parent calibration.
+                a, b = measured_font_size(start), target_sizes[id(end)]
                 if a is not None and b is not None:
                     self._font_motions.append((live, a, b))
 

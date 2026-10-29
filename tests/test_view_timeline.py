@@ -249,6 +249,19 @@ class ViewTimelineTests(unittest.TestCase):
             self.assertAlmostEqual(measured_font_size(part), 25.2)
         self.finish(program)
 
+    def test_new_unwatched_tex_pieces_inherit_their_parent_point_size(self):
+        from manim import MathTex
+        from algovis.layout import LessonStyle, measured_font_size
+        old = MathTex('v_i', '+', font_size=25.872)
+        LessonStyle().watch('proof', old)
+        destination = MathTex('v_k', '+', font_size=25.872)
+        operation = Move(old, destination)
+        operation.begin()
+        operation.interpolate(.5)
+        for part in old.submobjects:
+            self.assertAlmostEqual(measured_font_size(part), 25.872)
+        operation.finish()
+
 
 class DefaultAlignmentTests(unittest.TestCase):
     def test_a_column_aligns_new_items_without_offsets(self):
