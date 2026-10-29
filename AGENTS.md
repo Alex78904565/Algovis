@@ -1,5 +1,13 @@
 # Working on Algovis lessons
 
+The recorded lesson uses the view infrastructure throughout. Keep that migration
+complete: extend the shared compiler/components for unsupported animation rather
+than adding a procedural scene bypass. Groups are layout containers whose child
+identities survive separation and regrouping. Prefer aligned layout defaults;
+explicit offsets require a reason and an alignment review. Use object/word
+attention declarations for recurring focus; preserve semantic paint and verified
+word timing. Shared-helper cleanup must also pass through the view compiler.
+
 Before changing a lesson, read:
 
 - `docs/RECURRING_REVIEW_FEEDBACK.md`
@@ -38,7 +46,7 @@ rendered start with the timestamped words, including time consumed by preceding
 animations. An inherited cue does not justify a later pulse. Prefer stillness
 over an effect without an instructional purpose.
 
-Use `play_on_cue` for new or repaired spoken content reveals and changes.
+Use `view_on_cue` for new or repaired spoken content reveals and changes.
 Load timestamped `transcriptWords` in the narration document. Missing or
 approximate word alignment must be repaired from the recording; do not weaken
 the check or substitute a guessed time. A render that misses a declared word

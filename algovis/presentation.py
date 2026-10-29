@@ -266,6 +266,11 @@ class SlideSceneMixin:
             for old, new in zip(source.submobjects, destination.submobjects):
                 update(old, new, size)
         for animation in animations:
+            if getattr(animation, '_algovis_view_transition', False):
+                inner = getattr(animation, 'animation', None)
+                if inner is not None:
+                    SlideScene._refresh_review_labels((inner,))
+                continue
             # TransformFromCopy internally reverses source/destination and
             # runs the interpolation backwards. Its visible destination keeps
             # its own text and font; copying the source metadata would lie.
@@ -353,6 +358,16 @@ class SlideSceneMixin:
             )
 
     def _append_review_animation(self, animation, start, end, play_index, path):
+        trigger = getattr(animation, '_view_word_trigger', None)
+        if trigger is not None:
+            previous = getattr(self, '_review_active_cue', {})
+            self._review_active_cue = {'cue':trigger['cue'],'cueTime':trigger['time'],'cueOffset':0.,
+                                      'wordTiming':{**trigger,'edge':'start'}}
+            try:
+                self._append_review_animation(animation.animation, start, end, play_index, path+'.word')
+            finally:
+                self._review_active_cue = previous
+            return
         if getattr(animation, '_algovis_view_transition', False):
             inner = getattr(animation, 'animation', None)
             if inner is not None:
@@ -421,7 +436,11 @@ class SlideSceneMixin:
         self._review_animations.append({
             "id": f"play-{play_index + 1:04d}-{path}",
             "play": play_index,
-            "kind": type(animation).__name__.lstrip("_"),
+            "kind": {"Reveal":"FadeIn", "Retire":"FadeOut", "Move":"Transform",
+                     "ReplaceShape":"ReplacementTransform", "Draw":"Create", "WriteView":"Write",
+                     "Grow":"GrowFromCenter", "DrawArrow":"GrowArrow"}.get(
+                         type(animation).__name__, type(animation).__name__.lstrip("_")),
+            "authoringKind": type(animation).__name__.lstrip("_"),
             "label": label or type(animation).__name__.lstrip("_"),
             "fromLabel": initial.get("fromLabel", label),
             "toLabel": initial.get("toLabel", target_label),
@@ -662,6 +681,16 @@ class SlideSceneMixin:
         if not str(reason).strip():
             raise ValueError("A word-timed content change needs an instructional reason")
         anchor = self.narration.wait_for_word(self, name, edge=edge)
+        return self._play_aligned_word(name, anchor, *animations, run_time=run_time,
+                                       reason=reason, edge=edge)
+
+    def _play_aligned_word(self, name, anchor, *animations, run_time, reason, edge='start'):
+        """Play after one verified wait; never round a second tiny wait upward."""
+        if not str(reason).strip():
+            raise ValueError('A word-timed content change needs an instructional reason')
+        tolerance = 1/float(self.camera.frame_rate)+.015
+        if abs(self.narration.elapsed(self)-anchor[edge]) > tolerance:
+            raise RuntimeError(f'Word cue {name!r} is no longer aligned')
         self._last_word_event = {'cue':name, 'trigger':self.narration.cues[name].phrase,
                                 'time':anchor[edge], 'edge':edge,
                                 'narrationStart':self.narration.start_time}

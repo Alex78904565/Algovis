@@ -9,7 +9,7 @@ def first_line_of(content):
     """Use the first explicit row of a stacked group, or a single formula."""
     if type(content) is VGroup and len(content):
         return first_line_of(content[0])
-    if isinstance(content,Text) and '\n' in content.text:
+    if isinstance(content,Text) and '\n' in getattr(content,'original_text',content.text):
         glyphs=[g for g in content.submobjects if g.has_points() and g.height>0]
         if glyphs:
             highest=max(g.get_y() for g in glyphs)

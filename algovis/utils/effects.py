@@ -1,4 +1,5 @@
 from manim import *
+import numpy as np
 
 
 class DeferredAnimation(Animation):
@@ -68,6 +69,19 @@ class Pulse(ApplyMethod):
         self._algovis_attention = {"trigger": trigger, "reason": reason}
         kwargs.setdefault("rate_func", there_and_back)
         super().__init__(mobject.scale, scale_factor, **kwargs)
+
+    def interpolate_submobject(self, submobject, starting_submobject, target_copy, alpha):
+        # Transform normally interpolates paint as well as points. A concurrent
+        # status change must keep its live paint while this effect changes scale.
+        paint = {}
+        for name in ('fill_rgbas', 'stroke_rgbas', 'background_stroke_rgbas',
+                     'stroke_width', 'background_stroke_width'):
+            if hasattr(submobject, name):
+                value = getattr(submobject, name)
+                paint[name] = value.copy() if isinstance(value, np.ndarray) else value
+        super().interpolate_submobject(submobject, starting_submobject, target_copy, alpha)
+        for name, value in paint.items():
+            setattr(submobject, name, value)
 
 
 class ReplaceContent(Succession):

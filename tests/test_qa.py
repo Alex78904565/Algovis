@@ -110,6 +110,18 @@ def scene(self):
         self.assertTrue(all(issue.cue == "explain" for issue in issues))
         self.assertTrue(all(issue.time == 11.25 for issue in issues))
 
+    def test_view_timeline_and_object_bindings_are_audited_as_word_timed_controls(self):
+        tree=ast.parse('''
+def scene(self):
+    self.bind_attention(value, 'value', reason='Name it')
+    self.wait(.5)
+    self.view_on_cue('value', Reveal(value), run_time=.5, reason='Name it')
+    self.transition_view_on_cue('next', Retire(value), run_time=.5, reason='Continue')
+''')
+        self.assertEqual(audit_source_method(tree,'scene',{'value','next'},'scene.py'),[])
+        issues=audit_source_method(tree,'scene',set(),'scene.py')
+        self.assertEqual(sum('unknown cue' in issue.message for issue in issues),3)
+
 
 if __name__ == "__main__":
     unittest.main()

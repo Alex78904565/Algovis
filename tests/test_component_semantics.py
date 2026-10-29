@@ -10,6 +10,18 @@ from algovis import (CallNode, DEFAULT_THEME, LessonStyle, MathRow, Proof,
 
 
 class SemanticPropertyTests(unittest.TestCase):
+    def test_scale_attention_preserves_live_semantic_paint_at_intermediate_frames(self):
+        from algovis import Pulse
+        cell = StateCell('5')
+        status, pulse = SemanticChange(cell, status='computed'), Pulse(cell)
+        status.begin(); pulse.begin()
+        status.interpolate(.5)
+        expected = cell.box.get_stroke_color()
+        pulse.interpolate(.5)
+        self.assertEqual(cell.box.get_stroke_color(), expected)
+        status.finish(); pulse.finish()
+        self.assertEqual(cell.box.get_stroke_color(), cell.theme.success)
+
     def test_evaluation_overrides_status_without_discarding_the_status(self):
         obj=set_semantics(MathTex('O(2^n)'),status='computed',evaluation='bad')
         self.assertEqual(obj.get_color(),DEFAULT_THEME.danger)

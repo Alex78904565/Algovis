@@ -138,6 +138,8 @@ def capture_snapshot(scene, width, height):
             item["fontSize"] = round(float(font_size), 4)
         if getattr(mobject, "_algovis_font_container", False):
             item["fontContainer"] = True
+        if hasattr(mobject,'_algovis_relative_font_scale'):
+            item['relativeFontScale']=mobject._algovis_relative_font_scale
         for attribute, key in (("_algovis_semantic_role", "semanticRole"),
                                ("_algovis_type_role", "typeRole"),
                                ("_algovis_typography_group", "typographyGroup"),
@@ -171,11 +173,12 @@ def typography_findings(snapshot, *, relative_tolerance=.025):
             groups.setdefault(key, []).append(obj)
     findings = []
     for (group, role), objects in groups.items():
-        sizes = [obj["fontSize"] for obj in objects]
+        sizes = [obj["fontSize"]/obj.get('relativeFontScale',1.) for obj in objects]
         if max(sizes)-min(sizes) > relative_tolerance*max(sizes):
             findings.append({"kind":"peer_font_size_mismatch", "time":snapshot.get("time",0),
                              "group":group, "typeRole":role,
-                             "objects":[{"id":obj["id"],"label":obj["label"],"fontSize":obj["fontSize"]}
+                             "objects":[{"id":obj["id"],"label":obj["label"],"fontSize":obj["fontSize"],
+                                         "relativeFontScale":obj.get('relativeFontScale',1.)}
                                         for obj in objects]})
     return findings
 

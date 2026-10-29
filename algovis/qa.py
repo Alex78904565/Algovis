@@ -155,6 +155,10 @@ def audit_source_method(
     reachable = ast.Module(body=reachable_body, type_ignores=[])
 
     cue_times = cue_times or {}
+    cue_controls = {'wait_for_cue', 'wait_for_word', 'play_on_cue', 'view_on_cue',
+                    'transition_on_cue', 'transition_view_on_cue'}
+    play_controls = {'play', 'transition', 'play_on_cue', 'view_on_cue', 'animate_view',
+                     'open_view', 'play_opening', 'transition_on_cue', 'transition_view_on_cue'}
     anchors = []
     for statement in reachable_body:
         # Helper function bodies run later; their source position is not a
@@ -162,7 +166,7 @@ def audit_source_method(
         if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef)):
             continue
         for call in ast.walk(statement):
-            if not isinstance(call, ast.Call) or _call_name(call) not in {"wait_for_cue", "play_on_cue"}:
+            if not isinstance(call, ast.Call) or _call_name(call) not in cue_controls:
                 continue
             cue = _literal(call.args[0]) if call.args else None
             if not isinstance(cue, str):
@@ -192,12 +196,13 @@ def audit_source_method(
         if not isinstance(node, ast.Call):
             continue
         name = _call_name(node)
-        if name in {"play", "transition", "play_on_cue"}:
+        if name in play_controls:
             play_count += 1
         if name == "wait":
             hard_wait_lines.append(node.lineno)
-        elif name in {"wait_for_cue", "play_on_cue"}:
-            cue = _literal(node.args[0]) if node.args else None
+        elif name in cue_controls or name == 'bind_attention':
+            index = 1 if name == 'bind_attention' else 0
+            cue = _literal(node.args[index]) if len(node.args)>index else None
             if isinstance(cue, str):
                 used_cues.add(cue)
                 if cue not in cue_names:
@@ -224,12 +229,9 @@ def audit_source_method(
     for line in hard_wait_lines:
         next_control = next((call for call in sorted(
             (call for call in ast.walk(reachable) if isinstance(call, ast.Call)
-             and call.lineno > line and _call_name(call) in {
-                 "wait_for_cue", "play_to_cue", "play_on_cue", "play", "transition", "finish_narration",
-             }), key=lambda call: call.lineno)), None)
-        if next_control is None or _call_name(next_control) in {
-            "wait_for_cue", "play_to_cue", "play_on_cue", "finish_narration",
-        }:
+             and call.lineno > line and _call_name(call) in
+             cue_controls | play_controls | {'play_to_cue','finish_narration'}), key=lambda call: call.lineno)), None)
+        if next_control is None or _call_name(next_control) in cue_controls | {'play_to_cue','finish_narration'}:
             # A still hold before another named cue does not move that cue.
             # The rendered late-arrival check detects an actual overrun.
             continue

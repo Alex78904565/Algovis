@@ -21,6 +21,23 @@ the renderer to redraw the current composition; final coordinates and ownership
 assertions alone cannot catch a stale static background. Keep motion paths and
 spoken word timing in the review even when endpoints pass.
 
+Shared timeline checks from the migration:
+
+- Layout containers can already be dissolved into child roots when a section
+  handoff is retired. Remove the retiring family's actual artwork, not only its
+  old container. Inspect the first move and the later clear: a leftover empty
+  Fibonacci row was visible only in the encoded frames. The corrected section
+  was checked again; a regression test covers dissolved-container retirement.
+- A scale-only attention effect must preserve live paint at intermediate frames,
+  including while a different animation changes a computed/duplicate status.
+  Checking only the final color misses a distracting temporary color reversal.
+- Resolve each verified word once. Nested animation preparation must not add a
+  second, frame-rounded wait; delayed phases cannot introduce future labels.
+- Test component motion on mixed image/vector groups too. Detached planning must
+  support the same artwork as the actual interpolation, without a scene bypass.
+
+These are agent verification and regression checks, not new viewer endorsements.
+
 ## Quick reference: recurring complaints and required checks
 
 Use this before handing over a preview. These are recurring failures to prevent,

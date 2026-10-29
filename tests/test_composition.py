@@ -287,7 +287,7 @@ class ViewTransitionTests(unittest.TestCase):
         plan.commit(scene)
         self.assertEqual(scene.mobjects, [copied.mobject])
 
-    def test_missing_sources_and_parent_child_reparenting_are_rejected(self):
+    def test_missing_copy_sources_fail_and_layout_children_can_be_retained_independently(self):
         first = ColumnSlide()
         source = SlideObject(Square(.5))
         second = ColumnSlide()
@@ -298,8 +298,27 @@ class ViewTransitionTests(unittest.TestCase):
         first.add('parent', VGroup(child))
         second = ColumnSlide()
         second.add('child', child)
-        with self.assertRaisesRegex(ValueError, 'Bind retained children separately'):
-            ViewTransition(first, second)
+        scene = Scene()
+        first.install(scene)
+        plan = ViewTransition(first, second)
+        apply(plan, scene)
+        self.assertEqual(scene.mobjects, [child])
+
+    def test_children_keep_identity_when_layout_groups_change_between_views(self):
+        first, second = ColumnSlide(), SplitSlide()
+        a, b = Square(.5), Square(.4)
+        first.add('together', VGroup(a,b).arrange([1,0,0],buff=.3))
+        second.add('left', VGroup(a))
+        second.add('right', VGroup(b),column='right')
+        scene = Scene()
+        first.install(scene)
+        plan = ViewTransition(first, second)
+        self.assertEqual(set(plan.retained), {id(a),id(b)})
+        apply(plan, scene)
+        self.assertIn(a, scene.get_mobject_family_members())
+        self.assertIn(b, scene.get_mobject_family_members())
+        self.assertAlmostEqual(a.get_x(), second.target('left')[0].get_x())
+        self.assertAlmostEqual(b.get_x(), second.target('right')[0].get_x())
 
     def test_removing_everything_leaves_no_hidden_group_or_lingering_descendants(self):
         first = ColumnSlide('Heading')

@@ -28,10 +28,10 @@ python -m pip install -e .
 ## Your first scene
 
 ```python
-from algovis import ColumnSlide, MathRow, SlideScene, SplitSlide, WARM_THEME
+from algovis import ColumnSlide, MathRow, ViewScene, SplitSlide, WARM_THEME
 
 
-class FirstLesson(SlideScene):
+class FirstLesson(ViewScene):
     theme = WARM_THEME
 
     def construct(self):
@@ -67,6 +67,8 @@ manim -pql library_features_demo.py TreeMemoizationDemo
 manim -pql library_features_demo.py CapacityStoryDemo
 manim -pql examples/extensible_components.py SharedCellsExample ProofExample
 manim -pql examples/layout_transitions.py LayoutTransitions ProofTransitions
+manim -pql examples/word_attention.py WordAttentionExample
+manim -pql examples/automatic_layout.py AutomaticLayout
 ```
 
 See [the component architecture](docs/COMPONENT_ARCHITECTURE.md) for the shared
@@ -78,6 +80,20 @@ For compositions that build in place, use `ColumnSlide`, `SplitSlide`,
 to retain it, call its `copy()` to carry a new copy from the original, or fork
 the layout and substitute one named equation term. See
 [composition planning](docs/COMPONENT_ARCHITECTURE.md#plan-compositions-then-transition).
+
+`ViewScene` also supports overlapping/staggered component animations and
+automatic object attention on verified narration words. Declare, for example,
+`equation.part('argument').on_word('input_size', style='box', duration=.5,
+reason='Identify the input')`. Layout groups preserve child identities when
+regrouped; deliberate anchor offsets are reported instead of silently becoming
+another local alignment rule. See [word attention](docs/COMPONENT_ARCHITECTURE.md#declare-attention-on-the-object).
+
+Shared view layouts wrap ordinary prose and fit related objects together by
+default, while retaining readable type and aligned baselines. Use `auto_fit=False`
+for exact sizes or `FitPolicy` for different limits. See
+[automatic fitting](docs/COMPONENT_ARCHITECTURE.md#fit-content-by-default).
+Use `font_scale=.85` or `1.2` on a text/equation item for an explicit relative
+size; the layout preserves that hierarchy when it fits the scene.
 
 ## Try the browser reviewer
 

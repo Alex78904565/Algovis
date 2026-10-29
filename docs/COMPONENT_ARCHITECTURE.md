@@ -20,11 +20,15 @@ Manim VGroup
 SlideScene
 └── AlgorithmLessonScene       derive/prove/compare teaching workflows
 
+ViewScene                     preferred scene with view timelines/word attention
+└── ViewSceneMixin             also composes with AlgorithmLessonScene
+
 SlideView                     detached composition at one point in the lesson
 ├── ColumnSlide               a shared left-aligned column
 ├── SplitSlide                two columns inside the body region
 ├── EquationSlide             named rows from EquationFrame
 └── ProofSlide                named rows/labels from ProofFrame
+    CanvasSlide               positioned components with their own layout rules
 
 SlideObject                   stable live artwork; copy() records a new identity
 ViewTransition                difference between compositions, played by SlideScene
@@ -99,12 +103,13 @@ so later edits to the author's view cannot rewrite what it thinks is visible.
 and removed items before rendering. Play planned transitions through `SlideScene`
 so deferred ownership changes are redrawn rather than cached as static text.
 
-Layout validation rejects overflow, overlap between separate logical items,
-duplicate ownership, and ambiguous parent/child reparenting. Group intentionally
-overlapping artwork inside one component. To retain individual children across
-views, bind those children separately in both views rather than retiring their
-parent. Optional `via=` waypoints or `path_arc=` route copies around intervening
-work; clear final layouts alone do not certify clear motion paths.
+Layout validation rejects overflow, overlap between separate logical items and
+duplicate ownership. Groups are layout containers: their children keep their
+identities when separated, moved to another group, or recombined. Retiring a
+layout container does not erase a child retained in the next view. A semantic
+component remains intact until one of its children is explicitly extracted.
+Optional `via=` waypoints or `path_arc=` route copies around intervening work;
+clear final layouts alone do not certify clear motion paths.
 
 The existing procedural `Slide` and animation-based `transition(...)` APIs remain
 supported. This is an authoring layer, not an automatic conversion of previously
@@ -118,6 +123,150 @@ three short animations and a still-layout example, with no private lesson assets
 Final-position checks are necessary; inspect intermediate motion, word timing
 and ownership as well. Deferred view transitions redraw current objects each
 frame to avoid stale background copies of earlier equations.
+
+## Good alignment is the default
+
+Use `ColumnSlide` for related explanations, `SplitSlide` for parallel panels,
+and `EquationSlide`/`ProofSlide` for their named rows. Adding content aligns it
+to the shared anchors, reserves enough space and preserves peer type sizes.
+Overflow fails instead of silently shrinking an individual row.
+
+An intentional departure uses `view.offset(name, vector, reason='...')`.
+`LayoutOverrideWarning` makes that exception visible. `view.layout_report()`
+also detects unexplained direct target shifts and identifies boards with several
+overrides. Reconsider the layout before adding another offset. Unchanged,
+previously reported offsets do not emit another warning on every inspection.
+
+`CanvasSlide` serves positioned components such as a recursion tree, a route map
+or an established shared proof frame. Its `include` operation explicitly retains
+that component geometry. It rejects ordinary `add`: use an automatic layout
+for a new stack of text or equations. A canvas is not an excuse to hand-position
+repeated explanatory rows or to bypass the ink-level layout audit.
+
+## Fit content by default
+
+`SlideView`, `ColumnSlide`, `SplitSlide`, `EquationSlide` and `ProofSlide` fit
+their detached targets before arranging them. Plain strings use the shared body
+type and wrap to their content column. Related content shares a fitting scale,
+including both columns of a split layout; a wide formula does not silently get
+a smaller font than its peers. Equation baselines and first-line proof-label
+alignment remain component constraints. Replanning starts from natural sizes,
+so adding several rows cannot repeatedly shrink earlier content.
+
+```python
+board = SplitSlide('The choices')
+board.add('meaning', 'The best additional value from the items under consideration.')
+board.add('recurrence', MathRow({'call':'f(i,w)', 'rhs':'=...'}), column='right')
+```
+
+The default `FitPolicy` permits scaling down to 72% and requires text to stay at
+least 16 points. Content that still cannot fit fails with a readable-capacity
+error: split the explanation or select a more suitable layout. Use
+`auto_fit=False` to keep exact authored sizes, or pass
+`auto_fit=FitPolicy(min_scale=.85, min_font_size=20)` for stricter limits.
+`layout_report()` records the actual scale as well as alignment overrides.
+Prepared diagram canvases retain their explicit component geometry; a raw Manim
+`Scene.add` is not an automatic-layout operation.
+
+Declare a relative type hierarchy with `font_scale`, rather than choosing local
+point sizes:
+
+```python
+board.add('note', 'A smaller supporting explanation.', font_scale=.85)
+board.add('important', MathRow({'value':'f(1,0)'}), column='right', font_scale=1.2)
+refined = board.fork().set_font_scale('note', .9)
+```
+
+The final size is the natural role size times `font_scale` times the shared fit
+scale. Fitting therefore preserves the declared size ratios. A retained object
+inherits its ratio in the next view unless a new one is supplied. The reviewer
+checks the underlying peer sizes after accounting for these explicit ratios,
+and the report lists the overrides. Readability limits still apply. Set label
+sizes through a diagram's own styling rather than scaling the entire diagram
+with `font_scale`.
+
+See `examples/automatic_layout.py` for wrapping, shared scaling and retained
+objects returning to their natural size when more space becomes available.
+
+## Multi-phase views and component animation
+
+Use `ViewScene` for new scenes, or mix `ViewSceneMixin` into an existing lesson
+scene. A cue-driven timeline can retain component-specific drawing and motion:
+
+```python
+self.view_on_cue('next_calls', tree.get_depth_reveal_anim(2),
+                 run_time=.7, reason='Expand exactly the next layer')
+self.view_on_cue('apply', Then(
+    CopyInto(definition, application, run_time=.8),
+    Later(lambda: Replace(application, simplified), run_time=.5)),
+    run_time=1.3, reason='Carry the definition, then simplify its application')
+```
+
+`Reveal`, `Retire`, `Move`, `CopyInto`, `Replace`, `Draw` and `WriteView` describe
+the corresponding view operations. `Together`, `Then`, `Stagger` and `Later`
+describe their timing. Each active phase constructs a detached `CanvasSlide`
+and a `ViewTransition`; native Manim interpolation is its motion policy.
+Already-working component animation factories are lowered into the same view
+timeline, including their nested reveals, copies and cleanup. There is no
+second procedural scene path for helper-added effects.
+
+Moving a container that includes `MathRow` uses the row's named-term motions
+and native-layout adoption. Baseline anchors never turn into painted symbols
+when the text changes. Keep destinations as `MathRow` too, using `next_layout`
+for a substitution. Changing a container's children calls for explicit
+reveal/retire operations, rather than silently aligning unrelated child counts.
+Term motion also adopts the destination's font calibration before its endpoint
+is inspected. A different letter's ink height must not change its reported
+point size or create a false mismatch between equation terms.
+
+Gated phases activate at their actual start, including overlapping staggers.
+Preparing a later phase cannot introduce future objects. Layout containers
+change ownership without changing their children's geometry or identity.
+Completed component artwork uses `mount_view`/`unmount_view` for explicit
+adoption/retirement. Retirement follows the whole object family even after a
+layout container has dissolved into independent roots; retiring a handoff must
+not leave its old boxes under the new factory's artwork. The review manifest records every view phase, its cue,
+duration, object difference, copy sources and completion under
+`viewInfrastructure`. Canonical animation kinds remain available to the existing
+reviewer and word-timing audit.
+
+Resolve a spoken cue once. The verified-word scheduler checks alignment before
+playing; another tiny wait can round up to an extra video frame and push the
+following process past its next word. Do not compensate by weakening the timing
+gate or moving the audio.
+
+## Declare attention on the object
+
+```python
+call = board.add('recurrence', MathRow({
+    'call': 'f(', 'argument': 'n', 'close': ')=f(n-1)+n'}))
+call.part('argument').on_word('input_size', style='box', duration=.5,
+                             reason='Identify the input inside the function')
+```
+
+The cue names a verified transcript phrase. `ViewScene` schedules the declaration
+while waiting or during another view animation; it does not need a separate
+pulse beside every narration call. `bind_attention(target, cue, ...)` provides
+the same declaration for existing component objects. An optional
+`callback(scene, target)` supplies a specialized effect.
+
+Bind the intended occurrence of a word, using its named narration cue. A common
+word such as "value" appearing later does not automatically pulse every object
+that once mentioned it. Declare another cue binding for an intentional repeated
+reference. The duration belongs to the attention declaration; the containing
+transition's duration does not silently stretch the effect.
+
+`auto` boxes a selected equation term and pulses an isolated object. Explicit
+styles include `pulse`, `box`, `fill` for a framed object, and `plus` for an
+existing operation token. A binding never invents an unexplained plus sign.
+Effects preserve semantic paint, including during a simultaneous status change.
+A copy does not inherit its source's automatic bindings. An already-clear reveal
+can supply the attention itself.
+
+Missing/late word alignment, invisible target glyphs and an effect extending
+beyond its declared time slot fail explicitly. Attention keeps its own absolute
+word clock even when a caption retires first. Permanent mathematical changes
+belong in the view program; use attention callbacks to direct attention.
 
 ## Properties determine color
 

@@ -23,8 +23,12 @@ from .theme import (
     WARM_THEME, NIGHTCLUB_THEME,
 )
 from .presentation import Slide, SlideLayout, SlideRegion, SlideScene, SlideSceneMixin, slide_scene
+from .fitting import FitPolicy
 from .composition import (SlideObject, SlideView, ColumnSlide, SplitSlide,
-                          EquationSlide, ProofSlide, ViewTransition)
+                          EquationSlide, ProofSlide, ViewTransition, LayoutOverrideWarning)
+from .view_timeline import (CanvasSlide, ViewScene, ViewSceneMixin, Reveal, Retire, Move, CopyInto,
+                            Replace, ReplaceShape, Draw, WriteView, Grow, DrawArrow,
+                            Together, Then, Stagger, Later)
 from .layout import ColumnLayout, LessonStyle, LessonTypography
 from .frames import (
     DEFAULT_FRAME_STYLE, CaseEquation, ChapterMarker, ComparisonFrame, EquationFrame,
