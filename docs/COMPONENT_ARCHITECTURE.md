@@ -215,9 +215,10 @@ and native-layout adoption. Baseline anchors never turn into painted symbols
 when the text changes. Keep destinations as `MathRow` too, using `next_layout`
 for a substitution. Changing a container's children calls for explicit
 reveal/retire operations, rather than silently aligning unrelated child counts.
-Term motion also adopts the destination's font calibration before its endpoint
-is inspected. A different letter's ink height must not change its reported
-point size or create a false mismatch between equation terms.
+Term motion tracks its intended point size throughout interpolation and adopts
+the destination's font calibration at the endpoint. A different letter's ink
+height must not change its reported point size or create a false mismatch
+between equation terms; actual size changes still interpolate normally.
 
 Gated phases activate at their actual start, including overlapping staggers.
 Preparing a later phase cannot introduce future objects. Layout containers

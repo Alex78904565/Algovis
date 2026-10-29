@@ -231,6 +231,24 @@ class ViewTimelineTests(unittest.TestCase):
         for name, part in row.parts.items():
             self.assertAlmostEqual(measured_font_size(part), expected[name])
 
+    def test_equation_peers_keep_their_point_sizes_during_a_glyph_morph(self):
+        from algovis.layout import LessonStyle, measured_font_size
+        row = MathRow({'index': 'i', 'value': 'v_i'})
+        LessonStyle().watch('proof-terms', row)
+        self.scene.mount_view(row)
+        destination = row.next_layout(index='k', value='v_k')
+        program = self.start(Move(VGroup(row), VGroup(destination)))
+        program.interpolate(.5)
+        for part in row.parts.values():
+            self.assertAlmostEqual(measured_font_size(part), 33.6)
+        self.finish(program)
+        smaller = row.next_layout(index='i', value='v_i').scale(.5)
+        program = self.start(Move(VGroup(row), VGroup(smaller)))
+        program.interpolate(.5)
+        for part in row.parts.values():
+            self.assertAlmostEqual(measured_font_size(part), 25.2)
+        self.finish(program)
+
 
 class DefaultAlignmentTests(unittest.TestCase):
     def test_a_column_aligns_new_items_without_offsets(self):

@@ -37,6 +37,28 @@ class Retire(FadeOut):
 class Move(Transform):
     """A retained object's next geometry, with the same object identity."""
 
+    def begin(self):
+        super().begin()
+        from .layout import measured_font_size
+        self._font_motions = []
+        for live, start, end in zip(self.mobject.get_family(),
+                                    self.starting_mobject.get_family(),
+                                    self.target_mobject.get_family()):
+            if hasattr(start, '_algovis_font_reference'):
+                a, b = measured_font_size(start), measured_font_size(end)
+                if a is not None and b is not None:
+                    self._font_motions.append((live, a, b))
+
+    def interpolate(self, alpha):
+        super().interpolate(alpha)
+        # During a glyph morph, ink height is not a font-size measurement.
+        # Another simultaneous operation can snapshot this halfway through.
+        # Calibrate against the intended interpolated point size on every frame.
+        progress = self.rate_func(alpha)
+        for live, start, end in getattr(self, '_font_motions', ()):
+            if live.height > 0:
+                live._algovis_font_reference = (start+(end-start)*progress, float(live.height))
+
     def finish(self):
         super().finish()
         # Transform adopts points, but not the font calibration attached to
