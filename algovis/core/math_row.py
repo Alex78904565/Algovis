@@ -118,9 +118,20 @@ class MathRow(MathTex):
 
     def commit(self, target, scene):
         """Adopt the exact native layout, preserving unchanged term owners."""
-        from ..semantics import copy_semantics
-        old = self.parts.copy(); old_family = list(self.get_family())
+        old_family = list(self.get_family())
         scene.remove(*old_family, *target.get_family())
+        self.adopt_layout(target)
+        scene.add(self)
+        if hasattr(scene,'_capture_review_snapshot'): scene._capture_review_snapshot()
+
+    def adopt_layout(self, target):
+        """Adopt detached artwork without adding it to a scene.
+
+        Layout transitions use this when introducing a new equation. ``commit``
+        additionally consolidates ownership of an already animated equation.
+        """
+        from ..semantics import copy_semantics
+        old = self.parts.copy()
         adopted = {}
         for name,new in target.parts.items():
             part = old.get(name, new)
@@ -145,11 +156,10 @@ class MathRow(MathTex):
         self.tex_string = self._algovis_label
         copy_semantics(target,self)
         if hasattr(target, '_sum_contract'): self._sum_contract = target._sum_contract
-        scene.add(self)
         if getattr(self, '_algovis_typography_group', None):
             from ..layout import LessonStyle
             LessonStyle._watch_type(self,self._algovis_typography_group,'equation')
-        if hasattr(scene,'_capture_review_snapshot'): scene._capture_review_snapshot()
+        return self
 
     def native_layout_findings(self, tolerance=.003):
         origin = self._axis_origin.get_center(); scale = self._scale(); findings = []

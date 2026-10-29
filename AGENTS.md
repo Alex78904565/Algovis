@@ -56,6 +56,13 @@ and narration. Prefer composition for theme/layout choices, subclasses for real
 specializations, and separate objects for substantially different meanings. When
 extending a shared object, inventory and check its earlier and later uses too.
 
+For new composition builds, prefer the detached `SlideView` layout classes and
+`SlideScene.transition_to`. Share a `SlideObject` to retain it; use its `copy()`
+when a definition must visibly travel to an application. Fork the view for a
+small equation change. Do not mutate live geometry while preparing a future
+view. Endpoint checks do not replace inspecting copy routes, internal phases
+and narration timing. Preserve working legacy scenes during deliberate migration.
+
 Generate the word-level animation ledgers and work through their findings
 before requesting viewer review. Passing tests or geometry checks alone cannot
 certify timing, clarity, motion, or audio quality. Describe verification limits

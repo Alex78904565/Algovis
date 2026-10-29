@@ -19,6 +19,15 @@ Manim VGroup
 
 SlideScene
 └── AlgorithmLessonScene       derive/prove/compare teaching workflows
+
+SlideView                     detached composition at one point in the lesson
+├── ColumnSlide               a shared left-aligned column
+├── SplitSlide                two columns inside the body region
+├── EquationSlide             named rows from EquationFrame
+└── ProofSlide                named rows/labels from ProofFrame
+
+SlideObject                   stable live artwork; copy() records a new identity
+ViewTransition                difference between compositions, played by SlideScene
 ```
 
 These visual classes compose `SemanticProperties` and shared style/layout
@@ -27,6 +36,88 @@ objects. They do not need a deep inheritance tree merely to obtain a theme.
 `PanelFrame`, `CaseEquation` and `ChapterMarker` serve distinct visual meanings.
 A comparison panel, a state cell and a bag's capacity meter are not interchangeable
 just because each happens to contain a rectangle.
+
+## Plan compositions, then transition
+
+A Manim `SlideScene` owns the section's clock. Each visual beat can be a small
+layout instance; it does not need another Manim Scene subclass. Constructing or
+forking a view only arranges detached targets. It cannot move the live objects
+while the narration is still explaining an earlier composition.
+
+```python
+first = ColumnSlide('Using a definition', theme=self.theme)
+definition = first.add('definition', MathRow({
+    'call': 'f(k)', 'equals': '=', 'value': r'\frac{k(k+1)}2'}))
+self.transition_to(first, cue='definition', run_time=.7,
+                   reason='Introduce the definition')
+
+next_view = SplitSlide(first.object('title'), theme=self.theme)
+next_view.add('definition', definition)          # retain the same object
+next_view.add('application', definition.copy(), column='right')
+self.transition_to(next_view, cue='apply', run_time=1.5,
+                   reason='Carry a copy to its application')
+```
+
+`SlideObject.copy()` creates a new object at the original's position and records
+its source. At the cue the transition takes the source's current geometry,
+carries a visible copy to the target, and keeps the original if it is retained
+in the next view. Ordinary Manim `mobject.copy()` remains an unrelated copy;
+explicit provenance avoids accidentally turning every cloned style or target
+into an instructional transfer.
+
+The transition rules are:
+
+- The same object in both views stays present and moves only if needed.
+- A provenance copy travels from its visible source rather than fading in.
+- Other new objects enter after unrelated outgoing content has cleared.
+- Objects omitted from the next view retire. A source needed for a copy stays
+  until that copy arrives.
+- Unchanged artwork receives no gratuitous pulse, fade or color change.
+
+Use `view.fork()` for a small refinement of the same board:
+
+```python
+applied = proof.fork().substitute(
+    'inductive_step', child=r'\frac{k(k+1)}2',
+    from_definition=hypothesis.part('value'))
+self.transition_to(applied, cue='hypothesis', run_time=1.2,
+                   reason='Use the induction hypothesis in the child call')
+```
+
+Equations use native `MathRow` terms. Substitution preserves their identities,
+type size and baseline; a definition-use relationship copies only its selected
+term. Column rows reserve their mathematical ascent/descent, so simplifying a
+fraction does not pull the unchanged function or following rows upward. Proof
+labels follow the first line using the existing `ProofFrame` convention.
+
+`view.target(name)` exposes detached final artwork for inspection or styling;
+`view.preview()` produces independent final artwork for a still. `set_view(view)`
+installs an opening/cut composition without animation and keeps independent
+objects such as a chapter marker. The renderer saves its own outgoing snapshot,
+so later edits to the author's view cannot rewrite what it thinks is visible.
+`ViewTransition.describe()` exposes retained, moved, copied, substituted, new
+and removed items before rendering. Play planned transitions through `SlideScene`
+so deferred ownership changes are redrawn rather than cached as static text.
+
+Layout validation rejects overflow, overlap between separate logical items,
+duplicate ownership, and ambiguous parent/child reparenting. Group intentionally
+overlapping artwork inside one component. To retain individual children across
+views, bind those children separately in both views rather than retiring their
+parent. Optional `via=` waypoints or `path_arc=` route copies around intervening
+work; clear final layouts alone do not certify clear motion paths.
+
+The existing procedural `Slide` and animation-based `transition(...)` APIs remain
+supported. This is an authoring layer, not an automatic conversion of previously
+written lesson scenes. Migrate an existing composition deliberately and preserve
+its working layout, narration cues and section handoff. Do not mix legacy slide
+lifecycle operations and view transitions without explicitly adopting the board
+with `set_view`.
+
+See [the rendered-example source](../examples/layout_transitions.py). It has
+three short animations and a still-layout example, with no private lesson assets.
+Final-position checks are necessary; inspect intermediate motion, word timing
+and ownership as well. Deferred view transitions redraw current objects each
+frame to avoid stale background copies of earlier equations.
 
 ## Properties determine color
 

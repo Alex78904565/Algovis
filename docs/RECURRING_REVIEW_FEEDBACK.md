@@ -5,6 +5,22 @@ with a useful composition and develop it. Keep useful work visible and move it
 when space is needed. A new spoken clause usually calls for a local change,
 not another slide.
 
+## Composition and copy contract
+
+The author wants reusable final-layout classes and automatic transitions. Share
+the same object across views to retain it. A deliberate `SlideObject.copy()` has
+a new identity, starts at the source, and travels to the new location while the
+retained original stays visible. Fork a board for a small substitution instead
+of rebuilding its definitions, proof labels or unchanged equation terms.
+
+Planning future layouts must leave the visible board untouched. Check endpoint
+bounds and alignment, then inspect the actual encoded transition: no stale text
+under moving terms, future destination pop-in, orphan groups, or unnecessary
+baseline shifts after a fraction simplifies. Deferred scene mutations require
+the renderer to redraw the current composition; final coordinates and ownership
+assertions alone cannot catch a stale static background. Keep motion paths and
+spoken word timing in the review even when endpoints pass.
+
 ## Quick reference: recurring complaints and required checks
 
 Use this before handing over a preview. These are recurring failures to prevent,

@@ -161,6 +161,7 @@ class SlideSceneMixin:
         self.theme.apply(self)
         self.slide_layout = self.slide_layout or SlideLayout()
         self.current_slide = None
+        self.current_view = None
         self.narration = None
         self._review_manifest_path = os.environ.get("ALGOVIS_REVIEW_MANIFEST")
         self._review_snapshots = []
@@ -352,6 +353,11 @@ class SlideSceneMixin:
             )
 
     def _append_review_animation(self, animation, start, end, play_index, path):
+        if getattr(animation, '_algovis_view_transition', False):
+            inner = getattr(animation, 'animation', None)
+            if inner is not None:
+                self._append_review_animation(inner, start, end, play_index, path+'.deferred')
+                return
         focus_target = getattr(animation, "_algovis_focus_target", None)
         if focus_target is not None:
             self._review_animations.append({
@@ -592,6 +598,10 @@ class SlideSceneMixin:
 
     def transition_on_cue(self, name, *animations, run_time, reason, edge="start"):
         """Retire and reveal a composition as one word-anchored transition."""
+        from .composition import SlideView
+        if len(animations) == 1 and isinstance(animations[0], SlideView):
+            return self.transition_to(animations[0], cue=name, run_time=run_time,
+                                      reason=reason, edge=edge)
         with self.cue_sequence(name, reason=reason, edge=edge):
             return self.transition(*animations, run_time=run_time)
 
@@ -743,12 +753,89 @@ class SlideSceneMixin:
     def make_slide(self, title, kicker=None):
         return Slide(title, kicker, theme=self.theme, layout=self.slide_layout)
 
+    def set_view(self, view):
+        """Establish a planned layout without animation, e.g. at a section cut.
+
+        Only the previously managed composition is removed. Independent objects
+        such as the chapter marker remain visible. Later edits to ``view`` cannot
+        change the renderer's saved outgoing layout.
+        """
+        from .composition import SlideView
+        if not isinstance(view, SlideView):
+            raise TypeError('set_view requires a SlideView')
+        view.validate()
+        previous = getattr(self, 'current_view', None)
+        if previous is not None:
+            for item in previous.items.values():
+                self.remove(*item.object.mobject.get_family())
+        if self.current_slide is not None:
+            self.remove(*self.current_slide.mobjects)
+            self.current_slide = None
+        view.install(self)
+        self.current_view = view.fork()
+        self._capture_review_snapshot()
+        return view
+
+    def transition_to(self, view, *, cue=None, run_time=.8, reason=None, edge='start'):
+        """Retain, move, copy and retire objects according to the next layout.
+
+        Narrated transitions require their verified word and instructional reason.
+        With no narration, this also serves small examples and layout previews.
+        No effects are added to unchanged objects.
+        """
+        from .composition import ViewTransition
+        if not np.isfinite(run_time) or run_time <= 0:
+            raise ValueError('A view transition needs a positive finite duration')
+        if self.current_slide is not None:
+            raise ValueError('Adopt the legacy composition with set_view before using view transitions')
+        if self.narration is not None and cue is None:
+            raise ValueError('A narrated view transition needs a spoken cue')
+        if cue is not None:
+            if self.narration is None:
+                raise RuntimeError('Call begin_narration before a word-timed transition')
+            if not str(reason or '').strip():
+                raise ValueError('A word-timed view transition needs an instructional reason')
+            # Validation and planning are detached. Preparing actual live objects
+            # remains deferred until the animation starts at the verified word.
+        plan = ViewTransition(getattr(self, 'current_view', None), view)
+        animations = plan.animations(self)
+        self._view_transition_active = True
+        try:
+            if cue is not None:
+                self.play_on_cue(cue, *(animations or (Wait(run_time),)),
+                                 run_time=run_time, reason=reason, edge=edge)
+            elif animations:
+                self.play(*animations, run_time=run_time)
+            else:
+                self.wait(run_time)
+        finally:
+            self._view_transition_active = False
+        plan.commit(self)
+        self.current_view = view.fork()
+        return view
+
+    def get_moving_and_static_mobjects(self, animations):
+        if getattr(self, '_view_transition_active', False):
+            # Deferred phases may add, remove or restructure objects after
+            # Manim has classified the initial frame. A cached background would
+            # otherwise keep painting old equations beneath their moving terms.
+            return list(dict.fromkeys([*self.mobjects, *self.foreground_mobjects])), []
+        return super().get_moving_and_static_mobjects(animations)
+
+    def update_to_time(self, t):
+        super().update_to_time(t)
+        if getattr(self, '_view_transition_active', False):
+            self.moving_mobjects = list(dict.fromkeys([*self.mobjects, *self.foreground_mobjects]))
+
     def transition(self, *animations, **kwargs):
         """Clear outgoing material before revealing its replacement.
 
         Use for two compositions occupying the same space. The supplied
         runtime covers both phases, so narration cues do not move.
         """
+        from .composition import SlideView
+        if len(animations) == 1 and isinstance(animations[0], SlideView):
+            return self.transition_to(animations[0], **kwargs)
         animations = self._filter_cleanup_animations(animations)
         def only_exits(animation):
             if isinstance(animation, FadeOut):
@@ -788,6 +875,8 @@ class SlideSceneMixin:
         return tuple(result)
 
     def begin_slide(self, title, kicker=None, *, transition=True):
+        if getattr(self, 'current_view', None) is not None:
+            raise ValueError('A planned view is active; keep using view layouts for this scene')
         incoming = self.make_slide(title, kicker)
         if transition and self.current_slide is not None:
             outgoing = self.present_mobjects(*self.current_slide.mobjects)

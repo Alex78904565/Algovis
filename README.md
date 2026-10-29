@@ -28,24 +28,29 @@ python -m pip install -e .
 ## Your first scene
 
 ```python
-from manim import DOWN, MathTex, Text, VGroup
-from algovis import SlideScene, WARM_THEME
+from algovis import ColumnSlide, MathRow, SlideScene, SplitSlide, WARM_THEME
 
 
 class FirstLesson(SlideScene):
     theme = WARM_THEME
 
     def construct(self):
-        self.begin_slide("Start with a state", "1 · Construct")
-        state = self.card(r"f(k,c)")
-        meaning = Text("k items remain; c capacity remains", font_size=25)
-        self.show(VGroup(state, meaning).arrange(DOWN, buff=0.35))
-        self.caption("Ask what choices are possible from this state.")
+        first = ColumnSlide('Using a definition', theme=self.theme)
+        definition = first.add('definition', MathRow({
+            'call': 'f(k)', 'equals': '=', 'value': r'\frac{k(k+1)}2'}))
+        self.transition_to(first)
+        self.wait(1)
 
-        self.begin_slide("Write the recurrence", "2 · Recur")
-        self.show(MathTex(
-            r"f(k,c)=\max\{f(k-1,c),v_k+f(k-1,c-w_k)\}"
-        ))
+        second = SplitSlide(first.object('title'), theme=self.theme)
+        second.add('definition', definition)
+        second.add('application', definition.copy(), column='right')
+        second.substitute('application', call='f(3)', value=r'\frac{3(3+1)}2')
+        self.transition_to(second, run_time=1.5)
+        self.wait(1)
+
+        third = second.fork().substitute('application', value='6')
+        self.transition_to(third)
+        self.wait(1)
 ```
 
 Render it with Manim:
@@ -61,11 +66,18 @@ manim -pql slide_authoring_demo.py SlideAuthoringDemo
 manim -pql library_features_demo.py TreeMemoizationDemo
 manim -pql library_features_demo.py CapacityStoryDemo
 manim -pql examples/extensible_components.py SharedCellsExample ProofExample
+manim -pql examples/layout_transitions.py LayoutTransitions ProofTransitions
 ```
 
 See [the component architecture](docs/COMPONENT_ARCHITECTURE.md) for the shared
 cell/node hierarchy, proof objects, semantic properties, and definition-copy
 helpers. Extend a shared component once to update its uses throughout a lesson.
+
+For compositions that build in place, use `ColumnSlide`, `SplitSlide`,
+`EquationSlide` or `ProofSlide` with `SlideScene.transition_to`. Share an object
+to retain it, call its `copy()` to carry a new copy from the original, or fork
+the layout and substitute one named equation term. See
+[composition planning](docs/COMPONENT_ARCHITECTURE.md#plan-compositions-then-transition).
 
 ## Try the browser reviewer
 
