@@ -1079,6 +1079,7 @@ class ReviewServer:
 
     def _render_once(self) -> None:
         try:
+            self._validate_source_typography()
             command = self._render_command()
             completed = subprocess.run(
                 command, cwd=self.workspace, capture_output=True, text=True,
@@ -1124,6 +1125,23 @@ class ReviewServer:
                     rerender = True
             if rerender:
                 self.request_render()
+
+    def _validate_source_typography(self) -> None:
+        """Catch manual scene text sizing even when it has no peer registration."""
+        source = self.scene_source
+        if source is None and (self.workspace / 'render_sections.ps1').is_file():
+            # The supported legacy production launcher targets this file.
+            # It must not evade the same check as explicitly configured sources.
+            legacy_source = self.workspace / 'full_video_preview.py'
+            if legacy_source.is_file():
+                source = legacy_source
+        if source is None or not self.scene_name:
+            return
+        from .typography_source import audit_source, require_scene_typography
+        report = audit_source(source.read_text(encoding='utf-8-sig'),
+                              path=str(source), scene=self.scene_name)
+        _atomic_json(self.review_dir / 'typography-source.json', report)
+        require_scene_typography(source, self.scene_name)
 
     def _validate_render_timing(self) -> None:
         """Reject timing and declared peer-type errors, keeping the last good video."""

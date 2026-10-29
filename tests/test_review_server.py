@@ -14,6 +14,31 @@ from algovis.review.server import ReviewCatalog, ReviewHTTPServer, ReviewServer
 
 
 class ReviewServerTests(unittest.TestCase):
+    def test_legacy_production_launcher_cannot_evade_the_typography_check(self):
+        (self.workspace/'render_sections.ps1').write_text('# production launcher',encoding='utf-8')
+        (self.workspace/'full_video_preview.py').write_text(
+            'class Lesson:\n def construct(self):\n  MathTex("x").scale(.86)\n',encoding='utf-8')
+        self.review.scene_name='Lesson'
+        self.assertIsNone(self.review.scene_source)
+        with self.assertRaisesRegex(ValueError,'Scene typography migration required'):
+            self.review._validate_source_typography()
+
+    def test_unregistered_manual_text_size_is_rejected_before_render(self):
+        source=self.workspace/'lesson.py'
+        source.write_text('class Lesson:\n def construct(self):\n  MathTex("x").scale(.86)\n',encoding='utf-8')
+        self.review.scene_source=source
+        self.review.scene_name='Lesson'
+        previous=self.review.video_path
+        with patch('algovis.review.server.subprocess.run') as render, \
+             patch.object(self.review,'_publish_render') as publish:
+            self.review._render_worker()
+        render.assert_not_called()
+        publish.assert_not_called()
+        self.assertEqual(self.review.video_path,previous)
+        self.assertIn('Scene typography migration required',self.review.render_status.log_tail)
+        report=json.loads((self.review.review_dir/'typography-source.json').read_text())
+        self.assertEqual(report['counts'],{'manual_text_scale':1})
+
     def test_native_math_drift_is_rejected_even_when_peer_fonts_match(self):
         self.review.manifest_path.parent.mkdir(parents=True,exist_ok=True)
         self.review.manifest_path.write_text(json.dumps({'animations':[],

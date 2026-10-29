@@ -7,6 +7,12 @@ approval status, and willingness to watch another preview do not limit it.
 
 ## Required evidence
 
+Run the [source sizing inventory](TYPOGRAPHY_AUTHORING_AUDIT.md) across the active
+scene entry points and shared components. Identify ordinary text that still uses
+absolute/manual sizing, separate legitimate diagram geometry, and inspect coverage
+outside opt-in typography groups. A migrated animation timeline does not establish
+that the scene owns its text sizing. Keep remaining migration findings open.
+
 Before checking timing differences, review each active cue as a semantic pair:
 **spoken referent/action → visible target/change**. Read the surrounding words,
 not only the cue name. Record why the first matched word introduces that target.
@@ -118,6 +124,13 @@ parameters or values after arrival. Do not carry a background patch or fade the
 copy away before the result exists. Adopt the final result with identical geometry
 on the same frame. Route the copy clear of other work when possible. Inspect the
 travelling copy, arrival, local substitution, and cleanup as well as the final row.
+
+An intentional destination type-size change happens continuously during travel,
+finishing at arrival. Distinguish that from an accidental mismatch between peer
+rows: compare source and destination term sizes and spacing before animating.
+Include operators in the typography contract, and derive peer expressions from
+the same equation component. Matching letters and a valid destination baseline
+do not establish consistent formatting between the two expressions.
 
 ## Work through the findings yourself
 

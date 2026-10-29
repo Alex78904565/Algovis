@@ -23,6 +23,22 @@ spoken word timing in the review even when endpoints pass.
 
 Shared timeline checks from the migration:
 
+- Automatic fitting and automatic font assignment are different requirements.
+  A canvas containing manually scaled text still violates the scene-typography
+  paradigm even when every animation goes through the view compiler. Inventory
+  source sizing across all active sections and shared components. Reject known
+  scene-level manual text sizing before rendering, independently of opt-in peer
+  registration. Keep unresolved source/coverage findings explicit; do not call
+  a report or a guard a completed typography migration. See the
+  [source audit](TYPOGRAPHY_AUTHORING_AUDIT.md).
+- Destination formatting can be authoritative when its context intentionally
+  uses a different type size. Make the change continuously during travel, with
+  the copied object already matching the destination when it lands. Peer rows
+  in one derivation have no such size distinction: construct them from the same
+  named equation and shared style. Inspect every operator too. The Fibonacci
+  source used a separately scaled multiplication sign while its editable copy
+  used the row's uniform size; the source sign was outside the opt-in typography
+  check. A smooth transfer alone would hide, rather than repair, that inconsistency.
 - Identical TeX can have different container hierarchies (a group of references
   versus an editable `MathRow`). Inspect the final part of the copy, not only its
   travel and settled endpoints. Match corresponding glyphs for the temporary

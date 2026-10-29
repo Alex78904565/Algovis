@@ -69,6 +69,16 @@ in the next view. Ordinary Manim `mobject.copy()` remains an unrelated copy;
 explicit provenance avoids accidentally turning every cloned style or target
 into an instructional transfer.
 
+Copies inherit their source formatting by default. A destination may intentionally
+use another shared type role or declared relative scale, such as moving a large
+working equation into a smaller reference area. Interpolate that formatting
+continuously during travel; do not finish the move and then reformat at rest.
+Peer equation rows in the same composition share their type size and mathematical
+spacing. Build a worked instance from the same named-row component, with a copy
+or `next_layout`, rather than reconstructing it from separately scaled fragments.
+Register operators with the same typography contract as their neighboring terms;
+an unregistered multiplication sign can evade an otherwise passing peer check.
+
 `ApplyDefinition` also supports equivalent TeX landing in an editable `MathRow`.
 Its travelling copy matches visible glyphs rather than incompatible term/group
 wrappers and invisible baseline anchors. The destination keeps its named parts
@@ -160,6 +170,12 @@ for a new stack of text or equations. A canvas is not an excuse to hand-position
 repeated explanatory rows or to bypass the ink-level layout audit.
 
 ## Fit content by default
+
+Implementation status: fitting and relative-size support are available, but
+prepared raw Manim objects still retain their supplied natural font sizes.
+View compilation alone does not establish scene-owned typography. Use the
+[source sizing audit](TYPOGRAPHY_AUTHORING_AUDIT.md) to identify remaining manual
+construction before claiming a production migration is complete.
 
 `SlideView`, `ColumnSlide`, `SplitSlide`, `EquationSlide` and `ProofSlide` fit
 their detached targets before arranging them. Plain strings use the shared body
