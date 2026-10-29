@@ -192,17 +192,45 @@ class ApplyDefinition(AnimationGroup):
         # actual TeX glyphs for the transient copy instead of making Manim
         # pad term containers/anchors into duplicate letters on arrival.
         def ink(mobject):
-            return [part for part in mobject.family_members_with_points()
-                    if not isinstance(part, VectorizedPoint)]
+            glyphs = []
+            for part in mobject.family_members_with_points():
+                # align_data can leave padding points on a term/container,
+                # or invisible point-bearing placeholders below it. Neither
+                # is a painted TeX glyph. Inspect each leaf's own ink, not a
+                # container's bounding box (which includes its children).
+                if (not isinstance(part, VMobject) or isinstance(part, VectorizedPoint)
+                        or part.submobjects):
+                    continue
+                extent = np.ptp(part.points[:, :2], axis=0)
+                filled = float(np.max(part.get_fill_opacity())) > 0 and bool(np.all(extent > 1e-10))
+                stroked = (float(np.max(part.get_stroke_opacity())) > 0
+                           and float(np.max(part.get_stroke_width())) > 0
+                           and bool(np.any(extent > 1e-10)))
+                if filled or stroked:
+                    glyphs.append(part)
+            return glyphs
 
         source_ink, target_ink = ink(definition), ink(result)
-        self._glyph_aligned_copy = bool(
+        equivalent_structured = bool(
             source_text and source_text == target_text
             and getattr(result, '_algovis_preserve_structure', False)
-            and len(source_ink) == len(target_ink)
-            and all(len(a.points) == len(b.points)
-                    for a, b in zip(source_ink, target_ink))
         )
+        if equivalent_structured and len(source_ink) != len(target_ink):
+            raise ValueError(f'Equivalent structured copies require matching visible glyphs '
+                             f'({len(source_ink)} source, {len(target_ink)} destination); '
+                             'select the formula without extra artwork or repair its glyph ownership')
+        self._glyph_aligned_copy = equivalent_structured
+        self._algovis_copy_contract = {
+            'equivalentFormula': bool(source_text and source_text == target_text),
+            'structuredDestination': bool(getattr(result, '_algovis_preserve_structure', False)),
+            'strategy': 'glyphs' if self._glyph_aligned_copy else 'native',
+            'sourceGlyphs': len(source_ink), 'destinationGlyphs': len(target_ink),
+        }
+        # A previous parentheses-to-brackets transform can subdivide a
+        # glyph's curves. The visible glyph still corresponds to the same
+        # destination glyph; Transform aligns those curve points locally.
+        # Requiring equal point counts would silently restore the unsafe
+        # container-level morph for already edited formulas.
 
         def copy_formula(mobject):
             if not self._glyph_aligned_copy:

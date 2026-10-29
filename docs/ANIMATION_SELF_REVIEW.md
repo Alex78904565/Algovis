@@ -35,6 +35,11 @@ The output includes one Markdown document and one JSON record per section:
 - Objects retained, removed, and added by every play
 - Text removed and subsequently recreated under another object identity
 - Input hashes, so an audit of an older render cannot pass as current evidence
+- A definition transfer's `copyContract`, when available: initial formula
+  equivalence, structured destination, source/destination glyph counts and the
+  chosen copy strategy. A later snapshot can show a different object type after
+  the same row has been edited. Missing older metadata requires inspecting the
+  actual construction before declaring that use unaffected.
 
 `--section SECTION_ID` restricts an incremental check. An incremental repair must
 still be checked against the surrounding lesson and the previous all-section audit.

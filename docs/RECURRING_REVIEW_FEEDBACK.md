@@ -30,6 +30,19 @@ Shared timeline checks from the migration:
   original destination with its named parts intact. Keep numerical parameters
   and unit labels in separate named parts, so substituting `n = 191` retains
   `states` and the work calculation still reads states times additions per state.
+- Edited brackets may have more curve points than freshly typeset brackets.
+  That does not change which glyph they represent. Align curve points within
+  corresponding glyphs; do not fall back to container matching because their
+  point counts differ. Check copies made after parentheses become brackets.
+- Previous substitutions can leave hidden SVG paths as well as layout anchors.
+  Copy only painted leaf glyphs. Matching every point-bearing object can revive
+  hidden letters or mistake container padding for another character. Include
+  this case in the component regression checks and inspect the actual source.
+- A shared-code fix does not update an existing video. Inventory the actual
+  inputs to every use, including component-generated copies, rather than relying
+  on a later snapshot whose object type may have changed. Rebuild every affected
+  section, inspect the repaired motion, and update the assembled previews before
+  claiming the fix has propagated throughout the video.
 
 - Verify the cue's meaning before its timing. Compare the actual visible text or
   action with the first word of the matched phrase. Leading filler can be aligned

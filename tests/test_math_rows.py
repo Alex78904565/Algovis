@@ -1,6 +1,6 @@
 import unittest
 import numpy as np
-from manim import BLUE, DOWN, MathTex, Scene, Transform, VGroup, VectorizedPoint
+from manim import BLUE, DOWN, MathTex, Scene, Square, Transform, VGroup, VectorizedPoint, VMobject
 from algovis import ApplyDefinition, MathRow
 
 
@@ -137,6 +137,64 @@ class MathRowTests(unittest.TestCase):
         self.assertEqual(row.native_layout_findings()[0]['expected'],5)
         other=row.next_layout(immediate='0',future='6',total='6')
         self.assertEqual(other.native_layout_findings(),[])
+
+    def test_equivalent_copy_stays_safe_after_brackets_have_been_transformed(self):
+        row = MathRow({'f':'f','open':'(','args':'i,t','close':')'})
+        for name, tex in [('open','['),('close',']')]:
+            bracket = MathTex(tex).match_height(row.part(name)).move_to(row.part(name))
+            motion = Transform(row.part(name), bracket)
+            motion.begin(); motion.finish()
+            row.part(name).tex_string = tex
+        source = VGroup(*row[:4])
+        destination = MathRow({'f':'f','open':'[','i':'i','comma':',','t':'t','close':']'}).shift(2*DOWN)
+        ink = lambda mob: [p for p in mob.family_members_with_points()
+                           if not isinstance(p, VectorizedPoint)]
+        self.assertEqual(len(ink(source)), len(ink(destination)))
+        self.assertNotEqual([len(p.points) for p in ink(source)],
+                            [len(p.points) for p in ink(destination)])
+        parts = dict(destination.parts)
+        transfer = ApplyDefinition(source, None, destination)
+        self.assertTrue(transfer._glyph_aligned_copy)
+        self.assertEqual(transfer._algovis_copy_contract['strategy'], 'glyphs')
+        scene = Scene(); scene.add(source)
+        transfer._setup_scene(scene); transfer.begin()
+        for alpha in (.7, .8, .9):
+            transfer.interpolate(alpha)
+            self.assertEqual(len(ink(transfer.traveller)), len(ink(destination)))
+        transfer.finish(); transfer.clean_up_from_scene(scene)
+        self.assertEqual(destination.parts, parts)
+        self.assertEqual(destination.native_layout_findings(), [])
+
+        numerical = destination.next_layout(i='1', t='0')
+        for motion in destination.motions_to(numerical):
+            motion.begin(); motion.finish()
+        destination.commit(numerical, scene)
+        self.assertEqual(destination.tex_string, 'f[1,0]')
+        self.assertEqual(destination.native_layout_findings(), [])
+
+    def test_equivalent_structured_copy_rejects_unmatched_extra_artwork(self):
+        source = VGroup(MathTex('f(i)'), Square())
+        destination = MathRow({'f':'f(','i':'i','close':')'})
+        with self.assertRaisesRegex(ValueError, 'matching visible glyphs'):
+            ApplyDefinition(source, None, destination)
+
+    def test_equivalent_copy_ignores_padding_points_on_math_containers(self):
+        source = MathRow({'f':'f(','i':'i','close':')'})
+        source.set_points(np.zeros((4,3)))
+        destination = source.next_layout().shift(2*DOWN)
+        transfer = ApplyDefinition(source, None, destination)
+        self.assertTrue(transfer._glyph_aligned_copy)
+        self.assertEqual(transfer._algovis_copy_contract['sourceGlyphs'], 4)
+        self.assertEqual(len(transfer.traveller), 4)
+
+    def test_equivalent_copy_ignores_invisible_non_point_placeholders(self):
+        hidden = VMobject().set_points_as_corners([[0,0,0],[1,0,0],[1,1,0]])
+        hidden.set_fill(opacity=0).set_stroke(width=0)
+        source = VGroup(MathTex('f(i)'), hidden)
+        destination = MathRow({'f':'f(','i':'i','close':')'})
+        transfer = ApplyDefinition(source, None, destination)
+        self.assertTrue(transfer._glyph_aligned_copy)
+        self.assertEqual(transfer._algovis_copy_contract['sourceGlyphs'], 4)
 
 
 if __name__=='__main__': unittest.main()

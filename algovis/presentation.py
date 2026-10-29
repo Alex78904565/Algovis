@@ -394,6 +394,7 @@ class SlideSceneMixin:
                 "play": play_index,
                 "kind": "ApplyDefinition",
                 "label": f"Apply definition: {source} → {destination}",
+                "copyContract": dict(getattr(animation, '_algovis_copy_contract', {})),
                 "objectId": self._review_object_ids.get(id(animation.result)),
                 "sourceObjectId": self._review_object_ids.get(id(animation.definition)),
                 "start": float(start), "end": float(end),

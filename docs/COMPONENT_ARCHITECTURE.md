@@ -74,6 +74,16 @@ Its travelling copy matches visible glyphs rather than incompatible term/group
 wrappers and invisible baseline anchors. The destination keeps its named parts
 and native layout, so later substitutions remain editable. Name the parameter
 separately from its units; replacing a count should not replace `states` as well.
+Already edited glyphs can contain extra curve subdivisions; those are aligned
+within each corresponding glyph. An equivalent structured copy with unmatched
+glyphs fails explicitly instead of silently using container-level matching.
+Only painted leaf paths count as glyphs. Earlier edits can leave invisible SVG
+paths or degenerate padding on containers; those must not become letters during
+a later copy. Inspect a path's own geometry and paint, rather than its children's
+combined bounding box.
+Rendered transfer records include a `copyContract` with the initial equivalence,
+structured-destination flag, glyph counts and chosen strategy. Inspect that
+initial contract rather than the destination's type after later substitutions.
 
 The transition rules are:
 
