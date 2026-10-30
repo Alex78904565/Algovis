@@ -122,10 +122,20 @@ state and the completed block. Preserve explicit proof rails and comparison
 columns rather than applying individual-row centering to every layout.
 
 For a compact standalone argument, center the block vertically as well as
-horizontally. Use `BlockScene`, or `ComparisonScene(center_blocks=True)` for
+horizontally. Use `BlockScene`, or the centered-by-default `ComparisonScene` for
 corresponding columns. Reserve the completed height across its `SceneSequence`
 so adding a line does not recenter everything already on screen. A deliberately
 top-anchored list or a proof rail remains a different layout contract.
+
+The backtracking stop was handed back with a top-heavy composition even after
+its duplicate rows were repaired. Checking the named repair is not a layout
+signoff. Compare the completed content envelope with the body region's center;
+inspect the shared arrangement and its visible motion independently. A count
+of inspected frames does not establish that this requirement was enforced.
+For the backtracking example, center the item/value panel and the equation/
+chosen-items panel independently. They are different kinds of content, not
+corresponding comparison rows. `WorkedExampleScene` owns that arrangement;
+centering their combined bounds while retaining a shared top is insufficient.
 
 Inspect attention at its peak, not just its recorded time. Reapplying green to
 an already-green answer, or growing a miniature node by four percent, can be

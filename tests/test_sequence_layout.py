@@ -7,6 +7,48 @@ from algovis.animation import SceneBeat
 
 
 class SequenceLayoutTests(unittest.TestCase):
+    def test_worked_example_centers_each_panel_independently(self):
+        from algovis import WorkedExampleScene
+        from manim import Group
+        first=WorkedExampleScene('Recovering a solution')
+        first.add('capacity',Equation({'capacity':'C=3'}),slot='left')
+        first.add('items',Rectangle(width=3,height=2),slot='left')
+        first.add('choices',Equation({'choices':r'f[2,2]=\max\{0,2+0\}'}),slot='right')
+        last=first.fork()
+        last.add('value',Equation({'value':'f[3,3]=0'}),slot='left')
+        last.add('chosen',TextObject('chosen items: 1, 2',type_role='label'),slot='right')
+        sequence=SceneSequence('Problem data beside its calculation')
+        sequence.add(first,reason='Review the last choice')
+        sequence.add(last,reason='Reach the base case')
+        sequence.compile()
+        a,b=[beat.scene for beat in sequence.beats]
+        for slot in ('left','right'):
+            panel=Group(*(item.target for item in b.items.values() if item.slot==slot))
+            self.assertAlmostEqual(panel.get_y(),b.layout.body.center[1])
+        for name in ('capacity','items','choices'):
+            np.testing.assert_allclose(a.target(name).get_center(),b.target(name).get_center())
+        self.assertGreater(b.target('choices').get_top()[1],b.target('items').get_bottom()[1])
+        self.assertLess(b.target('choices').get_top()[1],b.target('capacity').get_top()[1])
+
+    def test_default_comparison_centers_the_complete_future_argument(self):
+        from algovis import ComparisonScene
+        from manim import Group
+        first=ComparisonScene('Worked example')
+        first.add('capacity',Equation({'capacity':'C=3'}),slot='left')
+        last=first.fork()
+        last.add('items',Rectangle(width=3,height=2),slot='left')
+        last.add('answer',Equation({'answer':'f[1,0]=5'}),slot='left')
+        last.add('choice',Equation({'choice':r'f[1,0]=\max\{2,3+2\}'}),slot='right')
+        sequence=SceneSequence('A complete comparison')
+        sequence.add(first,reason='Supply the capacity')
+        sequence.add(last,reason='Work through the example')
+        sequence.compile()
+        a,b=[beat.scene for beat in sequence.beats]
+        body=Group(*(item.target for item in b.items.values() if item.slot in ('left','right')))
+        self.assertAlmostEqual(body.get_y(),b.layout.body.center[1])
+        self.assertAlmostEqual(b.target('capacity').get_top()[1],b.target('choice').get_top()[1])
+        np.testing.assert_allclose(a.target('capacity').get_center(),b.target('capacity').get_center())
+
     def test_illustration_is_centered_beside_a_taller_problem_data_block(self):
         from algovis import IllustratedProblemScene
         first=IllustratedProblemScene('A concrete problem')
@@ -215,9 +257,15 @@ class SequenceLayoutTests(unittest.TestCase):
         view.add('source',MathStack(TextObject('FUNCTION'),Equation({'call':'f(n)'})),slot='left')
         view.add('connector',Equation({'arrow':r'\Longrightarrow'}),slot='connector')
         view.add('destination',MathStack(TextObject('ARRAY'),Equation({'call':'f[n]'})),slot='right')
-        before=view.target('connector').get_center().copy()
-        view.add('source_cost',Equation({'cost':r'\Omega(1.6^n)'}),slot='left')
-        view.add('destination_cost',Equation({'cost':'O(n)'}),slot='right')
+        later=view.fork()
+        later.add('source_cost',Equation({'cost':r'\Omega(1.6^n)'}),slot='left')
+        later.add('destination_cost',Equation({'cost':'O(n)'}),slot='right')
+        sequence=SceneSequence('Conversion with its costs')
+        sequence.add(view,reason='Compare representations')
+        sequence.add(later,reason='Compare their work')
+        sequence.compile()
+        earlier,view=[beat.scene for beat in sequence.beats]
+        before=earlier.target('connector').get_center().copy()
         view.validate()
         np.testing.assert_allclose(view.target('connector').get_center(),before)
         self.assertAlmostEqual(view.target('source')[1].baseline,view.target('connector').baseline)

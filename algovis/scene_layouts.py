@@ -60,6 +60,7 @@ class SlotScene(SlideView):
     diagram_slots=()
     centered_slots=()
     block_slots=()
+    shared_block_height=True
     gutter=.35
 
     def __init__(self,*args,center_blocks=False,**kwargs):
@@ -151,7 +152,7 @@ class SlotScene(SlideView):
         for slot in self.block_slots:
             rows=[item for item in self.items.values() if item.slot==slot]
             heights[f'{type(self).__name__}/{slot}']=sum(self._height(item) for item in rows)+.28*max(0,len(rows)-1)
-        if self.center_blocks and heights:
+        if self.center_blocks and self.shared_block_height and heights:
             heights={key:max(heights.values()) for key in heights}
         return heights
 
@@ -215,7 +216,11 @@ class RecurrenceScene(SlotScene):
 
 
 class ComparisonScene(SlotScene):
+    """Two corresponding columns in a vertically centered argument block."""
     COLUMNS=(('left',1),('right',1))
+
+    def __init__(self,*args,center_blocks=True,**kwargs):
+        super().__init__(*args,center_blocks=center_blocks,**kwargs)
 
     def definition_route(self,source,destination):
         """Carry cross-column values through the gutter if artwork intervenes."""
@@ -247,11 +252,27 @@ class IllustratedProblemScene(ComparisonScene):
     centered_slots=('left',)
     block_slots=('right',)
 
+    def __init__(self,*args,center_blocks=False,**kwargs):
+        # This specialization centers the illustration independently of the
+        # data block, rather than sharing a top across comparison columns.
+        super().__init__(*args,center_blocks=center_blocks,**kwargs)
+
+
+class WorkedExampleScene(ComparisonScene):
+    """Center problem data and its working independently, without matching rows.
+
+    Each panel reserves its own completed height across the explanation. A
+    short calculation must not inherit the top edge of a taller item panel.
+    """
+    shared_block_height=False
+
 
 class PairedScene(ComparisonScene):
     """Explanatory steps and their examples share named row envelopes."""
     def __init__(self,*args,pairs,**kwargs):
         self.pairs=tuple(tuple(pair) for pair in pairs)
+        # The paired-row algorithm below owns the joint block's centering.
+        kwargs.setdefault('center_blocks',False)
         super().__init__(*args,**kwargs)
 
     def paired_heights(self):

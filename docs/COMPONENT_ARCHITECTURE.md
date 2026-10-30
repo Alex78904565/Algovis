@@ -153,9 +153,14 @@ the arrived equation later carries its content, not an instruction to copy
 again from a source that may have left the board.
 
 Choose `BlockScene` for a compact argument: its rows share a left edge while
-the block is centered on both axes. `ComparisonScene(center_blocks=True)` uses
+the block is centered on both axes. `ComparisonScene` now uses centered blocks
+by default; `center_blocks=False` is a deliberate top-anchor override. It uses
 centered column blocks with a common vertical envelope. Their `SceneSequence`
 reserves the completed widths and heights before incremental reveals.
+Use `WorkedExampleScene` when problem data sits beside a calculation rather
+than corresponding comparison rows: each panel reserves its own height and
+is centered independently. A centered joint envelope alone can leave a short
+equation panel visibly too high beside taller illustrations.
 `ListScene` shares this centered block policy; `ProofSlide` retains its proof rail.
 
 `SlotScene.add(..., fill='width')` gives an illustration its text peers' width
