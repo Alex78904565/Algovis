@@ -11,6 +11,182 @@ from tests.test_composition import apply
 
 
 class SceneAnimationTests(unittest.TestCase):
+    def test_adding_a_row_to_the_same_view_does_not_replay_its_definition_use(self):
+        from algovis import ApplyDefinition
+        first=CenteredScene();source=first.add('source',Equation({'call':'f(n)'}))
+        first.add('cases',CaseEquation(Equation({'call':'f(n)'}),[Equation({'future':'0'})]))
+        applied=first.fork().apply_definition('cases','row:0.future',source.part('call'),'f(n)')
+        second=applied.snapshot()
+        applied.add('base',Text('The base case'))
+        third=applied.snapshot()
+        scene=Scene();first.install(scene)
+        with patch('algovis.composition.ApplyDefinition',wraps=ApplyDefinition) as transfer:
+            apply(ViewTransition(first,second),scene)
+            self.assertEqual(transfer.call_count,1)
+            apply(ViewTransition(second,third),scene)
+            self.assertEqual(transfer.call_count,1)
+
+    def test_new_label_waits_until_retained_text_has_cleared_its_space(self):
+        first=CenteredScene();retained=first.add('retained',Text('Keep this equation'))
+        second=first.fork();label=second.add('new',Text('Then explain it'))
+        second.add('last',Text('And retain the result'))
+        scene=Scene();first.install(scene)
+        plan=ViewTransition(first,second)
+        animation=plan.animations(scene)[0];start(animation,scene)
+        animation.interpolate(.4)
+        self.assertNotIn(id(label.mobject),{id(p) for p in scene.get_mobject_family_members()})
+        finish(animation,scene);plan.commit(scene)
+        self.assertIn(id(retained.mobject),{id(p) for p in scene.get_mobject_family_members()})
+        self.assertIn(id(label.mobject),{id(p) for p in scene.get_mobject_family_members()})
+        self.assertGreater(label.mobject.get_fill_opacity(),.9)
+
+    def test_frame_fill_attention_never_paints_over_its_label_in_encoded_artwork(self):
+        from algovis import StateCell,ViewScene
+        from algovis.attention import WordAttention
+        scene=ViewScene();scene.setup();cell=StateCell('8');scene.add(cell)
+        scene.narration=SimpleNamespace(cues={'eight':SimpleNamespace(phrase='eight')})
+        effect=WordAttention(cell,'eight',style='fill',reason='Name this stored value').animation(scene)
+        scene.narration=None
+        def ink():
+            scene.camera.reset();scene.camera.capture_mobjects(scene.mobjects)
+            return int(np.all(scene.camera.pixel_array[:,:,:3]>180,axis=2).sum())
+        before=ink();self.assertGreater(before,20)
+        animation=scene._compile_view(effect);start(animation,scene)
+        for alpha in (0,.5,1):
+            animation.interpolate(alpha);self.assertGreaterEqual(ink(),before*.9)
+        finish(animation,scene);self.assertGreaterEqual(ink(),before*.9)
+
+    def test_illustrated_selection_copies_only_each_new_item_and_retains_prior_contents(self):
+        from algovis import IllustratedBag,IllustratedItem,ItemCollection,SelectionScene,SlideObject,ApplyDefinition
+        from tempfile import TemporaryDirectory
+        from pathlib import Path
+        from PIL import Image
+        with TemporaryDirectory() as folder:
+            path=Path(folder)/'prop.png'
+            Image.fromarray(np.full((32,32,4),255,dtype=np.uint8)).save(path)
+            item=IllustratedItem(path,'item',1,metric_reserve={'weight':1,'value':10})
+            first=SelectionScene();first.add('items',ItemCollection(item),slot='items')
+            bag=first.add('bag',IllustratedBag(path),slot='bag')
+            first=first.refine('bag',capacity=6,show_meter=True)
+            second=first.fork().refine('bag',used=1,store=SlideObject(item.image))
+            third=second.fork().refine('bag',used=2)
+            scene=Scene();first.install(scene)
+            with patch('algovis.composition.ApplyDefinition',wraps=ApplyDefinition) as transfer:
+                apply(ViewTransition(first,second),scene)
+                self.assertEqual(transfer.call_count,1)
+                self.assertEqual(len(bag.mobject.contents),1)
+                apply(ViewTransition(second,third),scene)
+                self.assertEqual(transfer.call_count,1)
+                self.assertEqual(len(bag.mobject.contents),1)
+                self.assertEqual(bag.mobject.meter.used,2)
+            source_family={id(p) for p in item.image.get_family()}
+            self.assertFalse(source_family & {id(p) for p in bag.mobject.contents.get_family()})
+            initial=first.target('items').cards[0]
+            changed=first.fork().refine('items',index=0,weight=1,value=10).target('items').cards[0]
+            for key in ('weight','value'):
+                self.assertAlmostEqual(getattr(initial,key).baseline,getattr(changed,key).baseline)
+                self.assertAlmostEqual(getattr(initial,key).get_left()[0],getattr(changed,key).get_left()[0])
+
+    def test_new_layout_container_reuses_its_children_and_reveals_its_new_brace_and_label(self):
+        from algovis import BracedGroup
+        first=CenteredScene();row=first.add('definition',Equation({'f':'f(n)=n'}))
+        second=CenteredScene();group=BracedGroup(row.mobject,label='One definition')
+        second.add('definitions',group)
+        scene=Scene();first.install(scene);apply(ViewTransition(first,second),scene)
+        family={id(part) for part in scene.get_mobject_family_members()}
+        self.assertIn(id(row.mobject),family)
+        self.assertIn(id(group.heading),family);self.assertIn(id(group.brace),family)
+
+    def test_layout_refinement_cannot_silently_drop_an_unowned_child(self):
+        first=CenteredScene();stack=first.add('rows',MathStack(Equation({'a':'a'})))
+        second=first.fork().refine('rows',rows=[Equation({'a':'a'}),Equation({'b':'b'})])
+        with self.assertRaisesRegex(ValueError,'child identities'):ViewTransition(first,second)
+
+    def test_symbolic_child_labels_fit_the_compact_node_at_exact_padding(self):
+        tree=RecursiveTree(lambda n:(n,[('n-1',)] if n=='n' else []),('n',),profile='compact',depth_limit=1)
+        for node,_ in tree.iter_nodes():
+            self.assertLessEqual(node['label'].width,node['shape'].width-.16+1e-7)
+
+    def test_capacity_meter_keeps_used_load_and_readable_capacity_in_the_same_component(self):
+        from algovis import CapacityMeter,SelectionScene
+        from algovis.review.inspection import visible_opacity
+        meter=CapacityMeter()
+        view=SelectionScene();view.add('meter',meter,slot='bag')
+        defined=view.fork().refine('meter',capacity=6,visible=True)
+        selected=defined.fork().refine('meter',used=5)
+        scene=Scene();view.install(scene)
+        apply(ViewTransition(view,defined),scene);apply(ViewTransition(defined,selected),scene)
+        self.assertEqual(meter.readout.slot_tex,{'used':'5','slash':'/','capacity':'6'})
+        self.assertGreater(visible_opacity(meter.readout),.9)
+        self.assertGreater(meter.fill.height,1)
+        with self.assertRaisesRegex(ValueError,'must fit'):meter.with_state(used=8)
+
+    def test_leaf_counter_does_not_prepaint_the_later_count_labels(self):
+        from algovis import ViewScene
+        def branch(n):return f'f({n})',[] if n<=2 else [(n-1,),(n-2,)]
+        tree=RecursiveTree(branch,(4,),profile='compact').with_state(leaf_counts=True)
+        scene=ViewScene();scene.setup();scene.add(tree)
+        counting=scene._compile_view(tree.count_leaves())
+        self.assertTrue(all(label.get_fill_opacity()==0 for label in tree.leaf_numbers))
+        start(counting,scene);counting.interpolate(.12)
+        self.assertTrue(all(label.get_fill_opacity()==0 for label in tree.leaf_numbers[1:]))
+        finish(counting,scene)
+        self.assertTrue(all(label.get_fill_opacity()>.9 for label in tree.leaf_numbers))
+
+    def test_function_indices_do_not_introduce_array_brackets(self):
+        sequence=StateSequence([1,1,2],indices=True,index_notation='function')
+        self.assertEqual([label.tex_string for label in sequence.index_labels],['f(1)','f(2)','f(3)'])
+
+    def test_folding_call_names_travel_beside_values_then_into_array_indices(self):
+        from algovis import ViewScene
+        def branch(n):return f'f({n})',[] if n<=2 else [(n-1,),(n-2,)]
+        tree=RecursiveTree(branch,(4,),profile='compact',backbone_space=True)
+        sequence=StateSequence([1,1,2,3],indices=True)
+        sequence.shift([0,-4,0])
+        scene=ViewScene();scene.setup();scene.add(tree,sequence)
+        animation=scene._compile_view(tree.fold_to_backbone({(1,):1,(2,):1,(3,):2,(4,):3},keep_call_labels=True))
+        start(animation,scene)
+        for alpha in np.linspace(0,1,201):animation.interpolate(alpha)
+        finish(animation,scene)
+        self.assertEqual(len(tree.fold_labels),4)
+        for node in tree.backbone():
+            tag=tree.fold_labels[tree.fold_label_keys.index(tuple(node['args']))]
+            self.assertGreater(tag.get_left()[0],node['mobject'].box.get_right()[0])
+            self.assertNotEqual(tag.tex_string,node['mobject'].label.tex_string)
+        animation=scene._compile_view(tree.merge_backbone_into(sequence))
+        start(animation,scene)
+        for alpha in np.linspace(0,1,61):animation.interpolate(alpha)
+        finish(animation,scene)
+        self.assertTrue(all(label.get_fill_opacity()==0 for label in tree.fold_labels))
+        from algovis.review.inspection import visible_opacity
+        self.assertTrue(all(visible_opacity(cell.label)>.9 for cell in sequence.row))
+
+    def test_a_completed_transfer_is_not_repeated_when_the_equation_is_reused(self):
+        from algovis import BlockScene
+        first=ColumnSlide();source=first.add('definition',Equation({'f':'f(n)'}))
+        second=first.fork();answer=second.add('answer',Equation({'f':source.part('f')}))
+        scene=Scene();first.install(scene);apply(ViewTransition(first,second),scene)
+        third=BlockScene();third.add('answer',answer)
+        self.assertEqual(third.target('answer')._copy_sources,{})
+        apply(ViewTransition(second,third),scene)
+        fourth=third.fork();fourth.add('explanation','Keep the already-arrived value.')
+        apply(ViewTransition(third,fourth),scene)
+
+    def test_road_trip_dashboard_updates_fuel_on_purchase_and_drive(self):
+        from algovis import RoadTripSimulation,ViewScene
+        trip=RoadTripSimulation(capacity=2,prices=[4,2],consumption=[1,1])
+        scene=ViewScene();scene.setup();scene.add(trip)
+        operation=trip.buy(2)
+        self.assertEqual(trip.state.slot_tex['fuel'],'0')
+        animation=scene._compile_view(operation)
+        start(animation,scene);finish(animation,scene)
+        self.assertEqual(trip.state.slot_tex['city'],'1')
+        self.assertEqual(trip.state.slot_tex['fuel'],'2')
+        animation=scene._compile_view(trip.drive())
+        start(animation,scene);finish(animation,scene)
+        self.assertEqual(trip.state.slot_tex['city'],'2')
+        self.assertEqual(trip.state.slot_tex['fuel'],'1')
+
     def test_folded_duplicate_values_stay_hidden_after_canonical_cells_move(self):
         from algovis import RecursiveTree,ViewScene
         def branch(n):return f'f({n})',[] if n<=2 else [(n-1,),(n-2,)]
@@ -57,7 +233,7 @@ class SceneAnimationTests(unittest.TestCase):
         self.assertEqual(group.beats[-1].scene.target('recurrence').slot_tex['call'],'f(i,w)')
         self.assertEqual(first.target('recurrence').slot_tex['call'],'f(i)')
 
-    def test_domino_conversion_keeps_old_case_art_hidden_during_the_fall(self):
+    def test_domino_conversion_retains_readable_labels_below_the_falling_boxes(self):
         from algovis import InductionChain,ViewScene
         chain=InductionChain(3)
         scene=ViewScene();scene.setup();scene.add(chain)
@@ -65,10 +241,17 @@ class SceneAnimationTests(unittest.TestCase):
         compiled=scene._compile_view_native(operation)
         self.assertIs(compiled.operations[0],operation)
         operation._setup_scene(scene);operation.begin();operation.finish();operation.clean_up_from_scene(scene)
+        label_positions=[case.label.get_center().copy() for case in chain.cases]
+        for case in chain.cases:
+            self.assertLess(case.label.get_top()[1],case.box.get_bottom()[1])
+        for left,right in zip(chain.cases,chain.cases[1:]):
+            self.assertGreater(right.label.get_left()[0]-left.label.get_right()[0],.1)
         falling=chain.fall(0);falling._setup_scene(scene);falling.begin();falling.interpolate(.5)
         for case in chain.cases:
-            self.assertTrue(all(float(np.max(part.get_fill_opacity()))==0
-                for part in case.label.family_members_with_points()))
+            from algovis.review.inspection import visible_opacity
+            self.assertGreater(visible_opacity(case.label),.9)
+        for case,position in zip(chain.cases,label_positions):
+            np.testing.assert_allclose(case.label.get_center(),position)
         self.assertTrue(all(float(np.max(part.get_stroke_opacity()))==0
             for part in chain.arrows.family_members_with_points()))
         falling.finish()

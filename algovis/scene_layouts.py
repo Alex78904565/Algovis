@@ -22,6 +22,28 @@ class ListScene(ColumnSlide):
     """A left-aligned explanation whose rows grow from top to bottom."""
 
 
+class BlockScene(ColumnSlide):
+    """One compact argument, centered as a block with internally aligned rows."""
+    def block_widths(self):
+        return {'BlockScene/body':max((item.target.width for item in self.items.values()
+                                     if item.slot=='body'),default=0.)}
+
+    def block_heights(self):
+        rows=[item for item in self.items.values() if item.slot=='body']
+        return {'BlockScene/body':sum(self._height(item) for item in rows)+self.gap*max(0,len(rows)-1)}
+
+    def _arrange(self):
+        widths=self.block_widths();widths.update(getattr(self,'_sequence_block_widths',{}))
+        heights=self.block_heights();heights.update(getattr(self,'_sequence_block_heights',{}))
+        column=ColumnLayout(self.layout.body,gap=self.gap,
+            content_width=widths['BlockScene/body'] or None,
+            content_height=heights['BlockScene/body'] or None)
+        from .composition import _column_row
+        for name,item in self.items.items():
+            if item.slot=='body':_column_row(column,name,item)
+            else:item.target.move_to(self.layout.region(item.slot).center)
+
+
 class SlotScene(SlideView):
     """A reusable arrangement exposes named regions, not per-object coordinates.
 
@@ -33,7 +55,15 @@ class SlotScene(SlideView):
     COLUMNS=()
     diagram_slots=()
     centered_slots=()
+    block_slots=()
     gutter=.35
+
+    def __init__(self,*args,center_blocks=False,**kwargs):
+        self._width_fill=frozenset()
+        self.center_blocks=bool(center_blocks)
+        if center_blocks:
+            self.block_slots=tuple(key for key,_ in self.COLUMNS)
+        super().__init__(*args,**kwargs)
 
     def _slots(self):
         body=self.layout.body
@@ -50,11 +80,20 @@ class SlotScene(SlideView):
             top-=height+self.gutter
         return regions
 
-    def add(self,name,value,*,slot='main',region=None,**options):
+    def add(self,name,value,*,slot='main',region=None,fill=None,**options):
         slot=region or slot
         if slot not in self._slots() and slot not in ('header','footer'):
             raise ValueError(f'Unknown {type(self).__name__} location: {slot}')
-        return super().add(name,value,region=slot,**options)
+        if fill not in (None,'width'):raise ValueError('A slot can fill its width or use its natural size')
+        old=self._width_fill
+        if fill:
+            if not hasattr(type(getattr(value,'planned_mobject',value)),'fill_width'):
+                raise TypeError('Width filling needs component-owned geometry; it cannot stretch text')
+            self._width_fill=old|{name}
+        try:return super().add(name,value,region=slot,**options)
+        except Exception:
+            self._width_fill=old
+            raise
 
     def _region(self,slot):
         return self._slots().get(slot) or super()._region(slot)
@@ -65,7 +104,18 @@ class SlotScene(SlideView):
             if reflow is not None:
                 region=self._region(item.slot)
                 reflow(item.target,region.width,region.height,self.typography)
+        for name in self._width_fill & self.items.keys():
+            item=self.items[name];key=f'{type(self).__name__}/{item.slot}'
+            peers=[peer.target.width for other,peer in self.items.items()
+                   if peer.slot==item.slot and other not in self._width_fill]
+            width=getattr(self,'_sequence_fill_widths',{}).get(key,max(peers,default=self._region(item.slot).width))
+            item.target.fill_width(width)
         super()._fit_and_arrange()
+
+    def fill_widths(self):
+        return {f'{type(self).__name__}/{slot}':max((item.target.width
+            for name,item in self.items.items() if item.slot==slot and name not in self._width_fill),default=0.)
+            for slot in {self.items[name].slot for name in self._width_fill & self.items.keys()}}
 
     def _fit_areas(self):
         areas=[]
@@ -81,10 +131,36 @@ class SlotScene(SlideView):
         areas.append(FitArea('footer',footer,self.layout.footer.width,self.layout.footer.height,stacked=True,gap=.1))
         return areas
 
+    def block_widths(self):
+        """Fitted widths of left-aligned blocks centered inside their regions.
+
+        Internal row alignment and the position of the entire block are
+        separate constraints. SceneSequence reserves the widest later block
+        so adding a line cannot move the already-visible rows horizontally.
+        """
+        return {f'{type(self).__name__}/{slot}':max(
+            (item.target.width for item in self.items.values() if item.slot==slot),
+            default=0.) for slot in self.block_slots}
+
+    def block_heights(self):
+        heights={}
+        for slot in self.block_slots:
+            rows=[item for item in self.items.values() if item.slot==slot]
+            heights[f'{type(self).__name__}/{slot}']=sum(self._height(item) for item in rows)+.28*max(0,len(rows)-1)
+        if self.center_blocks and heights:
+            heights={key:max(heights.values()) for key in heights}
+        return heights
+
     def _arrange(self):
+        widths=self.block_widths()
+        widths.update(getattr(self,'_sequence_block_widths',{}))
+        heights=self.block_heights()
+        heights.update(getattr(self,'_sequence_block_heights',{}))
         for slot,region in self._slots().items():
             items=[(name,item) for name,item in self.items.items() if item.slot==slot]
-            column=ColumnLayout(region,gap=.28)
+            width=widths.get(f'{type(self).__name__}/{slot}')
+            height=heights.get(f'{type(self).__name__}/{slot}')
+            column=ColumnLayout(region,gap=.28,content_width=width or None,content_height=height or None)
             from .composition import _column_row
             for name,item in items:_column_row(column,name,item)
             if slot in self.centered_slots and items:
@@ -105,6 +181,7 @@ class DiagramScene(SlotScene):
     ROWS=(('diagram',3),('explanation',1))
     diagram_slots=('diagram',)
     centered_slots=('diagram',)
+    block_slots=('explanation',)
 
 
 class TreeScene(DiagramScene):
@@ -153,6 +230,60 @@ class ComparisonScene(SlotScene):
                    for p in samples):
                 return (np.array([gutter,start[1],0]),np.array([gutter,end[1],0]))
         return ()
+
+
+class PairedScene(ComparisonScene):
+    """Explanatory steps and their examples share named row envelopes."""
+    def __init__(self,*args,pairs,**kwargs):
+        self.pairs=tuple(tuple(pair) for pair in pairs)
+        super().__init__(*args,**kwargs)
+
+    def paired_heights(self):
+        return {str(index):max((self._height(self.items[name]) for name in pair if name in self.items),default=.52)
+                for index,pair in enumerate(self.pairs)}
+
+    def _arrange(self):
+        super()._arrange()
+        heights=self.paired_heights()
+        fit=next((area['scale'] for area in self._fit_report if area['group']=='body'),1.)
+        heights.update({key:height*fit for key,height in getattr(self,'_sequence_paired_heights',{}).items()})
+        columns={slot:ColumnLayout(region,gap=.28) for slot,region in self._slots().items()}
+        from .core.proof import first_line_of
+        from manim import UP
+        for index,pair in enumerate(self.pairs):
+            for column in columns.values():column.reserve(str(index),heights[str(index)])
+            for name in pair:
+                if name not in self.items:continue
+                item=self.items[name];columns[item.slot].place(str(index),item.target)
+                # Align the first readable line rather than the bounding-box
+                # center of a multiline example or a fraction.
+                top=columns[item.slot]._slots[str(index)][0]
+                item.target.shift((0,top-first_line_of(item.target).get_top()[1],0))
+
+    def _fit_areas(self):
+        areas=super()._fit_areas()
+        heights=getattr(self,'_sequence_paired_heights',None) or self.paired_heights()
+        # The paired row heights, not either independent stack, own capacity.
+        height=sum(heights.values());width=max(region.width for region in self._slots().values())
+        rows=[item for item in self.items.values() if item.slot in ('left','right')]
+        areas.append(FitArea('body',rows,width,self.layout.body.height-.28*(len(heights)-1),minimum_height=height))
+        return areas
+
+
+class SelectionScene(SlotScene):
+    """Keep selectable items above their container and accumulating arithmetic."""
+    ROWS=(('items',1),('details',1))
+    # Cards, the bag gauge and the calculation all contain peer labels.
+    # Fit them together; independently shrinking the bag also shrinks only
+    # its labels, even when both sets use the same typography role.
+    diagram_slots=()
+    centered_slots=('items','bag')
+    block_slots=('calculation',)
+
+    def _slots(self):
+        regions=super()._slots()
+        bag,calculation=regions.pop('details').split_columns(1,2,gutter=self.gutter)
+        return {**regions,'bag':bag,'calculation':calculation}
 
 
 class ConversionScene(ComparisonScene):
@@ -220,6 +351,7 @@ class TreeExplanationScene(SlotScene):
     ROWS=(('diagram',3.5),('equations',2.5))
     diagram_slots=('diagram',)
     centered_slots=('diagram',)
+    block_slots=('equations',)
 
 
 class TreeArrayScene(SlotScene):

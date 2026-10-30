@@ -14,7 +14,7 @@ import warnings
 from itertools import count
 
 import numpy as np
-from manim import AnimationGroup, FadeIn, FadeOut, Group, Mobject, Succession, Text, Transform, VGroup, Wait, config
+from manim import AnimationGroup, FadeIn, FadeOut, Group, Mobject, SingleStringMathTex, Succession, Text, Transform, VGroup, Wait, config
 
 from .core.math import ApplyDefinition
 from .core.math_row import MathRow
@@ -167,6 +167,7 @@ def _content_model(mob):
     """Content and semantic component options, independent of layout/paint."""
     fields=('slot_tex','tex_string','text','profile','reveal_depth','columns',
             'weight_visible','value_visible','capacity','current_val')
+    fields=(*fields,*getattr(mob,'_algovis_content_fields',()))
     values=tuple((field,repr(getattr(mob,field))) for field in fields if field in mob.__dict__)
     return (type(mob),values,tuple(_content_model(child) for child in mob.submobjects))
 
@@ -406,6 +407,9 @@ class SlideView:
                 'sceneTypography':{name:self.typography.size(name) for name in self.typography.__dataclass_fields__},
                 'layoutGroup':getattr(self,'_sequence_layout_name',None),
                 'sharedFit':getattr(self,'_sequence_fit_scales',{}),
+                'sharedBlocks':getattr(self,'_sequence_block_widths',{}),
+                'sharedBlockHeights':getattr(self,'_sequence_block_heights',{}),
+                'widthFill':sorted(getattr(self,'_width_fill',())),
                 'reviewAlignment':bool(overrides), 'manyOverrides':len(overrides)>=3}
 
     @staticmethod
@@ -630,6 +634,32 @@ class ColumnSlide(SlideView):
     def _text_width(self,slot):
         return super()._text_width(slot)-2*self.padding if slot=='body' else super()._text_width(slot)
 
+    def definition_route(self,source,destination):
+        """Carry a definition beside intervening rows, keeping them readable."""
+        start,end=source.get_center(),destination.get_center()
+        if abs(end[1]-start[1])<.1:return ()
+        half_width=max(source.width,destination.width)/2+.12
+        half_height=max(source.height,destination.height)/2+.08
+        samples=[start+(end-start)*a for a in np.linspace(0,1,61)]
+        obstacles=[]
+        for item in self.items.values():
+            if item.slot!='body':continue
+            if id(source) in {id(p) for p in item.object.mobject.get_family()}:continue
+            if id(destination) in {id(p) for p in item.target.get_family()}:continue
+            target=item.target
+            if any(target.get_left()[0]-half_width<p[0]<target.get_right()[0]+half_width
+                   and target.get_bottom()[1]-half_height<p[1]<target.get_top()[1]+half_height
+                   for p in samples):obstacles.append(target)
+        if not obstacles:return ()
+        left=min(p.get_left()[0] for p in obstacles)-half_width
+        right=max(p.get_right()[0] for p in obstacles)+half_width
+        low=self.layout.body.center[0]-self.layout.body.width/2+half_width
+        high=self.layout.body.center[0]+self.layout.body.width/2-half_width
+        choices=[x for x in (left,right) if low<=x<=high]
+        if not choices:raise ValueError('Definition copy needs a clear route beside the intervening rows')
+        x=min(choices,key=lambda x:abs(x-start[0])+abs(x-end[0]))
+        return (np.array([x,start[1],0]),np.array([x,end[1],0]))
+
     def _fit_areas(self):
         body=[item for item in self.items.values() if item.slot=='body']
         return [FitArea('body',body,self.layout.body.width-2*self.padding,
@@ -804,10 +834,16 @@ class ProofSlide(SlideView):
         fit=next((area['scale'] for area in self._fit_report if area['group']=='body'),1.)
         self._plan_rows(getattr(self,'_row_plan_metrics',None),scale=fit)
         for name, item in self.items.items():
-            if item.slot in self.frame.rows:
+            if item.slot=='conclusion':
+                item.target.move_to(self.layout.footer.center)
+            elif item.slot in self.frame.rows:
                 _frame_row(self.frame, item)
             elif item.slot not in ("chrome",) and not item.slot.startswith("label:"):
                 item.target.move_to(self.layout.region(item.slot).center)
+        if 'proof_rail' in self.items:
+            rail=self.items['proof_rail'].target;body=self.layout.body
+            rail.put_start_and_end_on([self.frame.divider.get_x(),body.center[1]+body.height/2,0],
+                                     [self.frame.divider.get_x(),body.center[1]-body.height/2,0])
         for name, item in self.items.items():
             if item.slot.startswith("label:"):
                 row = self.items.get(item.slot[6:])
@@ -863,6 +899,9 @@ class ViewTransition:
                 if not is_new_copy and (layout_group or extracting) and mob.submobjects:
                     if mob.has_points():
                         raise ValueError('Extracting children from a painted parent requires a component operation')
+                    if len(mob.submobjects)!=len(target.submobjects):
+                        raise ValueError('A layout refinement cannot invent or discard child identities: '
+                            'construct a new layout container from the retained and new children')
                     wrappers.append(mob)
                     for index, (child, child_target) in enumerate(zip(mob.submobjects, target.submobjects)):
                         visit(f'{name}/{index}', replace(item, object=SlideObject(child), target=child_target))
@@ -881,8 +920,14 @@ class ViewTransition:
             prior=self.old[key][1].target if key in self.old else None
             previous=getattr(prior,'_copy_sources',{})
             self.borrowed[key]={term:source for term,source in getattr(item.target,'_copy_sources',{}).items()
-                if previous.get(term) is not source or getattr(prior,'slot_tex',{}).get(term)!=item.target.slot_tex[term]}
+                if previous.get(term) is not source or getattr(prior,'slot_tex',{}).get(term)!=getattr(item.target,'slot_tex',{}).get(term)}
         self._scheduled = ()
+        # A definition use is a transition instruction. Adding another object
+        # to the same authored view keeps its content but must not replay an
+        # already-applied transfer. A new application creates a new use object.
+        previous_uses=outgoing.definition_uses if outgoing is not None else {}
+        self.definition_uses={name:use for name,use in incoming.definition_uses.items()
+                              if use is not previous_uses.get(name)}
         # Semantic components remain atomic unless a child is explicitly moved
         # out. Layout groups were expanded above, preserving their child IDs.
         for key in self.exiting:
@@ -920,7 +965,7 @@ class ViewTransition:
                 raise ValueError("The outgoing view has absent objects; adopt the visible composition first")
         sources = [self.new[key][1].object.copied_from for key in self.entering
                    if self.new[key][1].object.copied_from is not None]
-        sources += [use.source for name, use in self.incoming.definition_uses.items()
+        sources += [use.source for name, use in self.definition_uses.items()
                     if id(self.incoming.items[name].object.mobject) in self.retained]
         sources += [source for key,(_name,item) in self.new.items()
                     if item.object.copied_from is None
@@ -939,7 +984,32 @@ class ViewTransition:
         exits = [FadeOut(self.old[key][1].object.mobject) for key in self.exiting if key not in copy_owners]
 
         def build_changes():
-            motions = []
+            motions = [];delayed_labels=[]
+            # A row leaving a proof can resize while its definition source
+            # remains in that proof for a copy. During travel they are no
+            # longer settled peers. Keep the row's measured font contract,
+            # but give its moving terms one transition peer group until the
+            # arrival callback adopts the destination contract below.
+            for key in self.retained:
+                item=self.new[key][1];live=item.object.mobject
+                if (getattr(live,'_algovis_typography_group',None)
+                        !=getattr(item.target,'_algovis_typography_group',None)):
+                    for part in live.get_family():
+                        if hasattr(part,'_algovis_typography_group'):
+                            part._algovis_typography_group=f'transition/{self.incoming._type_group}/{key}'
+            def crosses_moving_art(target):
+                for retained in self.retained:
+                    live=self.new[retained][1].object.mobject
+                    end=self.new[retained][1].target
+                    if np.linalg.norm(live.get_center()-end.get_center())<.1:continue
+                    width=max(live.width,end.width)/2
+                    height=max(live.height,end.height)/2
+                    for alpha in np.linspace(0,1,41):
+                        point=live.get_center()*(1-alpha)+end.get_center()*alpha
+                        if (target.get_left()[0]-width<point[0]<target.get_right()[0]+width
+                                and target.get_bottom()[1]-height<point[1]<target.get_top()[1]+height):
+                            return True
+                return False
             # Copy introductions precede any simultaneous retirement of their source.
             for key in self.entering:
                 name, item = self.new[key]
@@ -949,12 +1019,16 @@ class ViewTransition:
                 if source is None:
                     term_sources=getattr(item.target,'_copy_sources',{})
                     if term_sources:
-                        motions.extend(ApplyDefinition(term_sources[key].mobject,None,part)
+                        route=getattr(type(self.incoming),'definition_route',None)
+                        motions.extend(ApplyDefinition(term_sources[key].mobject,None,part,
+                            via=route(self.incoming,term_sources[key].mobject,part) if route else ())
                                        if key in term_sources else FadeIn(part)
                                        for key,part in live.parts.items())
                     else:
                         entering=getattr(type(live),'enter_animation',None)
-                        motions.append(entering(live) if entering else FadeIn(live))
+                        if entering is None and isinstance(live,(Text,SingleStringMathTex)) and crosses_moving_art(item.target):
+                            delayed_labels.append(live)
+                        else:motions.append(entering(live) if entering else FadeIn(live))
                 else:
                     motions.append(ApplyDefinition(source.mobject, None, live,
                         via=item.via, path_arc=item.path_arc, preserve_destination_layout=True,copy_only=True))
@@ -962,10 +1036,13 @@ class ViewTransition:
                 name, item = self.new[key]
                 live = item.object.mobject
                 if isinstance(live, MathRow):
-                    use = self.incoming.definition_uses.get(name)
+                    use = self.definition_uses.get(name)
                     borrowed=self.borrowed[key]
                     for term,source in borrowed.items():
-                        motions.append(ApplyDefinition(source.mobject,None,item.target.part(term),copy_only=True))
+                        destination=item.target.part(term)
+                        route=getattr(type(self.incoming),'definition_route',None)
+                        motions.append(ApplyDefinition(source.mobject,None,destination,copy_only=True,
+                            via=route(self.incoming,source.mobject,destination) if route else ()))
                     if use:
                         arc=use.path_arc
                         # A proof substitution often moves a wide fraction
@@ -992,7 +1069,11 @@ class ViewTransition:
                                 if not hasattr(animation, "target_mobject")
                                 or not _same_picture(animation.mobject, animation.target_mobject)]
                 elif hasattr(type(live),'motions_to') and hasattr(type(live),'adopt_layout'):
-                    use=self.incoming.definition_uses.get(name)
+                    use=self.definition_uses.get(name)
+                    borrowed=self.borrowed[key]
+                    for part,source in borrowed.items():
+                        motions.append(ApplyDefinition(source.mobject,None,item.target.part(part),copy_only=True,
+                            path_arc=getattr(item.target,'copy_path_arc',0),preserve_destination_layout=True))
                     if use:
                         def at_path(root,path):
                             for part in path.split('.'):root=root.part(part)
@@ -1002,11 +1083,28 @@ class ViewTransition:
                         via=use.via or (route(self.incoming,use.source.mobject,destination) if route else ())
                         motions.append(ApplyDefinition(use.source.mobject,at_path(live,use.part),
                             destination,via=via,path_arc=use.path_arc,preserve_destination_layout=True))
-                        motions.extend(live.motions_to(item.target,skip=(use.part,)))
-                    elif not _same_picture(live,item.target):motions.extend(live.motions_to(item.target))
+                        motions.extend(live.motions_to(item.target,skip=(*borrowed,use.part)))
+                    elif not _same_picture(live,item.target):
+                        motions.extend(live.motions_to(item.target,skip=tuple(borrowed)) if borrowed else live.motions_to(item.target))
                 elif not _same_picture(live, item.target):
                     motions.append(Transform(live, item.target, path_arc=item.path_arc))
-            changing = AnimationGroup(*motions) if motions else Wait(.001)
+            def finish_layout():
+                # A definition source may stay visible for a later cleanup
+                # phase. Retained artwork has already arrived in its new
+                # layout by then: its peer group and font references belong
+                # to that destination, not to the departing proof.
+                for key in self.retained:
+                    item=self.new[key][1]
+                    for live,target in zip(item.object.mobject.get_family(),item.target.get_family()):
+                        _copy_layout_metadata(target,live)
+            changing = _ArrivedLayoutGroup(*motions,on_arrival=finish_layout) if motions else Wait(.001)
+            if delayed_labels:
+                # This is one cue-anchored mechanical transition: move the
+                # retained argument first, then write into the cleared space.
+                # Construct the fades only at that phase so future labels
+                # cannot be prepainted by an AnimationGroup owner.
+                changing=Succession(changing,_deferred(lambda:AnimationGroup(
+                    *(FadeIn(label) for label in delayed_labels)),run_time=.2))
             if copy_owners:
                 # The definition stays visible until its copy has arrived.
                 return Succession(changing, _deferred(lambda: AnimationGroup(
@@ -1020,7 +1118,7 @@ class ViewTransition:
                 self._scheduled = (Succession(
                     _deferred(lambda: AnimationGroup(*exits), run_time=.25),
                     _deferred(build_changes, run_time=.75)),)
-        elif (not self.incoming.definition_uses
+        elif (not self.definition_uses
                 and not any(self.describe()[kind] for kind in ("move", "substitute", "copy", "enter", "exit"))):
             self._scheduled = ()
         else:
@@ -1064,6 +1162,17 @@ class ViewTransition:
             scene._capture_review_snapshot()
 
 
+class _ArrivedLayoutGroup(AnimationGroup):
+    """Adopt layout metadata when movement finishes, before source cleanup."""
+    def __init__(self,*animations,on_arrival,**options):
+        self.on_arrival=on_arrival
+        super().__init__(*animations,**options)
+
+    def finish(self):
+        super().finish()
+        self.on_arrival()
+
+
 def _adopt(live, target):
     if hasattr(type(live),'adopt_layout'):
         live.adopt_layout(target)
@@ -1096,11 +1205,14 @@ def _copy_layout_metadata(source,destination):
         destination.initial_height=source.initial_height
         for name in ('_algovis_source_text','_algovis_label'):
             if hasattr(source,name):setattr(destination,name,getattr(source,name))
-    if getattr(source,'_algovis_scene_typography',False):
-        from .layout import LessonStyle, measured_font_size
-        destination._algovis_scene_typography=True
-        LessonStyle._watch_type(destination,source._algovis_typography_group,
-                                source._algovis_type_role,measured_font_size(source))
+    # Copy the measured contract as well as its peer name. A moving MathRow
+    # still has its old baseline anchors until native adoption; rebuilding
+    # the contract from that live root would stamp its old size onto the
+    # newly arrived glyphs. Their destination geometry is authoritative.
+    for name in ('_algovis_scene_typography','_algovis_type_role',
+                 '_algovis_typography_group','_algovis_font_container',
+                 '_algovis_font_reference'):
+        if hasattr(source,name):setattr(destination,name,getattr(source,name))
 
 
 def _frame_fit_areas(view, rows, left):

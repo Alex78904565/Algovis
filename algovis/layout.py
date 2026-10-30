@@ -194,7 +194,7 @@ class ColumnLayout:
     """
 
     def __init__(self, region, *, padding=0, gap=DEFAULT_SPACING.relaxed, name="column",
-                 content_width=None):
+                 content_width=None, content_height=None):
         if padding < 0 or gap < 0 or 2*padding >= min(region.width, region.height):
             raise ValueError("Column padding and gap must leave a positive content area")
         available_width = region.width - 2*padding
@@ -206,6 +206,10 @@ class ColumnLayout:
         self.width = available_width if content_width is None else content_width
         self.left = region.center[0] - self.width/2
         self.top = region.center[1] + region.height/2 - padding
+        if content_height is not None:
+            if not math.isfinite(content_height) or not 0 < content_height <= region.height-2*padding+1e-7:
+                raise ValueError('Centered content height must fit inside the padded region')
+            self.top = region.center[1] + content_height/2
         self.bottom = region.center[1] - region.height/2 + padding
         self._cursor = self.top
         self._slots = {}

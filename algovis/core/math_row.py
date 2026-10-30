@@ -93,7 +93,9 @@ class MathRow(MathTex):
     def next_layout(self, parts=None, **changes):
         from ..semantics import copy_semantics
         values = dict(parts) if parts is not None else {**self.slot_tex, **changes}
-        target = MathRow(values, font_size=self._native_size*self._scale(), color=self.get_color())
+        meaning=getattr(self,'semantics',None)
+        color=meaning.color(self._semantic_theme) if meaning is not None else self.get_color()
+        target = MathRow(values, font_size=self._native_size*self._scale(), color=color)
         for name,part in target.parts.items():
             if name in self.parts:
                 part.set_color(self.parts[name].get_color())
@@ -154,6 +156,10 @@ class MathRow(MathTex):
         self._remember_layout()
         self._algovis_label = ''.join(self.slot_tex.values())
         self.tex_string = self._algovis_label
+        # Transfers are instructions for this transition, not persistent
+        # content. A later scene may reuse this live equation after the source
+        # was retired; its already-arrived terms must not fly in a second time.
+        self._copy_sources = {}
         copy_semantics(target,self)
         if hasattr(target, '_sum_contract'): self._sum_contract = target._sum_contract
         if getattr(self, '_algovis_typography_group', None):

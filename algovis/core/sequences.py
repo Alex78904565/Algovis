@@ -10,7 +10,8 @@ from ..semantics import set_semantics
 
 
 class StateSequence(VGroup):
-    def __init__(self,values,*,indices=False,known=False,theme=DEFAULT_THEME):
+    def __init__(self,values,*,indices=False,index_notation='array',known=False,theme=DEFAULT_THEME):
+        if index_notation not in ('array','function'):raise ValueError('Choose function or array index notation')
         values=tuple(values)
         self.theme=theme
         prepared=[LessonStyle(theme=theme).math(str(value)) for value in values]
@@ -25,7 +26,8 @@ class StateSequence(VGroup):
         if indices:
             for index,cell in enumerate(self.row,1):
                 self.index_labels.add(LessonStyle(theme=theme).math(
-                    rf'f[{index}]',type_role='label',role='current').next_to(cell,DOWN,buff=.12))
+                    (rf'f[{index}]' if index_notation=='array' else rf'f({index})'),
+                    type_role='label',role='current').next_to(cell,DOWN,buff=.12))
         self.ellipsis=MathTex(r'\cdots',color=theme.muted)
         self.ellipsis.next_to(self.row,RIGHT,buff=.55).set_opacity(0)
         super().__init__(self.row,self.index_labels)

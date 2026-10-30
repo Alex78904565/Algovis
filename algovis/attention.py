@@ -1,7 +1,7 @@
 """Object-level attention declarations, resolved against verified spoken words."""
 from dataclasses import dataclass
 import numpy as np
-from manim import Circumscribe, Transform, there_and_back
+from manim import Circumscribe, UpdateFromAlphaFunc, interpolate_color, there_and_back
 from .utils.effects import Pulse
 
 
@@ -57,9 +57,16 @@ class WordAttention:
             frame = getattr(target, 'box', None)
             if frame is None:
                 raise ValueError('A fill attention binding needs a framed object; use box for equation terms')
-            destination = frame.copy().set_fill(frame.get_stroke_color(), opacity=.25)
-            animation = Transform(frame, destination, rate_func=there_and_back)
+            color,opacity=frame.get_fill_color(),float(np.max(frame.get_fill_opacity()))
+            accent=frame.get_stroke_color()
+            def tint(_cell,alpha):
+                frame.set_fill(interpolate_color(color,accent,alpha),opacity=(1-alpha)*opacity+alpha*.4)
+            # Animate the owning cell. Promoting its opaque frame to a new
+            # scene root can paint that frame over the label even after the
+            # effect finishes; changing paint needs no ownership change.
+            animation = UpdateFromAlphaFunc(target,tint,rate_func=there_and_back)
             animation._algovis_attention = {'trigger':trigger, 'reason':self.reason}
+            animation._algovis_focus_target=target
             return animation
         raise ValueError(f'Unknown attention style: {style!r}')
 

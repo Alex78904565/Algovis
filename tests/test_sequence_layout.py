@@ -7,6 +7,100 @@ from algovis.animation import SceneBeat
 
 
 class SequenceLayoutTests(unittest.TestCase):
+    def test_new_terms_follow_the_declared_completed_status_in_an_edited_equation(self):
+        first=ListScene();first.add('base',Equation({'call':'f(0)'},role='current'))
+        completed=first.fork().revise('base',{'call':'f(0)','eq':'=','zero':'0'}).set_meaning('base',status='computed')
+        final=completed.fork().revise('base',{'call':'f(0)','eq':'=','zero':'0','consequence':r'\Longrightarrow P(0)'})
+        self.assertEqual(final.target('base').part('consequence').get_color(),final.theme.success)
+
+    def test_paired_explanations_share_row_tops_and_reserve_later_multiline_examples(self):
+        from algovis import PairedScene
+        first=PairedScene(pairs=(('step1','example1'),('step2','example2')))
+        first.add('step1',TextObject('Choose a smaller input'),slot='left')
+        first.add('step2',TextObject('Assume its answer'),slot='left')
+        later=first.fork()
+        later.add('example1',TextObject('A longer example\nwith two lines.'),slot='right')
+        later.add('example2',Equation({'f':'f(n-1)'}),slot='right')
+        group=SceneSequence('Paired recipe')
+        group.add(first,reason='Show the recipe');group.add(later,reason='Apply each step');group.compile()
+        a,b=[beat.scene for beat in group.beats]
+        for name in ('step1','step2'):np.testing.assert_allclose(a.target(name).get_center(),b.target(name).get_center())
+        from algovis.core.proof import first_line_of
+        for left,right in first.pairs:
+            self.assertAlmostEqual(first_line_of(b.target(left)).get_top()[1],first_line_of(b.target(right)).get_top()[1])
+        b.validate()
+
+    def test_proof_consequence_is_centered_beyond_the_proof_rail(self):
+        view=ProofSlide('A proof')
+        view.add('claim',TextObject('The claim holds.'))
+        view.add('conclusion',Equation({'conclusion':r'P(n)\text{ holds for all }n\ge0'}))
+        conclusion=view.target('conclusion');rail=view.target('proof_rail')
+        self.assertAlmostEqual(conclusion.get_x(),view.layout.footer.center[0])
+        self.assertLess(conclusion.get_top()[1],rail.get_bottom()[1])
+        view.validate()
+
+    def test_compact_argument_reserves_future_height_and_centers_the_completed_block(self):
+        from algovis import BlockScene
+        from manim import Group
+        first=BlockScene();first.add('work',Equation({'f':'f(n)'}))
+        last=first.fork();last.add('meaning',TextObject('A lower bound on the number of operations.'))
+        group=SceneSequence('One compact argument')
+        group.add(first,reason='State the work');group.add(last,reason='Explain the bound');group.compile()
+        a,b=[beat.scene for beat in group.beats]
+        np.testing.assert_allclose(a.target('work').get_center(),b.target('work').get_center())
+        art=Group(*(item.target for item in b.items.values()))
+        np.testing.assert_allclose(art.get_center(),b.layout.body.center)
+        self.assertAlmostEqual(b.target('work').get_left()[0],b.target('meaning').get_left()[0])
+
+    def test_filling_illustration_follows_its_text_column_without_stretching_label_type(self):
+        from algovis import ComparisonScene,ServerRacks
+        from algovis.layout import measured_font_size
+        first=ComparisonScene(center_blocks=True)
+        first.add('machine',ServerRacks('COMPUTER'),slot='left',fill='width')
+        last=first.fork();last.add('speed',Equation({'speed':r'1.742\times10^{18}\ \mathrm{FLOPS}'}),slot='left')
+        last.add('description',TextObject('floating-point operations per second',type_role='note'),slot='left')
+        last.add('calculation',Equation({'years':r'17.6\times10^{12}'}),slot='right')
+        group=SceneSequence('The complete calculation')
+        group.add(first,reason='Show the computer');group.add(last,reason='Give its speed and runtime');group.compile()
+        a,b=[beat.scene for beat in group.beats]
+        width=max(b.target(name).width for name in ('speed','description'))
+        self.assertAlmostEqual(b.target('machine')[0].width,width)
+        np.testing.assert_allclose(a.target('machine').get_center(),b.target('machine').get_center())
+        self.assertAlmostEqual(measured_font_size(b.target('machine').label),b.typography.label)
+        for view in (a,b):view.validate()
+
+    def test_definition_rows_are_left_aligned_inside_a_centered_block(self):
+        from algovis import DefinitionScene
+        view=DefinitionScene()
+        view.add('label',TextObject('A rule',type_role='note'),slot='explanation')
+        view.add('meaning',TextObject('A longer definition of the function.'),slot='explanation')
+        view.add('base',Equation({'base':'f(1)=1'}),slot='explanation')
+        rows=[view.target(name) for name in ('label','meaning','base')]
+        self.assertTrue(all(abs(row.get_left()[0]-rows[0].get_left()[0])<1e-7 for row in rows))
+        left=min(row.get_left()[0] for row in rows);right=max(row.get_right()[0] for row in rows)
+        self.assertAlmostEqual((left+right)/2,view._region('explanation').center[0])
+        view.validate()
+
+    def test_future_block_width_reserves_a_stable_left_anchor_before_reveal(self):
+        from algovis import DefinitionScene
+        first=DefinitionScene()
+        source=first.add('base',Equation({'base':'f(1)=1'}),slot='explanation')
+        source_position=source.mobject.get_center().copy()
+        later=first.fork()
+        later.add('meaning',TextObject('The answer for this input is the sum of its two children.'),slot='explanation')
+        group=SceneSequence('A complete function definition')
+        group.add(first,reason='Introduce the base case')
+        group.add(later,reason='Explain how to construct the other cases')
+        group.compile()
+        a,b=[beat.scene for beat in group.beats]
+        self.assertNotIn('meaning',a.items)
+        self.assertAlmostEqual(a.target('base').get_left()[0],b.target('base').get_left()[0])
+        left=min(item.target.get_left()[0] for item in b.items.values())
+        right=max(item.target.get_right()[0] for item in b.items.values())
+        self.assertAlmostEqual((left+right)/2,b._region('explanation').center[0])
+        np.testing.assert_allclose(source.mobject.get_center(),source_position)
+        self.assertIn('DefinitionScene/explanation',group.layout_report['blockWidths'])
+
     def test_cross_column_definition_copy_avoids_the_example_artwork(self):
         from algovis import ComparisonScene
         first=ComparisonScene()

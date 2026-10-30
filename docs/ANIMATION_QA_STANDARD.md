@@ -49,6 +49,10 @@ editorial checklist. An inherited cue is context, not a justification for a puls
 - Build an argument in place. Avoid turning consecutive clauses into separate
   slides.
 - Keep earlier useful work visible when the next line depends on it.
+- When migrating an example, inventory and retain its instructional devices:
+  braces/headings, persistent problem data, meters, state updates, item motion
+  and definition transfers. Scene count and tidy endpoints do not establish
+  that the visual explanation survived.
 - Do not make an object disappear and later recreate it unless the narration
   explicitly leaves and returns to that idea.
 - A transition clears the outgoing composition before revealing the incoming
@@ -75,6 +79,8 @@ because the screen has been still.
 
 Inspect the target's actual glyphs before, during, and after the effect. A label
 hidden by a fill or removed child is a failure even when the border pulses on time.
+Inspect the effect's visible contrast as well: recoloring an already-green cell
+green, or a barely visible size change on a tiny node, does not direct attention.
 
 ## 4. Color is semantic
 
@@ -123,6 +129,13 @@ across layout changes.
 
 ## 6. Layout is relational
 
+- Check internal alignment and whole-block placement separately. Compact
+  diagram explanations share a left edge inside a block centered beneath the
+  diagram. Reserve the complete explanation's later width before revealing its
+  first row; adding a line must not make earlier rows drift horizontally.
+- Center a compact standalone argument vertically too. Reserve its completed
+  height before the first reveal. Keep corresponding comparison columns on a
+  shared vertical envelope rather than centering each side independently.
 - Plan the completed composition before its incremental reveals. For a layout
   repair, compare a few sketches and record the chosen arrangement. Use named
   rows and nested regions rather than a new coordinate for every object.
@@ -261,6 +274,9 @@ A section is ready only when all answers are yes:
 - Do local substitutions preserve their native mathematical baseline, spacing,
   and semantic colors, as well as font size? Use `MathRow` for editable calls
   and worked arithmetic; inspect each intermediate result.
+- Do incoming labels wait until retained moving work has cleared their space?
+  Final-frame separation does not establish a clear transition. Inspect the
+  copied definition's whole route, including intervening base cases.
 - Do attention boxes remain for the complete spoken reference and disappear
   at its declared release cue? Prefer `focus_on_cue(..., until=...)` to a
   short transient pulse when explaining a term for several seconds.

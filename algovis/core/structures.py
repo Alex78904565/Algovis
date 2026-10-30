@@ -54,7 +54,7 @@ class StateCell(VGroup):
         value_size=LessonTypography().equation if value_scale is None else 48*value_scale
         self.label = value if isinstance(value,Mobject) else MathTex(str(value),font_size=value_size,color=theme.foreground)
         self.label._algovis_empty_font_size=value_size
-        if self.label.width > width-self.frame_style.horizontal_padding:
+        if self.label.width > width-self.frame_style.horizontal_padding+1e-7:
             raise ValueError("StateCell value exceeds its width; reserve a wider cell")
         self.label.move_to(self.box)
         self._value_font_size=float(getattr(self.label,'font_size',value_size)) if self.label.height>0 else value_size
@@ -74,7 +74,7 @@ class StateCell(VGroup):
         desired=typography.size(role)
         if size>0 and self.label.height>0:
             self.label.scale(desired/size).move_to(self.box)
-            if self.label.width>self.box.width-self.frame_style.horizontal_padding:
+            if self.label.width>self.box.width-self.frame_style.horizontal_padding+1e-7:
                 raise ValueError('Cell text exceeds its component; reserve a wider cell')
         self.label._algovis_empty_font_size=desired
         self._value_font_size=desired*self._initial_box_height/self.box.height
@@ -85,7 +85,7 @@ class StateCell(VGroup):
         target=self.copy()
         label=MathTex(str(value),font_size=self._value_font_size*self.box.height/self._initial_box_height,
                       color=self.theme.foreground).move_to(target.box)
-        if label.width>target.box.width-self.frame_style.horizontal_padding*self.box.height/self._initial_box_height:
+        if label.width>target.box.width-self.frame_style.horizontal_padding*self.box.height/self._initial_box_height+1e-7:
             raise ValueError('Value exceeds the cell; reserve a wider cell')
         target.label=label
         target.submobjects[1]=label

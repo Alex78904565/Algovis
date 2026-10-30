@@ -134,8 +134,9 @@ class RoadTripSimulation(VGroup):
         self.theme,self.capacity,self.prices,self.consumption=theme,capacity,prices,consumption
         self.city=0;self.fuel=0;self.costs=[]
         self.map=CityMap(range(1,len(consumption)+2),prices=prices,theme=theme)
-        self.state=Equation({'state':'(1,0)'},theme=theme)
-        self.purchase=Equation({'b':'b=0'},theme=theme)
+        self.state=Equation({'city_label':r'\text{city: }','city':'1',
+            'fuel_label':r'\quad\text{fuel: }','fuel':'0'},theme=theme)
+        self.purchase=Equation({'b':r'\text{buy: }0'},theme=theme)
         self.cost=Equation({'cost':r'\text{cost}=0'},theme=theme)
         self.dashboard=VGroup(self.state,self.purchase,self.cost)
         self.dashboard.arrange(RIGHT,buff=.6).next_to(self.map,DOWN,buff=.8)
@@ -166,8 +167,9 @@ class RoadTripSimulation(VGroup):
         if amount<0 or self.fuel+amount>self.capacity:raise ValueError('Purchase exceeds the fuel capacity')
         self.fuel+=amount
         if amount:self.costs.append(amount*self.prices[self.city])
-        target=self.purchase.next_layout(b=f'b={amount}')
-        motions=[Transform(self.purchase,target),self._fuel_animation()]
+        target=self.purchase.next_layout(b=rf'\text{{buy: }}{amount}')
+        motions=[Transform(self.purchase,target),self._fuel_animation(),
+            Transform(self.state,self.state.next_layout(city=str(self.city+1),fuel=str(self.fuel)))]
         if reveal_cost:
             expression='+'.join(map(str,self.costs)) or '0'
             motions.append(Transform(self.cost,self.cost.next_layout(cost=rf'\text{{cost}}={expression}')))
@@ -183,4 +185,4 @@ class RoadTripSimulation(VGroup):
         if self.fuel<required:raise ValueError('The demonstrated trip runs out of fuel')
         old=self.city;self.city+=1;self.fuel-=required
         return AnimationGroup(self.map.route_step(old,self.city),self._fuel_animation(),
-            Transform(self.state,self.state.next_layout(state=f'({self.city+1},{self.fuel})')))
+            Transform(self.state,self.state.next_layout(city=str(self.city+1),fuel=str(self.fuel))))

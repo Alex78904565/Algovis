@@ -35,6 +35,7 @@ class FitArea:
     height: float
     stacked: bool = False
     gap: float = 0
+    minimum_height: float = 0
 
     def scale(self, heights):
         if not self.items:
@@ -42,6 +43,7 @@ class FitArea:
         width = max(item.target.width for item in self.items)
         sizes = [heights(item) for item in self.items]
         height = sum(sizes) if self.stacked else max(sizes)
+        height=max(height,self.minimum_height)
         available = self.height-self.gap*max(0,len(self.items)-1) if self.stacked else self.height
         return min(1., self.width/max(width,1e-9), available/max(height,1e-9))
 

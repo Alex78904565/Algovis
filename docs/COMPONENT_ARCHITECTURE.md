@@ -117,6 +117,50 @@ The transition rules are:
   until that copy arrives.
 - Unchanged artwork receives no gratuitous pulse, fade or color change.
 
+Completed term transfers are consumed during native equation adoption. Reusing
+the arrived equation later carries its content, not an instruction to copy
+again from a source that may have left the board.
+
+Choose `BlockScene` for a compact argument: its rows share a left edge while
+the block is centered on both axes. `ComparisonScene(center_blocks=True)` uses
+centered column blocks with a common vertical envelope. Their `SceneSequence`
+reserves the completed widths and heights before incremental reveals. Keep
+`ListScene` for deliberate top-anchored lists and `ProofSlide` for proof rails.
+
+`SlotScene.add(..., fill='width')` gives an illustration its text peers' width
+without letting the illustration determine that preferred width. The component
+must implement `fill_width(width)`; plain text cannot be stretched this way.
+`ServerRacks` scales its rack geometry and repositions its unchanged-size label.
+Sequence planning measures future peer widths before the first filled item is
+revealed. A future region allocation never reveals its future content.
+
+`PairedScene(pairs=...)` reserves shared row heights for a method and its
+corresponding examples. `ObjectRow` keeps the same children in a horizontal
+container; its optional `align_part` aligns illustrations rather than their
+different caption/meter bounds. `BracedGroup` owns a shared brace and heading
+for related definitions. `SelectionScene` retains the items, illustrated bag
+and arithmetic in their named regions. `IllustratedBag` owns a `CapacityMeter`
+and its stored pictures; declaring `store=SlideObject(item.image)` in a planned
+refinement visibly carries a copy while keeping the source item on screen.
+Semantic components expose named `parts`, `motions_to(..., skip=...)` and
+`adopt_layout` so transferred parts are not also faded in or copied twice.
+
+Layout containers preserve **declared child identities**. To add a brace,
+caption or other child, construct another container from the existing children
+plus the new ones. Do not add anonymous children inside a layout-only
+`refine`: a child-count mismatch fails instead of silently dropping them.
+For example, construct `ItemCollection(*cards, count=Equation(...))` when
+introducing the count, retaining the same cards. Semantic components such as
+`CaseEquation` own their explicit protocols for adding/removing internal parts.
+Components can declare `_algovis_content_fields` for non-geometric state that
+must participate in reconciliation after intrinsic processes.
+
+Small primary dependency diagrams can choose a scene type role through
+`RecursiveTree(label_type_role='equation')`. Dense trees keep the default
+supporting label role. This changes the component's layout contract rather
+than adding local font sizes or offsets. Plot descriptions likewise use the
+scene's text/math statement roles; tick numerals remain supporting labels.
+
 Use `view.fork()` for a small refinement of the same board:
 
 ```python
@@ -452,6 +496,47 @@ are adopted too. Partial editable equations use `MathRow` planning and commit,
 or `substitute_on_cue`, so a digit is never merely centered on an old letter.
 
 ## Extending the system
+
+Transitions own the route as well as the destination. `ColumnSlide` routes a
+borrowed definition around intervening body rows using the measured source and
+destination bounds. It fails when no in-bounds gutter fits the copy. This is a
+layout default, not a narration-specific offset. Inspect the encoded route when
+changing its source formula or surrounding rows.
+
+A definition application is a one-transition instruction. Snapshots retain its
+identity so adding another row to the same authored view cannot replay it.
+Explicitly applying the definition again creates a new instruction. Component
+copies follow the same rule: adopted transfers are consumed, not stored as
+permanent content behavior.
+
+If a new plain label occupies a retained object's movement corridor, the view
+compiler moves the retained work first and reveals the label in the cleared
+space. Both phases belong to the same word-anchored transition; there is no
+second attention cue. Deferred construction prevents the label from prepainting.
+This safeguard does not certify arbitrary component motion or copy paths.
+
+Retained objects adopt the destination's typography metadata on arrival,
+before a later source-cleanup phase. Geometry and the font reference must agree
+throughout that phase; stale peer metadata cannot certify a new layout.
+During resizing between different layout contexts, a moving row has a temporary
+peer group for its own terms. Its source remains in the outgoing proof group.
+The measured size is retained throughout travel; the destination's settled peer
+contract applies on arrival. Comparing a departing, resizing row against its
+stationary source would incorrectly treat those two layouts as one composition.
+
+`SelectionScene` fits the bag's readout and item-card metrics as peers. Component
+geometry can reserve space, but treating one label-bearing component as an
+independently shrinking diagram would give equivalent labels different sizes.
+
+`DiagramScene` (including `DefinitionScene` and `TreeScene`) centers its
+explanation block while retaining a shared left edge for its rows.
+`TreeExplanationScene` uses the same contract for its equations. `block_slots`
+declares this placement separately from `centered_slots`, which centers each
+independent diagram. A `SceneSequence` measures completed block widths after
+common fitting, then reserves those widths in every state without adding future
+artwork. Inspect both early and completed states; do not replace this with local
+position offsets. Explicit proof rails and full content columns retain their
+own layout contracts.
 
 `ConversionScene` has `left`, `right` and `connector` locations. Supply a
 heading/call `MathStack` on each side; the connector aligns between the calls.

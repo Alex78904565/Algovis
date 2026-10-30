@@ -7,6 +7,60 @@ not another slide.
 
 ## Composition and copy contract
 
+Distinguish a block's position from the alignment of its rows. A compact
+definition below a centered diagram should form one centered block with a common
+left edge inside it. Left-aligning rows does not mean pinning that whole block
+to the screen margin; centering the block does not mean centering each row.
+Measure its completed width across the explanation before the first reveal, so
+later lines do not pull existing lines sideways. Inspect both the early sparse
+state and the completed block. Preserve explicit proof rails and comparison
+columns rather than applying individual-row centering to every layout.
+
+For a compact standalone argument, center the block vertically as well as
+horizontally. Use `BlockScene`, or `ComparisonScene(center_blocks=True)` for
+corresponding columns. Reserve the completed height across its `SceneSequence`
+so adding a line does not recenter everything already on screen. A deliberately
+top-anchored list or a proof rail remains a different layout contract.
+
+Inspect attention at its peak, not just its recorded time. Reapplying green to
+an already-green answer, or growing a miniature node by four percent, can be
+mechanically scheduled and still provide no useful visual direction. Use the
+shared frame-fill attention for an isolated state whose semantic color must
+remain unchanged. Check the glyphs remain readable through that fill.
+
+Terminology and hierarchy are prerequisites too: function labels use parentheses
+until the narration introduces brackets; the isolated notation being discussed
+must dominate its supporting caption. Retain the recurrence **and its base
+cases** while explaining the array's dependencies. A definition's name belongs
+above the content it names. Match the meaning and type hierarchy of both axes
+on a graph; fit coordinate geometry without shrinking its labels into illegibility.
+
+Attachments need the same deferred-lifecycle checks as equations. Numbered
+leaves start hidden and reveal in their own phases; do not prepaint every label
+before a staggered fade begins. A consumed definition transfer is not persistent
+content: reusing the arrived equation must not replay a copy from a retired
+source. Inspect before, during and after the subsequent regrouping as well.
+Animating a cell's opaque background as an independent root can cover its value
+even after a highlight finishes. Paint-only attention must keep the cell's
+ownership and draw order. Check actual rendered label pixels at the peak and
+after cleanup; opacity metadata alone cannot detect this occlusion.
+
+A migration preserves teaching devices, not just scene count and equations.
+Inventory the useful brace/group labels, persistent examples and meters,
+definition transfers, state updates and chosen-item movement before replacing
+their implementation. Compare those devices with the earlier version. A clean
+layout is insufficient evidence if a working part of the explanation vanished.
+Layout-container refinements must not silently zip away added children. Build
+a new container from the retained children plus new children; the compiler
+rejects mismatched child ownership rather than publishing an incomplete view.
+
+Width filling is a component layout operation, not a text-size override. Use
+`fill='width'` for an illustration that follows the enclosing text block's width;
+its illustration owns the geometric change while its label retains the shared
+type size. The filling item does not set its peers' preferred width. Verify
+the simulation's numeric state against its drawing after every action, including
+purchases as well as arrivals.
+
 The author wants reusable final-layout classes and automatic transitions. Share
 the same object across views to retain it. A deliberate `SlideObject.copy()` has
 a new identity, starts at the source, and travels to the new location while the
@@ -187,6 +241,19 @@ the viewer liking a particular device is not approval of every section using it,
 and an agent's frame check is not viewer endorsement.
 
 Viewer-endorsed patterns from this lesson's reviews:
+
+- **Scratch-paper appearance:** in note `971f295a2ac3` the viewer explicitly
+  liked the sheet's appearance while correcting when the second sheet appears.
+  Preserve the artwork, readable written results, and red repeated fifth value;
+  this endorsement does not approve its earlier reveal time.
+- **Grouped equivalent definitions:** note `bcdbdb536c0f` endorses a shared
+  brace and explanatory heading for the three sum definitions. Preserve that
+  grouping when updating the proof or changing their layout.
+- **Knapsack's concrete bag example:** notes `e3d8a2829e96` and `5b9a94390763`
+  endorse the persistent bag, its fullness meter, item insertion and the
+  highlighted feasible weight/value. Preserve those instructional devices,
+  not merely the arithmetic totals. Carry only the newly selected item's
+  attributes into a growing sum; previous contributions stay where they are.
 
 - **Minimal introduction:** the topic title and one small, appropriately timed
   character beat. Do not expand it back into a sequence of narrated slogans.
@@ -876,3 +943,25 @@ recoloring or unhiding before `play_on_cue` evaluates its arguments can paint
 during its wait. Put the verified word wait before that preparation, or animate
 the change inside the cued operation. Inspect a frame before the trigger to
 confirm the old state is still present.
+
+Lessons from the restored induction and knapsack devices:
+
+- Preserve useful visual mechanisms, not only their captions or final values.
+  The bag must retain its selected items and fullness meter; a three-definition
+  group includes its brace and heading; dominoes need their proposition labels.
+  These were explicitly liked or requested in the viewer's notes. Restoration
+  and the agent's frame inspection do not imply new viewer approval.
+- An attention effect is ineffective if its peak is barely visible, and wrong
+  if its background paints over the target's glyphs. Check the actual peak in
+  the encoded video. A label-bearing cell owns its fill and text layering.
+- When adding an item to a running total, transfer only that item's numbers.
+  Earlier terms remain in place. Consume a copy instruction after adoption so
+  future unrelated changes cannot replay old transfers.
+- Final layouts can be clean while a moving equation crosses a new heading or
+  caption. Clear the corridor before revealing that label. Keep a definition
+  copy readable while it passes an intervening base case; route it around the
+  row, rather than inspecting only its arrival.
+- Component fit groups must respect comparable text. Item metrics and a bag's
+  numerical readout should not acquire unrelated sizes because one component
+  was fitted as a diagram. Update font-reference metadata on arrival as well as
+  geometry, including the internal phase before an old source retires.

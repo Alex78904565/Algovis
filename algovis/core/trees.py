@@ -24,6 +24,7 @@ class RecursiveTree(VGroup):
                  node_style=None, node_type=CallNode,
                  reveal_depth=None,
                  backbone_space=False,
+                 label_type_role='label',
                  profile='standard',
                  theme=DEFAULT_THEME,
                  **kwargs):
@@ -32,6 +33,7 @@ class RecursiveTree(VGroup):
         if profile=='compact':
             width,height,node_radius,node_padding,node_shape=1.,.7,.20,.08,'box'
         self.profile=profile
+        self.label_type_role=label_type_role
         self.theme = theme
         self.branching_fn = branching_fn
         self.depth_limit = depth_limit
@@ -107,7 +109,7 @@ class RecursiveTree(VGroup):
     def _build_node_data(self, args, depth):
         label_str, child_args = self.branching_fn(*args)
 
-        size=LessonTypography().label if self.label_scale is None else 48*self.label_scale
+        size=LessonTypography().size(self.label_type_role) if self.label_scale is None else 48*self.label_scale
         label = MathTex(label_str,font_size=size,color=self.theme.foreground)
         label._algovis_empty_font_size=size
         if self.node_factory is None:
@@ -151,14 +153,15 @@ class RecursiveTree(VGroup):
             for label in self.leaf_numbers:
                 label.scale(typography.label/label.font_size)
                 LessonStyle._watch_type(label,group+'/leaf-counts','label')
-        if all(abs(float(measured_font_size(data['label']))-typography.label)<1e-6 for data,_ in self.iter_nodes()):
-            for data,_ in self.iter_nodes():LessonStyle._watch_type(data['label'],group+'/tree-labels','label')
+        desired=typography.size(self.label_type_role)
+        if all(abs(float(measured_font_size(data['label']))-desired)<1e-6 for data,_ in self.iter_nodes()):
+            for data,_ in self.iter_nodes():LessonStyle._watch_type(data['label'],group+'/tree-labels',self.label_type_role)
             return
         center=self.get_center()
         edge_opacities=[edge.get_stroke_opacity() for edge in self.edges]
         for data,_ in self.iter_nodes():
             label=data['label'];current=float(measured_font_size(label))
-            if current>0 and label.height>0:label.scale(typography.label/current)
+            if current>0 and label.height>0:label.scale(desired/current)
             if self.node_factory is None:
                 radius=max(self.node_radius,label.width/2+self.node_padding,
                            label.height/2+self.node_padding)
@@ -166,7 +169,7 @@ class RecursiveTree(VGroup):
                 box.stretch_to_fit_height(2*max(self.node_radius,label.height/2+self.node_padding)
                                           if self.node_shape=='box' else 2*radius)
                 label.move_to(box)
-            LessonStyle._watch_type(label,group+'/tree-labels','label')
+            LessonStyle._watch_type(label,group+'/tree-labels',self.label_type_role)
         heights={}
         for data,depth in self.iter_nodes():
             level=self._display_level(data,depth)
@@ -375,10 +378,15 @@ class RecursiveTree(VGroup):
         leaves=sorted((data for data,_ in self.iter_nodes() if not data['children']),
                       key=lambda data:data['mobject'].get_x())
         if not hasattr(self,'leaf_numbers'):self._prepare_leaf_counts()
-        self.leaf_numbers.set_opacity(1)
-        return AnimationGroup(*(SemanticChange(data['mobject'],status='computed',theme=self.theme)
-                                for data in leaves),
-                              LaggedStart(*(FadeIn(label) for label in self.leaf_numbers),lag_ratio=.12))
+        # Later labels must remain hidden until their own phase begins. Setting
+        # all their paint to 1 here makes them flash before nested FadeIns start.
+        def reveal(label):
+            label.set_opacity(1)
+            return FadeIn(label)
+        counting=Succession(*(DeferredAnimation(lambda label=label:reveal(label),run_time=.12)
+                              for label in self.leaf_numbers))
+        counting._algovis_component_process=True
+        return counting
 
     def annotate(self,node,content,*,side='left'):
         from .teaching import TreeAnnotation
@@ -400,12 +408,23 @@ class RecursiveTree(VGroup):
                 kept.append(node);keys.add(self.state_key(node['args']))
         return kept
 
-    def fold_to_backbone(self,values):
+    def fold_to_backbone(self,values,*,keep_call_labels=False):
         """Resolve a state, then fold its duplicate subtrees, from bottom to top."""
         kept=self.backbone();resolved=set()
         def resolve(node):
             key=self.state_key(node['args'])
             resolved.add(key)
+            if keep_call_labels:
+                def move_name():
+                    if not hasattr(self,'fold_labels'):
+                        self.fold_labels=VGroup();self.fold_label_keys=[];self.add(self.fold_labels)
+                    tag=node['mobject'].label.copy()
+                    destination=tag.copy().next_to(node['mobject'].box,RIGHT,buff=.1)
+                    self.fold_labels.add(tag);self.fold_label_keys.append(key)
+                    node['mobject'].label.set_opacity(0)
+                    return Transform(tag,destination)
+                return Succession(DeferredAnimation(move_name,run_time=.16),
+                    DeferredAnimation(lambda:node['mobject'].populate(values[key]),run_time=.34))
             return DeferredAnimation(lambda node=node,key=key:node['mobject'].populate(values[key]),run_time=.34)
         operations=[]
         # A distinct base sibling belongs in the retained state sequence, but
@@ -450,10 +469,16 @@ class RecursiveTree(VGroup):
                 # travelling artwork only after it has arrived, without a
                 # second fade across the readable stored answer.
                 for node in kept:node['mobject'].set_opacity(0)
+                if hasattr(self,'fold_labels'):self.fold_labels.set_opacity(0)
+        labels=[]
+        if hasattr(self,'fold_labels'):
+            destinations={self.state_key(node['args']):label for node,label in zip(kept,sequence.index_labels)}
+            labels=[Transform(tag,destinations[key]) for key,tag in zip(self.fold_label_keys,self.fold_labels)
+                    if key in destinations]
         return Succession(FadeOut(self.edges,run_time=.15),
             MergeIntoCells(*(motion for node,cell in zip(kept,sequence.row)
                 for motion in (node['mobject'].motions_to(cell)
-                    if hasattr(type(node['mobject']),'motions_to') else [Transform(node['mobject'],cell)])),
+                    if hasattr(type(node['mobject']),'motions_to') else [Transform(node['mobject'],cell)])),*labels,
                 lag_ratio=0,run_time=1))
 
     def get_layers(self):

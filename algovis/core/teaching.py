@@ -2,7 +2,7 @@
 import math
 import numpy as np
 from manim import (AnimationGroup,Axes,Create,DOWN,Dot,FadeIn,FadeOut,LEFT,Line,
-    RIGHT,RoundedRectangle,Succession,Transform,UP,VGroup,VMobject,config,linear)
+    RIGHT,RoundedRectangle,Succession,Transform,UP,VGroup,VMobject,config,linear,Group,Brace)
 from ..layout import LessonStyle,assign_scene_typography
 from ..theme import DEFAULT_THEME
 from ..semantics import SemanticChange
@@ -31,15 +31,48 @@ class MathStack(VGroup):
             DOWN,aligned_edge=LEFT,buff=.25).move_to(self)
 
 
+class ObjectRow(Group):
+    """A horizontal layout container; children retain their own identities."""
+    _algovis_layout_container=True
+    def __init__(self,*children,align_part=None):
+        self.align_part=align_part
+        super().__init__(*children)
+
+    def apply_scene_typography(self,typography,*,group):
+        for child in self:assign_scene_typography(child,typography,group=group)
+        self.arrange(RIGHT,aligned_edge=UP,buff=.45)
+        if self.align_part and len(self):
+            top=getattr(self[0],self.align_part).get_top()[1]
+            for child in self:child.shift((0,top-getattr(child,self.align_part).get_top()[1],0))
+
+
+class BracedGroup(Group):
+    """Related definitions keep their rows, common brace and explanatory label."""
+    _algovis_layout_container=True
+    def __init__(self,*rows,label,theme=DEFAULT_THEME):
+        self.rows=list(rows)
+        self.heading=LessonStyle(theme=theme).text(label,type_role='body',role='structure')
+        self.brace=Brace(Group(*rows),LEFT,color=theme.foreground)
+        super().__init__(*rows,self.heading,self.brace)
+
+    def apply_scene_typography(self,typography,*,group):
+        for row in self.rows:assign_scene_typography(row,typography,group=group)
+        assign_scene_typography(self.heading,typography,group=group)
+        block=Group(*self.rows).arrange(DOWN,aligned_edge=LEFT,buff=.35)
+        self.brace.become(Brace(block,LEFT,color=self.brace.get_color()))
+        self.heading.next_to(Group(block,self.brace),UP,buff=.35)
+
+
 class FixedGrowthPlot(VGroup):
     """A fixed input axis. Curve drawing is separate from layout fitting.
 
     Intentional offscreen growth therefore never forces the surrounding scene
     to shrink or follow the curve. Labels keep their semantic type roles.
     """
-    def __init__(self,*,function,label,x_max=100,y_max=2400000,
+    def __init__(self,*,function,label,x_label='input n',y_label=None,x_max=100,y_max=2400000,
                  x_ticks=(0,25,50,75,100),theme=DEFAULT_THEME):
         self.theme,self.function,self.y_max=theme,function,y_max
+        self.x_ticks=tuple(x_ticks)
         self.axes=Axes(x_range=[0,x_max,max(1,x_max/4)],y_range=[0,y_max,y_max/3],
             x_length=9.2,y_length=3.2,tips=False,
             axis_config={'color':theme.muted,'stroke_width':1.5,'tick_size':.045})
@@ -50,12 +83,36 @@ class FixedGrowthPlot(VGroup):
             value=round(y_max*fraction)
             self.labels.add(style.math(f'{value:,}'.replace(',','{,}'),type_role='label',role='muted')
                 .next_to(self.axes.c2p(0,value),LEFT,buff=.12))
-        self.labels.add(style.text('input n',type_role='label',role='muted').next_to(self.labels[4],DOWN,buff=.15))
-        self.labels.add(style.math(label,type_role='label',evaluation='bad').next_to(self.axes.y_axis.get_end(),UP,buff=.15))
+        self.x_title=style.text(x_label,type_role='label',role='muted')
+        self.y_title=style.math(y_label or label,type_role='label',evaluation='bad')
+        self.labels.add(self.x_title,self.y_title)
+        self._place_labels(x_ticks)
         super().__init__(self.axes,self.labels)
 
+    def _place_labels(self,x_ticks):
+        for n,label in zip(x_ticks,self.labels[:len(x_ticks)]):label.next_to(self.axes.c2p(n,0),DOWN,buff=.12)
+        for fraction,label in zip((1/3,2/3,1),self.labels[len(x_ticks):len(x_ticks)+3]):
+            label.next_to(self.axes.c2p(0,self.y_max*fraction),LEFT,buff=.12)
+        self.x_title.next_to(self.axes.x_axis.get_end(),DOWN,buff=.55)
+        self.y_title.next_to(self.axes.y_axis.get_end(),UP,buff=.15)
+
     def apply_scene_typography(self,typography,*,group):
-        for label in self.labels:assign_scene_typography(label,typography,group=group,role='label')
+        for label in self.labels:
+            if label not in (self.x_title,self.y_title):assign_scene_typography(label,typography,group=group,role='label')
+        assign_scene_typography(self.x_title,typography,group=group,role='body')
+        assign_scene_typography(self.y_title,typography,group=group,role='equation')
+
+    def layout_in(self,width,height,typography):
+        # Fit coordinate geometry, then place labels at their scene type size.
+        # Scaling the entire plot would make its short y-axis title microscopic.
+        x_ticks=self.x_ticks
+        self.axes.stretch_to_fit_width(min(9.2,max(1.,width-1.5)))
+        self.axes.stretch_to_fit_height(min(3.2,max(1.,height-1.2)))
+        self._place_labels(x_ticks)
+        for _ in range(3):
+            self.axes.stretch_to_fit_width(max(1.,self.axes.width-max(0.,self.width-width)))
+            self.axes.stretch_to_fit_height(max(1.,self.axes.height-max(0.,self.height-height)))
+            self._place_labels(x_ticks)
 
     def draw_growth(self):
         limit=config.frame_height/2+.15
@@ -90,8 +147,10 @@ class LogRuntimeComparison(VGroup):
         self.y_title.set_opacity(0)
 
     def apply_scene_typography(self,typography,*,group):
-        for label in [*self.x_labels,*self.y_labels,self.y_title,*self.legend]:
+        for label in [*self.x_labels,*self.y_labels]:
             assign_scene_typography(label,typography,group=group,role='label')
+        for label in [self.y_title,*self.legend]:
+            assign_scene_typography(label,typography,group=group,role='equation')
 
     def layout_in(self,width,height,typography):
         """Fit the axes rather than shrinking their labels with the drawing."""
@@ -143,6 +202,11 @@ class ServerRacks(VGroup):
 
     def apply_scene_typography(self,typography,*,group):
         assign_scene_typography(self.label,typography,group=group,role='label')
+        self.label.next_to(self[0],DOWN,buff=.22)
+
+    def fill_width(self,width):
+        """Stretch the illustration's footprint, preserving readable label type."""
+        self[0].scale_to_fit_width(width)
         self.label.next_to(self[0],DOWN,buff=.22)
 
 
@@ -200,23 +264,24 @@ class InductionChain(VGroup):
 
     def as_dominoes(self):
         from manim import Rectangle
+        # The physical contact model and readable labels share one spacing.
+        gap=max(.25,max(case.label.width for case in self.cases)+.15-.42)
         targets=VGroup(*(Rectangle(width=.42,height=1.3,color=self.theme.primary,
-            fill_color=self.theme.surface,fill_opacity=1) for _ in self.cases)).arrange(RIGHT,buff=.25).move_to(self.cases)
-        self.geometry=DominoGeometry(width=.42,height=1.3,gap=.25)
+            fill_color=self.theme.surface,fill_opacity=1) for _ in self.cases)).arrange(RIGHT,buff=gap).move_to(self.cases)
+        self.geometry=DominoGeometry(width=.42,height=1.3,gap=gap)
+        labels=[case.label.copy().next_to(target,DOWN,buff=.15) for case,target in zip(self.cases,targets)]
         chain=self
         class ToDominoes(AnimationGroup):
             _algovis_component_process=True
             def finish(self):
                 super().finish()
                 chain.arrows.set_opacity(0)
-                for case in chain.cases:case.label.set_opacity(0)
             def clean_up_from_scene(self,scene):
                 super().clean_up_from_scene(scene)
                 # FadeOut restores its source paint. These semantic children
                 # remain in the chain, so record the new hidden state as well.
                 chain.arrows.set_opacity(0)
-                for case in chain.cases:case.label.set_opacity(0)
-        return ToDominoes(FadeOut(self.arrows),*(FadeOut(case.label) for case in self.cases),
+        return ToDominoes(FadeOut(self.arrows),*(Transform(case.label,label) for case,label in zip(self.cases,labels)),
             *(Transform(case.box,target) for case,target in zip(self.cases,targets)))
 
     def fall(self,front):

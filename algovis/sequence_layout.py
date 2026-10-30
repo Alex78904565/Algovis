@@ -5,7 +5,9 @@ from .composition import ProofSlide
 
 def natural_view(view):
     result=view.snapshot()
-    for field in ('_sequence_layout_name','_sequence_fit_scales','_sequence_proof_envelopes'):
+    for field in ('_sequence_layout_name','_sequence_fit_scales','_sequence_proof_envelopes',
+                  '_sequence_block_widths','_sequence_block_heights','_sequence_fill_widths',
+                  '_sequence_paired_heights'):
         result.__dict__.pop(field,None)
     for item in result.items.values():
         if item.fit_scale!=1:result._scale_item(item,1/item.fit_scale)
@@ -22,7 +24,26 @@ def plan_sequence(name,views):
     cannot fit readably fails here, before any member begins playback.
     """
     planned=[natural_view(view) for view in views]
-    envelopes={};scales={}
+    fill_widths={}
+    for view in planned:
+        measure=getattr(view,'fill_widths',None)
+        for key,width in (measure() if measure else {}).items():
+            if width:fill_widths[key]=max(fill_widths.get(key,0.),width)
+    for view in planned:
+        view._sequence_fill_widths=fill_widths.copy()
+        # Still measure natural artwork here. Running the fitting pass now
+        # would measure already-fitted items as though they were natural, then
+        # apply an incompatible common scale when _editing restores them.
+        for item_name in getattr(view,'_width_fill',()) & view.items.keys():
+            item=view.items[item_name]
+            width=fill_widths.get(f'{type(view).__name__}/{item.slot}')
+            if width:item.target.fill_width(width)
+    envelopes={};scales={};paired={}
+    for view in planned:
+        measure=getattr(view,'paired_heights',None)
+        for key,height in (measure() if measure else {}).items():paired[key]=max(paired.get(key,0.),height)
+    for view in planned:
+        if hasattr(type(view),'paired_heights'):view._sequence_paired_heights=paired.copy()
     proofs=[view for view in planned if isinstance(view,ProofSlide)]
     for view in proofs:
         for slot,row in view.row_envelopes().items():
@@ -41,5 +62,20 @@ def plan_sequence(name,views):
         view._sequence_fit_scales=scales.copy()
         # _editing restores natural sizes before applying this one common fit.
         with view._editing():pass
-    report={'name':name,'scales':scales,'proofEnvelopes':envelopes,'scenes':len(planned)}
+    # Measure after common fitting, not from individual scene fits or raw text.
+    # Reserve future width without inserting that future artwork into a view.
+    widths={};heights={}
+    for view in planned:
+        measure=getattr(view,'block_widths',None)
+        for key,width in (measure() if measure else {}).items():
+            widths[key]=max(widths.get(key,0.),width)
+        measure=getattr(view,'block_heights',None)
+        for key,height in (measure() if measure else {}).items():
+            heights[key]=max(heights.get(key,0.),height)
+    for view in planned:
+        view._sequence_block_widths=widths.copy()
+        view._sequence_block_heights=heights.copy()
+        with view._editing():pass
+    report={'name':name,'scales':scales,'proofEnvelopes':envelopes,
+            'blockWidths':widths,'blockHeights':heights,'fillWidths':fill_widths,'scenes':len(planned)}
     return planned,report

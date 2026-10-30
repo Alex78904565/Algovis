@@ -6,6 +6,59 @@ from algovis import ViewTransition
 
 
 class SceneTypographyTests(unittest.TestCase):
+    def test_column_definition_copy_bypasses_an_intervening_base_case(self):
+        from algovis import Equation
+        import numpy as np
+        view=ColumnSlide()
+        definition=view.add('definition',TextObject('Definition'))
+        view.add('base',TextObject('Base case'))
+        view.add('application',TextObject('Application'))
+        scene=Scene();view.install(scene)
+        source=definition.mobject;destination=view.target('application')
+        route=view.definition_route(source,destination)
+        self.assertEqual(len(route),2)
+        base=view.target('base')
+        for a in np.linspace(0,1,31):
+            point=route[0]+a*(route[1]-route[0])
+            self.assertFalse(base.get_left()[0]-source.width/2<point[0]<base.get_right()[0]+source.width/2)
+
+    def test_selection_labels_share_one_fit_across_items_and_bag(self):
+        from algovis import SelectionScene,MathStack
+        from algovis.layout import measured_font_size
+        from manim import Group,Rectangle
+        view=SelectionScene()
+        view.add('items',TextObject('Item labels',type_role='label'),slot='items')
+        # The container is tall enough to require automatic fitting.
+        view.add('bag',Group(Rectangle(width=1,height=3),
+            TextObject('Bag label',type_role='label')),slot='bag')
+        view.add('total',MathRow({'value':'1+3+1=5'}),slot='calculation')
+        view.validate()
+        self.assertAlmostEqual(measured_font_size(view.target('items')),
+            measured_font_size(view.target('bag')[1]))
+        self.assertLess(measured_font_size(view.target('items')),view.typography.label)
+
+    def test_regrouped_equation_adopts_destination_peers_before_transition_commit(self):
+        from algovis import CenteredScene,Equation
+        from tests.test_composition import start,finish
+        first=ColumnSlide(typography=LessonTypography(equation=30))
+        retained=first.add('retained',Equation({'call':'f(k)'}))
+        definition=first.add('definition',Equation({'value':'k+1'}))
+        scene=Scene();first.install(scene)
+        second=CenteredScene()
+        second.add('retained',retained)
+        second.add('application',Equation({'value':definition.part('value')}))
+        transition=ViewTransition(first,second)
+        for animation in transition.animations(scene):
+            start(animation,scene)
+            animation.interpolate(.5)
+            self.assertTrue(retained.mobject._algovis_typography_group.startswith('transition/'))
+            self.assertEqual(definition.mobject._algovis_typography_group,first._type_group)
+            finish(animation,scene)
+        # The arrived object is checked before ViewTransition.commit runs.
+        self.assertEqual(retained.mobject._algovis_typography_group,second._type_group)
+        from algovis.layout import measured_font_size
+        self.assertAlmostEqual(measured_font_size(retained.mobject.part('call')),second.typography.equation)
+
     def test_chart_reflows_axes_while_keeping_scene_label_sizes(self):
         import math
         from algovis import DiagramScene,LogRuntimeComparison
@@ -15,8 +68,12 @@ class SceneTypographyTests(unittest.TestCase):
         view.add('caption',TextObject('Vertical units are powers of ten',type_role='label'),slot='explanation')
         view.validate()
         chart=view.target('chart')
-        for label in [*chart.x_labels,*chart.y_labels,chart.y_title,*chart.legend]:
+        for label in [*chart.x_labels,*chart.y_labels]:
             self.assertAlmostEqual(measured_font_size(label),measured_font_size(view.target('caption')))
+        # Axis/series descriptions are mathematical statements; tiny tick
+        # numerals remain supporting labels. Neither shrinks with the axes.
+        for label in [chart.y_title,*chart.legend]:
+            self.assertAlmostEqual(measured_font_size(label),view.typography.equation)
 
     def test_reflow_preserves_semantic_color_as_well_as_typography(self):
         view=ColumnSlide()
