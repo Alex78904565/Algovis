@@ -246,30 +246,79 @@ class TreeAnnotation(VGroup):
 
 class InductionChain(VGroup):
     """The same case boxes can become a contact-driven domino chain."""
-    def __init__(self,count=5,*,theme=DEFAULT_THEME):
+    def __init__(self,count=5,*,known=(),dominoes=False,theme=DEFAULT_THEME):
         from manim import Arrow
         self.theme=theme
         self.cases=StateRow([rf'P({index})' for index in range(count)],theme=theme,gap=.55)
+        from ..semantics import set_semantics
+        for index in known:set_semantics(self.cases[index],status='computed',theme=theme)
         self.arrows=VGroup(*(Arrow(a.get_right(),b.get_left(),buff=.09,color=theme.muted,
             tip_length=.1,stroke_width=2) for a,b in zip(self.cases,self.cases[1:])))
+        self.reserve_dominoes=bool(dominoes)
         super().__init__(self.arrows,self.cases)
+        if self.reserve_dominoes:
+            from manim import Rectangle
+            self.motion_bounds=Rectangle(width=self.cases.width,height=self._domino_metrics()[1],
+                stroke_opacity=0,fill_opacity=0).move_to(self.cases)
+            self.add(self.motion_bounds)
 
     def apply_scene_typography(self,typography,*,group):
         self.cases.apply_scene_typography(typography,group=group)
+        if self.reserve_dominoes:
+            self.motion_bounds.stretch_to_fit_width(self.cases.width)
+            self.motion_bounds.stretch_to_fit_height(self._domino_metrics()[1]).move_to(self.cases)
 
-    def propagate(self,index):
-        animations=[SemanticChange(self.cases[index],status='computed',theme=self.theme)]
-        if index:animations.append(self.arrows[index-1].animate.set_color(self.theme.success))
-        return AnimationGroup(*animations)
+    def _domino_metrics(self):
+        width=max(case.label.width for case in self.cases)+.24
+        return width,max(1.5,2.1*width),.3*width
+
+    def propagate(self,indices,*,trigger,reason):
+        """One narrated implication process: recolor and visibly pulse each case.
+
+        A plural phrase can advance several cases in sequence. Their internal
+        phases belong to this one verified trigger, rather than invented words.
+        """
+        from manim import UpdateFromAlphaFunc,interpolate_color,there_and_back,ManimColor
+        from ..semantics import set_semantics
+        if not str(trigger).strip() or not str(reason).strip():
+            raise ValueError('Correctness propagation needs its spoken trigger and purpose')
+        indices=(indices,) if isinstance(indices,int) else tuple(indices)
+        if not indices or any(not 0<=i<len(self.cases) for i in indices):
+            raise ValueError('Name the cases whose correctness propagates')
+        original={i:self.cases[i].copy() for i in indices}
+        colors={i:self.cases[i].box.get_stroke_color() for i in indices}
+        arrow_colors={i:self.arrows[i-1].get_color() for i in indices if i}
+        success=ManimColor(self.theme.success)
+        def update(_chain,alpha):
+            for phase,index in enumerate(indices):
+                progress=np.clip(alpha*len(indices)-phase,0,1)
+                case=self.cases[index]
+                scale=1+.14*there_and_back(progress)
+                # Geometry and paint change as one component-owned process;
+                # promoting an opaque cell background would cover its label.
+                target=original[index].copy().scale(scale)
+                case.box.set_points(target.box.get_points())
+                for live,reference in zip(case.label.get_family(),target.label.get_family()):
+                    if live.has_points():live.set_points(reference.get_points())
+                case.box.set_stroke(interpolate_color(colors[index],success,progress))
+                if index:self.arrows[index-1].set_color(interpolate_color(arrow_colors[index],success,progress))
+                if progress>=1:set_semantics(case,status='computed',theme=self.theme)
+        animation=UpdateFromAlphaFunc(self,update,rate_func=linear)
+        animation._algovis_component_process=True
+        animation._algovis_attention={'trigger':trigger,'reason':reason}
+        animation._algovis_focus_target=self.cases[indices[0]] if len(indices)==1 else self.cases
+        return animation
 
     def as_dominoes(self):
         from manim import Rectangle
         # The physical contact model and readable labels share one spacing.
-        gap=max(.25,max(case.label.width for case in self.cases)+.15-.42)
-        targets=VGroup(*(Rectangle(width=.42,height=1.3,color=self.theme.primary,
-            fill_color=self.theme.surface,fill_opacity=1) for _ in self.cases)).arrange(RIGHT,buff=gap).move_to(self.cases)
-        self.geometry=DominoGeometry(width=.42,height=1.3,gap=gap)
-        labels=[case.label.copy().next_to(target,DOWN,buff=.15) for case,target in zip(self.cases,targets)]
+        width,height,gap=self._domino_metrics()
+        targets=VGroup(*(Rectangle(width=width,height=height,color=case.box.get_stroke_color(),
+            fill_color=self.theme.surface,fill_opacity=1) for case in self.cases)).arrange(RIGHT,buff=gap).move_to(self.cases)
+        self.geometry=DominoGeometry(width=width,height=height,gap=gap)
+        cells=[]
+        for case,target in zip(self.cases,targets):
+            cell=case.copy();cell.box.become(target);cell.label.move_to(target);cells.append(cell)
         chain=self
         class ToDominoes(AnimationGroup):
             _algovis_component_process=True
@@ -281,18 +330,27 @@ class InductionChain(VGroup):
                 # FadeOut restores its source paint. These semantic children
                 # remain in the chain, so record the new hidden state as well.
                 chain.arrows.set_opacity(0)
-        return ToDominoes(FadeOut(self.arrows),*(Transform(case.label,label) for case,label in zip(self.cases,labels)),
-            *(Transform(case.box,target) for case,target in zip(self.cases,targets)))
+        # Move the complete cell. Independent box roots paint over their own
+        # labels until a later component animation happens to reunite them.
+        return ToDominoes(FadeOut(self.arrows),*(Transform(case,target) for case,target in zip(self.cases,cells)))
 
     def fall(self,front):
         from manim import UpdateFromAlphaFunc,DR,PI,smooth
+        from ..layout import measured_font_size
         if not hasattr(self,'upright'):
-            self.upright=[case.box.copy() for case in self.cases]
-            self.pivots=[box.get_corner(DR) for box in self.upright]
+            self.upright=[case.copy() for case in self.cases]
+            self.pivots=[case.box.get_corner(DR) for case in self.upright]
         def update(_mob,alpha):
             limit=PI/2 if front==len(self.cases)-1 else self.geometry.first_contact
             angles=self.geometry.angles(len(self.cases),front,smooth(alpha)*limit)
             for index,(case,original,pivot,angle) in enumerate(zip(self.cases,self.upright,self.pivots,angles)):
-                case.box.become(original.copy().rotate(-angle,about_point=pivot))
+                target=original.copy().rotate(-angle,about_point=pivot)
+                case.box.become(target.box)
+                case.label.become(target.label)
+                for live,reference in zip(case.label.get_family(),original.label.get_family()):
+                    if getattr(reference,'_algovis_font_reference',None) and live.height>0:
+                        # Rotating an unchanged font changes its ink bounds,
+                        # not its point size. Keep that distinction measured.
+                        live._algovis_font_reference=(measured_font_size(reference),float(live.height))
                 if index<=front:case.box.set_stroke(self.theme.success).set_fill(self.theme.success,opacity=.5)
         return UpdateFromAlphaFunc(self,update)

@@ -3,13 +3,14 @@ import math
 from manim import (AnimationGroup,Arrow,Create,DOWN,FadeIn,FadeOut,LEFT,MathTex,
                    MoveAlongPath,ParametricFunction,RIGHT,Succession,SurroundingRectangle,
                    SVGMobject,Transform,UP,VGroup,config,linear)
-from .structures import StateRow
+from .structures import StateRow,StateCell
 from ..layout import LessonStyle
 from ..theme import DEFAULT_THEME
 from ..semantics import set_semantics
 
 
 class StateSequence(VGroup):
+    _algovis_content_fields=('_continuation','_final_index')
     def __init__(self,values,*,indices=False,index_notation='array',known=False,theme=DEFAULT_THEME):
         if index_notation not in ('array','function'):raise ValueError('Choose function or array index notation')
         values=tuple(values)
@@ -23,6 +24,8 @@ class StateSequence(VGroup):
         self.index_labels=VGroup()
         self._pair=self._plus=self._arrow=None
         self._continuation=False
+        self._final_index=None
+        self.terminal=None
         if indices:
             for index,cell in enumerate(self.row,1):
                 self.index_labels.add(LessonStyle(theme=theme).math(
@@ -40,15 +43,28 @@ class StateSequence(VGroup):
         self.ellipsis.scale(typography.label/self.ellipsis.font_size)
         LessonStyle._watch_type(self.ellipsis,group+'/indices','label')
         self.ellipsis.next_to(self.row,RIGHT,buff=.55)
+        if self.terminal is not None:
+            self.terminal.apply_scene_typography(typography,group=group)
+            self.terminal.next_to(self.ellipsis,RIGHT,buff=.35).set_y(self.row.get_y())
 
     def cell(self,index):return self.row[index]
 
-    def with_state(self,*,continuation):
+    def with_state(self,*,continuation,final_index=None):
         target=self.copy();target._continuation=bool(continuation)
+        if final_index is not None and not continuation:
+            raise ValueError('A symbolic final state requires the intervening ellipsis')
+        target._final_index=final_index
         if continuation:
             target.ellipsis.next_to(target.row,RIGHT,buff=.55).set_opacity(1)
             if target.ellipsis not in target.submobjects:target.add(target.ellipsis)
         elif target.ellipsis in target.submobjects:target.remove(target.ellipsis)
+        if target.terminal is not None:target.remove(target.terminal)
+        target.terminal=None
+        if final_index is not None:
+            target.terminal=StateCell(rf'f[{final_index}]',width=self.row[-1].box.width,
+                height=self.row[-1].box.height,status='computed',theme=self.theme)
+            target.terminal.next_to(target.ellipsis,RIGHT,buff=.35).set_y(target.row.get_y())
+            target.add(target.terminal)
         return target
 
     def motions_to(self,target):
@@ -58,6 +74,12 @@ class StateSequence(VGroup):
             motions.append(FadeIn(self.ellipsis))
         elif self._continuation and not target._continuation:motions.append(FadeOut(self.ellipsis))
         elif self._continuation:motions.append(Transform(self.ellipsis,target.ellipsis))
+        if target.terminal is not None:
+            if self.terminal is None:
+                self.terminal=target.terminal.copy();self.add(self.terminal)
+                motions.append(FadeIn(self.terminal))
+            else:motions.append(Transform(self.terminal,target.terminal))
+        elif self.terminal is not None:motions.append(FadeOut(self.terminal))
         return motions
 
     def adopt_layout(self,target):
@@ -65,7 +87,12 @@ class StateSequence(VGroup):
         _adopt(self.row,target.row);_adopt(self.index_labels,target.index_labels)
         _adopt(self.ellipsis,target.ellipsis)
         self._continuation=target._continuation
-        self.submobjects=[self.row,self.index_labels]+([self.ellipsis] if self._continuation else [])
+        self._final_index=target._final_index
+        if target.terminal is not None:
+            if self.terminal is None:self.terminal=target.terminal.copy()
+            else:self.terminal.adopt_layout(target.terminal)
+        else:self.terminal=None
+        self.submobjects=[self.row,self.index_labels]+([self.ellipsis] if self._continuation else [])+([self.terminal] if self.terminal is not None else [])
         return self
 
     def populate(self,index,value):return self.row[index].populate(value)

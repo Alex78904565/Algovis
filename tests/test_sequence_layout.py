@@ -7,6 +7,43 @@ from algovis.animation import SceneBeat
 
 
 class SequenceLayoutTests(unittest.TestCase):
+    def test_list_and_block_share_the_centered_common_edge_contract(self):
+        from algovis import BlockScene
+        from manim import Group
+        for layout in (ListScene,BlockScene):
+            first=layout();first.add('first',TextObject('A short starting row.'))
+            last=first.fork();last.add('second',TextObject('The longer completed argument.'))
+            sequence=SceneSequence('the complete argument')
+            sequence.add(first,reason='Begin');sequence.add(last,reason='Complete');sequence.compile()
+            a,b=[beat.scene for beat in sequence.beats]
+            body=Group(*(item.target for item in b.items.values() if item.slot=='body'))
+            np.testing.assert_allclose(body.get_center(),b.layout.body.center,atol=1e-7)
+            self.assertAlmostEqual(b.target('first').get_left()[0],b.target('second').get_left()[0])
+            np.testing.assert_allclose(a.target('first').get_center(),b.target('first').get_center())
+
+    def test_paired_argument_is_centered_as_a_whole_without_losing_row_alignment(self):
+        from algovis import PairedScene
+        from manim import Group
+        first=PairedScene(pairs=(('step1','example1'),('step2','example2')))
+        first.add('step1',TextObject('Choose a smaller instance'),slot='left')
+        first.add('step2',TextObject('Assume it works'),slot='left')
+        last=first.fork();last.add('example1',Equation({'f':'f(n-1)'}),slot='right')
+        last.add('example2',Equation({'f':'f(n-1)=1+2+\\cdots+(n-1)'}),slot='right')
+        sequence=SceneSequence('Paired explanation');sequence.add(first,reason='Recipe');sequence.add(last,reason='Examples');sequence.compile()
+        a,b=[beat.scene for beat in sequence.beats]
+        art=Group(*(item.target for item in b.items.values()))
+        np.testing.assert_allclose(art.get_center(),b.layout.body.center,atol=1e-7)
+        np.testing.assert_allclose(a.target('step1').get_center(),b.target('step1').get_center())
+        for left,right in b.pairs:self.assertAlmostEqual(b.target(left).get_top()[1],b.target(right).get_top()[1])
+
+    def test_continuing_proof_equality_aligns_its_operator_with_the_previous_line(self):
+        view=ProofSlide()
+        view.add('inductive_step',Equation({'call':'f(k+1)','eq':'=','child':'f(k)','plus':'+','n':'(k+1)'}))
+        view.add('work',Equation({'eq':'=','child':r'1+2+\cdots+k','plus':'+','n':'(k+1)'}))
+        self.assertAlmostEqual(view.target('work').part('eq').get_left()[0],view.target('inductive_step').part('eq').get_left()[0])
+        self.assertNotIn('call',view.target('work').parts)
+        view.validate()
+
     def test_new_terms_follow_the_declared_completed_status_in_an_edited_equation(self):
         first=ListScene();first.add('base',Equation({'call':'f(0)'},role='current'))
         completed=first.fork().revise('base',{'call':'f(0)','eq':'=','zero':'0'}).set_meaning('base',status='computed')
@@ -129,6 +166,23 @@ class SequenceLayoutTests(unittest.TestCase):
         final=group.beats[-1].scene
         self.assertAlmostEqual(measured_font_size(final.target('claim')),
                                measured_font_size(final.target('conclusion')))
+
+    def test_proof_definition_copy_routes_beside_intervening_claim_and_base(self):
+        proof=ProofSlide('A proof',profile='worked')
+        source=proof.add('definitions',Equation({'child':'f(n-1)','plus':'+','n':'n'}))
+        proof.add('claim',Equation({'statement':r'P(n):f(n)=1+2+\cdots+n'}))
+        proof.add('base_case',Equation({'statement':'f(0)=0'}))
+        proof.add('induction_hypothesis',Equation({'statement':r'f(k)=1+2+\cdots+k'}))
+        proof.add('inductive_step',Equation({'call':'f(k+1)','eq':'=','child':'f(n-1)'}))
+        from manim import Scene
+        proof.install(Scene())
+        destination=proof.target('inductive_step').part('child')
+        route=proof.definition_route(source.mobject.part('child'),destination)
+        self.assertEqual(len(route),2)
+        half_width=max(source.mobject.part('child').width,destination.width)/2
+        for name in ('claim','base_case','induction_hypothesis'):
+            self.assertGreater(route[0][0]-half_width,proof.target(name).get_right()[0])
+        self.assertLess(route[0][0]+half_width,proof.layout.body.width/2)
 
     def test_a_concrete_example_stays_centered_as_its_definition_grows(self):
         first=MapScene('A journey')

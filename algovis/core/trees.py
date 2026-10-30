@@ -294,8 +294,8 @@ class RecursiveTree(VGroup):
             for parent,depth in self.iter_nodes():
                 for child,edge in zip(parent['children'],parent['edges']):
                     direction=child['shape'].get_center()-parent['shape'].get_center()
-                    full=Line(parent['shape'].get_boundary_point(direction),
-                              child['shape'].get_boundary_point(-direction),
+                    full=Line(self._connection_point(parent,direction),
+                              self._connection_point(child,-direction),
                               color=edge.get_stroke_color(),stroke_width=edge.get_stroke_width())
                     self._layered_unroll_edges.append((edge,full,depth+1))
         return self
@@ -337,8 +337,8 @@ class RecursiveTree(VGroup):
         for child in node_data["children"]:
             direction = child["shape"].get_center() - node_data["shape"].get_center()
             edge = Line(
-                node_data["shape"].get_boundary_point(direction),
-                child["shape"].get_boundary_point(-direction),
+                self._connection_point(node_data,direction),
+                self._connection_point(child,-direction),
                 color=self.theme.muted,
                 stroke_width=2,
             )
@@ -346,6 +346,11 @@ class RecursiveTree(VGroup):
             self.edges.add(edge)
 
             self._create_edges(child)
+
+    @staticmethod
+    def _connection_point(data,direction):
+        point=getattr(type(data['mobject']),'connection_point',None)
+        return point(data['mobject'],direction) if point else data['shape'].get_boundary_point(direction)
 
     def iter_nodes(self):
         """Yield ``(node_data, depth)`` pairs in preorder."""
@@ -646,8 +651,8 @@ class RecursiveTree(VGroup):
             if np.linalg.norm(direction) < 1e-8:
                 return None
             target.put_start_and_end_on(
-                parent_target["shape"].get_boundary_point(direction),
-                child_target["shape"].get_boundary_point(-direction),
+                self._connection_point(parent_target,direction),
+                self._connection_point(child_target,-direction),
             )
             return target
 
@@ -857,8 +862,8 @@ class RecursiveTree(VGroup):
                 target = graph.nodes[child_key]
                 delta = target.get_center() - parent.get_center()
                 edge = Arrow(
-                    parent[0].get_boundary_point(delta),
-                    target[0].get_boundary_point(-delta),
+                    self._connection_point({'mobject':parent,'shape':parent[0]},delta),
+                    self._connection_point({'mobject':target,'shape':target[0]},-delta),
                     buff=0.02, color=edge_color, stroke_width=2,
                     max_tip_length_to_length_ratio=0.12,
                 )

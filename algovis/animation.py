@@ -81,8 +81,9 @@ class LessonAnimation:
                 continue
             if isinstance(beat,SceneBeat):
                 planned=beat.scene.snapshot()
-                if self._intrinsic_since_scene and self._last_scene is not None:
-                    planned.retain_live_models(self._last_scene)
+                # Every composition change inherits completed component state,
+                # including caption-only beats after the first regrouping.
+                planned.retain_live_models(self._last_scene)
                 if beat.cue is not None and beat.cue==self._last_cue:
                     renderer.transition_phase(beat.cue,planned,run_time=beat.duration,reason=beat.reason)
                 else:

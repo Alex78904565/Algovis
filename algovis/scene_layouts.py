@@ -18,10 +18,6 @@ class CenteredScene(ColumnSlide):
             for part in body:part.set_x(self.layout.body.center[0])
 
 
-class ListScene(ColumnSlide):
-    """A left-aligned explanation whose rows grow from top to bottom."""
-
-
 class BlockScene(ColumnSlide):
     """One compact argument, centered as a block with internally aligned rows."""
     def block_widths(self):
@@ -42,6 +38,14 @@ class BlockScene(ColumnSlide):
         for name,item in self.items.items():
             if item.slot=='body':_column_row(column,name,item)
             else:item.target.move_to(self.layout.region(item.slot).center)
+
+
+class ListScene(BlockScene):
+    """A growing list with common left edges in a centered argument block.
+
+    Row alignment does not authorize anchoring the whole argument to a screen
+    corner. This uses exactly the same reservation policy as BlockScene.
+    """
 
 
 class SlotScene(SlideView):
@@ -242,12 +246,37 @@ class PairedScene(ComparisonScene):
         return {str(index):max((self._height(self.items[name]) for name in pair if name in self.items),default=.52)
                 for index,pair in enumerate(self.pairs)}
 
+    def _region(self,slot):
+        return getattr(self,'_paired_regions',{}).get(slot) or super()._region(slot)
+
+    def _text_width(self,slot):
+        # Wrapping uses the full column capacity, not an earlier short row's
+        # fitted width. Validation uses the actual centered column below.
+        return super()._slots()[slot].width if slot in ('left','right') else super()._text_width(slot)
+
     def _arrange(self):
         super()._arrange()
         heights=self.paired_heights()
         fit=next((area['scale'] for area in self._fit_report if area['group']=='body'),1.)
         heights.update({key:height*fit for key,height in getattr(self,'_sequence_paired_heights',{}).items()})
-        columns={slot:ColumnLayout(region,gap=.28) for slot,region in self._slots().items()}
+        widths=self.block_widths()
+        widths.update(getattr(self,'_sequence_block_widths',{}))
+        total_height=sum(heights.values())+.28*max(0,len(heights)-1)
+        regions=self._slots()
+        # Center the two-column argument as one block; retain a shared top
+        # for corresponding rows and a common left edge within each column.
+        content_widths={slot:widths.get(f'{type(self).__name__}/{slot}',max(
+            (item.target.width for item in self.items.values() if item.slot==slot),default=0.))
+            for slot in regions}
+        total_width=sum(content_widths.values())+self.gutter
+        left=self.layout.body.center[0]-total_width/2
+        columns={};self._paired_regions={}
+        for slot,region in regions.items():
+            width=content_widths[slot]
+            area=SlideRegion((left+width/2,self.layout.body.center[1],0),max(width,.01),region.height)
+            self._paired_regions[slot]=area
+            columns[slot]=ColumnLayout(area,padding=0,gap=.28,content_height=total_height)
+            left+=width+self.gutter
         from .core.proof import first_line_of
         from manim import UP
         for index,pair in enumerate(self.pairs):
@@ -259,6 +288,11 @@ class PairedScene(ComparisonScene):
                 # center of a multiline example or a fraction.
                 top=columns[item.slot]._slots[str(index)][0]
                 item.target.shift((0,top-first_line_of(item.target).get_top()[1],0))
+
+    def block_widths(self):
+        return {f'{type(self).__name__}/{slot}':max(
+            (item.target.width for item in self.items.values() if item.slot==slot),default=0.)
+            for slot in self._slots()}
 
     def _fit_areas(self):
         areas=super()._fit_areas()

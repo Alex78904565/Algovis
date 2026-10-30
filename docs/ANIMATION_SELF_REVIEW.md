@@ -7,6 +7,18 @@ approval status, and willingness to watch another preview do not limit it.
 
 ## Required evidence
 
+For reopened feedback, invalidate the affected visual signoff. Write a small
+acceptance record for each note: required visible behavior, old failure,
+underlying cause, every affected use, inspected phase range, and observed
+result. Mark it incomplete until that observation is actually made. A sample
+count, passing bounds, exact cue time or retained ID is not a substitute.
+Inspect all frames of short/problematic motions, including a plural process's
+later successors, rather than accepting a clean middle or final frame alone.
+Preserve mathematically meaningful presentation choices even when another form
+is technically equivalent. If the existing renderer cannot support the
+requested motion clearly, use the author's accepted simpler transition instead
+of certifying an incoherent morph.
+
 Run the [source sizing inventory](TYPOGRAPHY_AUTHORING_AUDIT.md) across the active
 scene entry points and shared components. Identify ordinary text that still uses
 absolute/manual sizing, separate legitimate diagram geometry, and inspect coverage
@@ -236,6 +248,12 @@ Preserve the earlier record as history and attach the new note IDs, failed
 acceptance criterion, and required new evidence. Record successes just as
 specifically: viewer praise for a domino fall does not approve an unrelated
 substitution, and resolving earlier notes is not approval of the whole section.
+
+An agent finding a visible failure must invalidate its own signoff as well.
+For partially revealed components, inspect the immediate regrouping and the
+following caption-only beats: a preplanned snapshot must not restore hidden
+children later. For a labeled shape morph, inspect every encoded frame of the
+short phase for text occlusion and label ownership, not just arrival bounds.
 
 For local math changes, inspect a native baseline as well as font size. Use the
 named-term `MathRow` contract for arguments and numeric branch calculations.

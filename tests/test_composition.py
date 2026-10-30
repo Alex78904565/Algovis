@@ -258,10 +258,14 @@ class ViewTransitionTests(unittest.TestCase):
         plan = ViewTransition(first, second)
         animation, = plan.animations(scene)
         start(animation, scene)
-        transfer = next(a for a in animation.animation.animations if isinstance(a, ApplyDefinition))
+        animation.interpolate(.5)
+        def descendants(node):
+            yield node
+            for child in getattr(node,'animations',()):yield from descendants(child)
+            if getattr(node,'animation',None) is not None:yield from descendants(node.animation)
+        transfer = next(a for a in descendants(animation) if isinstance(a, ApplyDefinition))
         self.assertIs(transfer.definition, definition.mobject.part('value'))
         self.assertIs(transfer.application, row.mobject.part('child'))
-        animation.interpolate(.5)
         np.testing.assert_allclose(definition.mobject.get_all_points(), source_points)
         finish(animation, scene)
         plan.commit(scene)

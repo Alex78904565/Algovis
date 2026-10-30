@@ -124,8 +124,8 @@ again from a source that may have left the board.
 Choose `BlockScene` for a compact argument: its rows share a left edge while
 the block is centered on both axes. `ComparisonScene(center_blocks=True)` uses
 centered column blocks with a common vertical envelope. Their `SceneSequence`
-reserves the completed widths and heights before incremental reveals. Keep
-`ListScene` for deliberate top-anchored lists and `ProofSlide` for proof rails.
+reserves the completed widths and heights before incremental reveals.
+`ListScene` shares this centered block policy; `ProofSlide` retains its proof rail.
 
 `SlotScene.add(..., fill='width')` gives an illustration its text peers' width
 without letting the illustration determine that preferred width. The component
@@ -154,6 +154,20 @@ introducing the count, retaining the same cards. Semantic components such as
 `CaseEquation` own their explicit protocols for adding/removing internal parts.
 Components can declare `_algovis_content_fields` for non-geometric state that
 must participate in reconciliation after intrinsic processes.
+
+Reconciliation runs at every composition beat, not only the first beat after a
+component action. It follows retained child identities through replacement
+layout containers. The compiler compares successive authored models to find
+explicit content/semantic edits, then carries the completed live state into the
+new layout. Comparing against an already hydrated target mistakes inherited
+state for a new edit and can reset it on a later caption-only beat. Test a reveal
+and semantic change through regrouping and at least two later composition beats.
+
+Normalize inherited children with their owning placement's fit. A child can
+carry a local scale marker of 1 while its enclosing layout has scaled all its
+geometry. Trusting that local marker compounds the fit on each later edit.
+Exercise a fitted multi-card collection through several different card updates;
+unchanged frames and metric insets must remain stable throughout the timeline.
 
 Small primary dependency diagrams can choose a scene type role through
 `RecursiveTree(label_type_role='equation')`. Dense trees keep the default
@@ -497,6 +511,39 @@ or `substitute_on_cue`, so a digit is never merely centered on an old letter.
 
 ## Extending the system
 
+`ListScene` derives from `BlockScene`: its rows share a left edge while the
+completed argument is centered horizontally and vertically. Use `SceneSequence`
+for a growing explanation so its final dimensions are reserved from the first
+step. `PairedScene` reserves both columns and paired row heights, centers the
+whole argument and exposes the resulting regions for validation. Wrapping uses
+the full column capacity rather than an earlier short row's current width.
+
+`ProofSlide` aligns a `work` row with no `call` part at the preceding
+`inductive_step` row's `eq` part. This supports a continuing equality without
+inventing a repeated left-hand side or manual indentation.
+
+Proof and column copies share a measured route beside intervening rows. Named
+parts retain their source owner, so consecutive source terms placed consecutively
+at the destination travel together as one readable formula. Independently routing
+those terms down the same gutter can make the copies collide with each other.
+The bundle is only a travel container; destination term identities remain intact.
+
+`StateCell.connection_point(direction)` intersects a ray from the frame center
+with the frame. Trees use that contract for initial, reflowed and folded
+connectors. A shape's support point is not generally that ray intersection.
+
+`InductionChain.propagate(indices, trigger=..., reason=...)` owns the complete
+correctness process, including a visible pulse for every listed case. Multiple
+cases form one ordered process under their plural spoken phrase. Its initial
+`known` cases can be supplied when their truth has already been established.
+The same labeled boxes become readable dominoes whose labels remain inside and
+rotate with the physical frames. Their contact geometry remains explicit.
+
+`StateSequence.with_state(continuation=True, final_index='n')` adds an ellipsis
+and a terminal symbolic state while retaining the concrete computed cells.
+The enclosing sequence reserves the complete generalized row before revealing
+that extension.
+
 Transitions own the route as well as the destination. `ColumnSlide` routes a
 borrowed definition around intervening body rows using the measured source and
 destination bounds. It fails when no in-bounds gutter fits the copy. This is a
@@ -555,3 +602,16 @@ Keep narration-specific examples out of reusable classes. Exercise meaningful
 extension points with tests and real rendered examples; then rebuild and inspect
 every affected lesson context. A helper existing in the library does not prove
 that the production actually uses it.
+
+Component refinements declare non-geometric state in `_algovis_content_fields`.
+For example, `Checklist.visible`/`recursion_brace` and
+`PseudocodePanel.visible_lines` distinguish a spoken reveal from inherited
+paint. `SlideView.refine` rejects drawing changes with no declared content or
+semantic change. Components with named child references implement
+`motions_to`/`adopt_layout` to preserve those references; a generic Manim
+`Transform` is not a substitute for adopting their state.
+
+Proof substitutions prepare the surrounding terms before the copied formula
+arrives. The shared proof sequence reserves a landing band for its working
+equality, and the measured route avoids a retained suffix on the last leg.
+Endpoint clearance alone does not establish a safe substitution path.

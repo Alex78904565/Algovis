@@ -1,6 +1,7 @@
 from manim import *
 import enum
 import math
+import numpy as np
 from dataclasses import dataclass
 
 from ..theme import DEFAULT_THEME
@@ -79,6 +80,17 @@ class StateCell(VGroup):
         self.label._algovis_empty_font_size=desired
         self._value_font_size=desired*self._initial_box_height/self.box.height
         LessonStyle._watch_type(self.label,group+'/cells',role)
+
+    def connection_point(self,direction):
+        """Intersect a center ray with the frame, rather than its support corner."""
+        delta=np.asarray(direction,dtype=float)
+        radii=np.array([self.box.width/2,self.box.height/2])
+        if np.linalg.norm(delta[:2])<1e-10:return self.box.get_center()
+        if isinstance(self.box,Circle):
+            distance=1/np.linalg.norm(delta[:2]/radii)
+        else:
+            distance=min(radii[i]/abs(delta[i]) for i in (0,1) if abs(delta[i])>1e-10)
+        return self.box.get_center()+distance*delta
 
     def populate(self,value,*,status='computed',evaluation=None):
         """Plan value entry and its status together; live content stays untouched."""

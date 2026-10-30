@@ -7,6 +7,67 @@ not another slide.
 
 ## Composition and copy contract
 
+Reopened review after the 2026-10-30 handoff: several visibly wrong layouts were
+accepted by the agent despite the requirements below. A high frame count is not
+evidence that the requirements were enforced. For each repair, record the
+requested visible behavior and the observed result over its complete phase.
+Do not silently substitute "within its region" for "clean, centered composition,"
+or "retained identity" for a readable mathematical transition.
+
+`ListScene` uses the same centered common-edge block policy as `BlockScene`.
+`PairedScene` centers the complete pair of columns and reserves shared row
+heights/column widths across its sequence. A shared fix must cover every public
+layout variant used for that construction; inventory those variants explicitly.
+Proof rails and intentionally separate problem/diagram regions retain their
+meaningful structure. Independent row centering is not the requested policy.
+
+The full correctness-propagation process includes visible emphasis as well as
+green status: all successors, including those under "every case" and "and so
+on," use the same operation. A list of bindings for just the first named cases
+is incomplete. A recalled base case is already known and starts green; a new
+answer may become green when it is established. Both meanings follow semantics.
+
+For the induction refresher, keep a continuing equality aligned at its equals
+sign, and conclude explicitly that P(n) holds for every n >= 0 outside the rail.
+Do not replace those requested forms with mathematically equivalent but less
+connected captions. Keep the earlier result distinguishable when changing the
+claim for a second proof. The three-definition summary retains its brace,
+heading and complete formulas; use a clean fade if retaining proof fragments
+would make their travel unreadable. The author explicitly accepts that fade.
+
+Domino labels now belong inside wider dominoes and move with them, continuously
+reusing the proposition boxes. This supersedes the earlier below-box placement
+while preserving the endorsed contact physics. Smaller-instance trees continue
+through an ellipsis to a base input, and assumed child results are green.
+Connect rectangular nodes by center-ray/frame intersections; a support corner
+can produce a diagonal edge even when parent and child are perfectly vertical.
+Check initial geometry, cached reveals and later reflow, not only node centers.
+
+Follow a partial reveal through subsequent caption changes too. An unrevealed
+descendant appearing during a later explanation is still premature, even if the
+immediate regrouping was correct. Preserve intrinsic state by identity at every
+composition beat, comparing authored edits separately from inherited live state.
+An opaque cell frame and its label travel as one owned component; independently
+animating them can put the frame in front of the text midway through a morph.
+Reserve the full height of a future domino before the preceding implication is
+placed. These failures were found in the actual motion review, after the first
+endpoint and regression checks had passed.
+
+Check repeated updates to fitted groups, including unchanged children. A frame
+that shrinks a little on every sibling edit eventually puts its labels outside
+the card. The owning placement's fit must be undone before inherited live
+geometry is laid out again. Check the first, middle and final card updates.
+
+Proof copies need the same clear-route behavior as column slides. Inspect both
+stationary obstacles and simultaneous travelers: consecutive terms from one
+definition should travel as one formula, rather than colliding in a common
+gutter. Retain their separate identities when they arrive.
+
+The Fibonacci runtime product groups both factors with parentheses. Its
+generalized row reaches f[n] after the ellipsis, and the row now stays visible
+through the 191-state substitution. This latest specific request supersedes
+the earlier permission to retire it at that point.
+
 Distinguish a block's position from the alignment of its rows. A compact
 definition below a centered diagram should form one centered block with a common
 left edge inside it. Left-aligning rows does not mean pinning that whole block
@@ -965,3 +1026,25 @@ Lessons from the restored induction and knapsack devices:
   numerical readout should not acquire unrelated sizes because one component
   was fitted as a diagram. Update font-reference metadata on arrival as well as
   geometry, including the internal phase before an old source retires.
+
+Additional self-review failures found on October 30:
+
+- A final checklist and a code panel can pass geometry checks while their
+  intended reveals remain invisible. Verify every revealed line against the
+  narration. Visibility is authored component state, not incidental paint.
+  Components must declare it, preserve their named children during adoption,
+  and retain it through later unrelated scene beats. An undeclared drawing
+  change from `with_state` must fail instead of silently restoring old paint.
+- A definition copy can clear all earlier proof rows and still cross a suffix
+  in its own destination equation. Prepare the equation's spacing first and
+  reserve a landing corridor in the whole proof sequence. Inspect that final
+  approach, including concurrent substitutions, before accepting the repair.
+- Finding these failures during the new audit does not validate the earlier
+  audit. Record rejected renders separately from the final checked revision.
+- An opaque panel must move as an owned frame-and-content unit. Separately
+  animating its background can cover the existing code only during the reveal,
+  even when both endpoints look correct. Check those internal frames too.
+- Several definition copies sharing a destination need a readable order or
+  separate routes. Three valid endpoints do not justify three colliding copies.
+  Keep the existing spoken cue and duration when sequential internal phases
+  communicate the same substitution more clearly.

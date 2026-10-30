@@ -72,7 +72,10 @@ class SlideObject:
         for key in name.split('.'):
             part=part.part(key)
         part._view_attention_term = True
-        return SlideObject(part)
+        selected=SlideObject(part)
+        selected._part_owner=self.mobject
+        selected._part_path=name
+        return selected
 
     def on_word(self, cue, *, style='auto', reason, duration=.45, callback=None):
         """Declare attention once; ViewSceneMixin schedules its spoken trigger."""
@@ -265,20 +268,49 @@ class SlideView:
         remain authoritative; explicit semantic edits apply over the live state.
         This keeps an early-planned next scene from undoing a population/reveal.
         """
-        prior={id(item.object.mobject):item for item in previous.items.values()}
+        prior={}
+        authored={}
+        def container(mob):
+            return type(mob) in (Group,VGroup) or getattr(mob,'_algovis_layout_container',False)
+        def collect(mapping,mob,target,fit,baseline=None):
+            mapping[id(mob)]=(baseline.get(id(mob),target) if baseline else target,fit)
+            if container(mob):
+                for child,planned in zip(mob.submobjects,target.submobjects):
+                    collect(mapping,child,planned,fit,baseline)
+        # Compare authored states, not the hydrated result of an earlier beat.
+        # Otherwise inherited green paint or populated cells look like explicit
+        # edits when the next preplanned caption still contains the old state.
+        for item in self.items.values():
+            collect(authored,item.object.mobject,item.target.copy(),item.fit_scale)
+        self._authored_targets={key:value[0] for key,value in authored.items()}
+        if previous is None:return self
+        baseline=getattr(previous,'_authored_targets',None)
+        for item in previous.items.values():
+            collect(prior,item.object.mobject,item.target,item.fit_scale,baseline)
         with self._editing():
             for name,item in self.items.items():
-                old=prior.get(id(item.object.mobject))
-                if old is None or _content_model(old.target)!=_content_model(item.target):continue
-                live=item.object.mobject.copy()
-                factor=getattr(live,'_algovis_view_fit_scale',1.)
-                if factor!=1:live.scale(1/factor)
-                live._algovis_view_fit_scale=1.
-                for path,meaning in _semantic_edits(old.target,item.target):
-                    node=live
-                    for index in path:node=node.submobjects[index]
-                    copy_semantics(meaning,node);set_semantics(node)
-                if hasattr(item.target,'_copy_sources'):live._copy_sources=item.target._copy_sources.copy()
+                def inherit(mob,target):
+                    old=prior.get(id(mob))
+                    if old is not None and _content_model(old[0])==_content_model(target):
+                        live=mob.copy()
+                        # A child can carry a local scale marker of 1 even
+                        # though its containing layout fitted the whole group.
+                        # Undo that owning placement's fit before reflowing.
+                        factor=old[1]
+                        if factor!=1:live.scale(1/factor)
+                        live._algovis_view_fit_scale=1.
+                        for path,meaning in _semantic_edits(old[0],target):
+                            node=live
+                            for index in path:node=node.submobjects[index]
+                            copy_semantics(meaning,node);set_semantics(node)
+                        if hasattr(target,'_copy_sources'):live._copy_sources=target._copy_sources.copy()
+                        return live
+                    if container(mob):
+                        for child,planned in zip(mob.submobjects,target.submobjects):
+                            adopted=inherit(child,planned)
+                            if adopted is not planned:_adopt(planned,adopted)
+                    return target
+                live=inherit(item.object.mobject,item.target)
                 role='heading' if item.slot=='header' else 'proof_label' if item.slot.startswith('label:') else None
                 assign_scene_typography(live,self.typography,group=self._type_group,role=role)
                 inherited=getattr(live,'_algovis_relative_font_scale',1.)
@@ -507,7 +539,13 @@ class SlideView:
             item=self.items[name]
             if not hasattr(type(item.target),'with_state'):
                 raise TypeError('This component does not expose a semantic state model')
-            self.items[name]=replace(item,target=item.target.with_state(**state))
+            target=item.target.with_state(**state)
+            if (_content_model(item.target)==_content_model(target)
+                    and not _same_picture(item.target,target)
+                    and not list(_semantic_edits(item.target,target))):
+                raise ValueError(f'{type(target).__name__}.with_state changed drawing without changing its '
+                    'declared content model; include the state in _algovis_content_fields')
+            self.items[name]=replace(item,target=target)
         self._remember_model(name)
         return self
 
@@ -636,35 +674,94 @@ class ColumnSlide(SlideView):
 
     def definition_route(self,source,destination):
         """Carry a definition beside intervening rows, keeping them readable."""
-        start,end=source.get_center(),destination.get_center()
-        if abs(end[1]-start[1])<.1:return ()
-        half_width=max(source.width,destination.width)/2+.12
-        half_height=max(source.height,destination.height)/2+.08
-        samples=[start+(end-start)*a for a in np.linspace(0,1,61)]
-        obstacles=[]
-        for item in self.items.values():
-            if item.slot!='body':continue
-            if id(source) in {id(p) for p in item.object.mobject.get_family()}:continue
-            if id(destination) in {id(p) for p in item.target.get_family()}:continue
-            target=item.target
-            if any(target.get_left()[0]-half_width<p[0]<target.get_right()[0]+half_width
-                   and target.get_bottom()[1]-half_height<p[1]<target.get_top()[1]+half_height
-                   for p in samples):obstacles.append(target)
-        if not obstacles:return ()
-        left=min(p.get_left()[0] for p in obstacles)-half_width
-        right=max(p.get_right()[0] for p in obstacles)+half_width
-        low=self.layout.body.center[0]-self.layout.body.width/2+half_width
-        high=self.layout.body.center[0]+self.layout.body.width/2-half_width
-        choices=[x for x in (left,right) if low<=x<=high]
-        if not choices:raise ValueError('Definition copy needs a clear route beside the intervening rows')
-        x=min(choices,key=lambda x:abs(x-start[0])+abs(x-end[0]))
-        return (np.array([x,start[1],0]),np.array([x,end[1],0]))
+        return _definition_route(self,source,destination,
+            [item for item in self.items.values() if item.slot=='body'])
 
     def _fit_areas(self):
         body=[item for item in self.items.values() if item.slot=='body']
         return [FitArea('body',body,self.layout.body.width-2*self.padding,
                         self.layout.body.height-2*self.padding,True,self.gap),
                 *(area for area in super()._fit_areas() if area.group!='body')]
+
+
+def _definition_route(view,source,destination,items,*,left_bound=None):
+    """A common measured corridor for column and proof definition copies."""
+    start,end=source.get_center(),destination.get_center()
+    if abs(end[1]-start[1])<.1:return ()
+    half_width=max(source.width,destination.width)/2+.12
+    half_height=max(source.height,destination.height)/2+.08
+    samples=[start+(end-start)*a for a in np.linspace(0,1,61)]
+    obstacles=[]
+    source_ink={id(p) for p in source.family_members_with_points()}
+    destination_ink={id(p) for p in destination.family_members_with_points()}
+    for item in items:
+        live_family={id(p) for p in item.object.mobject.get_family()}
+        target_family={id(p) for p in item.target.get_family()}
+        if source_ink and source_ink<=live_family:continue
+        if destination_ink and destination_ink<=(target_family|live_family):continue
+        target=item.target
+        if any(target.get_left()[0]-half_width<p[0]<target.get_right()[0]+half_width
+               and target.get_bottom()[1]-half_height<p[1]<target.get_top()[1]+half_height
+               for p in samples):obstacles.append(target)
+    if not obstacles:return ()
+    left=min(p.get_left()[0] for p in obstacles)-half_width
+    right=max(p.get_right()[0] for p in obstacles)+half_width
+    low=(left_bound if left_bound is not None else view.layout.body.center[0]-view.layout.body.width/2)+half_width
+    high=view.layout.body.center[0]+view.layout.body.width/2-half_width
+    choices=[x for x in (left,right) if low<=x<=high]
+    if not choices:raise ValueError('Definition copy needs a clear route beside the intervening rows')
+    x=min(choices,key=lambda x:abs(x-start[0])+abs(x-end[0]))
+    route=[np.array([x,start[1],0]),np.array([x,end[1],0])]
+    # A copied term can arrive beside a retained suffix. Approaching along
+    # that suffix's baseline would cross it even though the endpoints fit.
+    # Go below the destination row, then rise into the prepared term slot.
+    for item in items:
+        if not isinstance(item.target,MathRow):continue
+        family={id(p) for p in item.target.get_family()}
+        if not destination_ink or not destination_ink<=family:continue
+        siblings=[part for part in item.target.parts.values()
+                  if not destination_ink & {id(p) for p in part.get_family()}]
+        if any(min(x,end[0])-half_width<part.get_right()[0]
+               and max(x,end[0])+half_width>part.get_left()[0]
+               and part.get_bottom()[1]-half_height<end[1]<part.get_top()[1]+half_height
+               for part in siblings):
+            below=item.target.get_bottom()[1]-half_height-.08
+            lower=-float(config.frame_height)/2+.18
+            for footer in items:
+                if footer.slot in ('footer','conclusion') and footer.target.get_top()[1]<end[1]:
+                    lower=max(lower,footer.target.get_top()[1]+.08)
+            if below-half_height<lower:
+                raise ValueError('Definition substitution needs a clear landing band above the footer')
+            route=[np.array([x,start[1],0]),np.array([x,below,0]),np.array([end[0],below,0])]
+        break
+    return tuple(route)
+
+
+def _definition_copies(view,sources,destination):
+    """Contiguous terms from one definition travel as one readable formula."""
+    route=getattr(type(view),'definition_route',None)
+    runs=[]
+    for key in destination.parts:
+        if key not in sources:
+            runs.append([]);continue
+        source=sources[key]
+        owner=source.owner.mobject if isinstance(source,PlannedPart) else getattr(source,'_part_owner',None)
+        path=source.path if isinstance(source,PlannedPart) else getattr(source,'_part_path',None)
+        keys=list(owner.parts) if isinstance(owner,MathRow) else []
+        index=keys.index(path) if path in keys else None
+        entry=(key,source,owner,index)
+        if (runs and runs[-1] and index is not None and runs[-1][-1][2] is owner
+                and runs[-1][-1][3] is not None and runs[-1][-1][3]+1==index):
+            runs[-1].append(entry)
+        else:runs.append([entry])
+    motions=[]
+    for run in runs:
+        if not run:continue
+        source=run[0][1].mobject if len(run)==1 else VGroup(*(entry[1].mobject for entry in run))
+        target=destination.part(run[0][0]) if len(run)==1 else VGroup(*(destination.part(entry[0]) for entry in run))
+        motions.append(ApplyDefinition(source,None,target,copy_only=True,
+            via=route(view,source,target) if route else ()))
+    return motions
 
 
 class SplitSlide(ColumnSlide):
@@ -741,6 +838,11 @@ class ProofSlide(SlideView):
     """Named proof rows with the existing shared rail and first-line alignment."""
     row_gap=.17
 
+    def definition_route(self,source,destination):
+        return _definition_route(self,source,destination,
+            [item for item in self.items.values() if item.slot in self.frame.rows or item.slot=='footer'],
+            left_bound=self.frame.left[0])
+
     def __init__(self, title=None, *, profile="compact", **kwargs):
         self.frame = ProofFrame(profile, theme=kwargs.get("theme", DEFAULT_THEME))
         super().__init__(title, **kwargs)
@@ -804,6 +906,14 @@ class ProofSlide(SlideView):
                 if isinstance(item.target,MathRow):
                     row['ascent']=max(row['ascent'],item.ascent)
                     row['descent']=max(row['descent'],item.descent)
+        # Definition applications need a landing corridor as well as a final
+        # line box. Sequence planning reserves this for every earlier step,
+        # so making room never changes the proof's scale midway through it.
+        for name,use in self.definition_uses.items():
+            item=self.items[name]
+            if isinstance(item.target,MathRow) and item.slot=='work':
+                glyph_height=max(use.source.mobject.height,item.target.part(use.part).height)
+                metrics[item.slot]['height']=max(metrics[item.slot]['height'],1.75,3*glyph_height+.4)
         return metrics
 
     def _plan_rows(self,metrics=None,*,scale=None):
@@ -851,6 +961,13 @@ class ProofSlide(SlideView):
                 target=(self.frame.label_target(row.slot,first_line_of(row.target)) if row is not None
                         else self.frame.labels_by_name[key].copy().set_y(self.frame.rows[key]))
                 item.target.become(target)
+        # A continuing equality omits the repeated left-hand side and aligns
+        # its equals sign with the preceding proof line's equals sign.
+        if 'work' in self.items and 'inductive_step' in self.items:
+            work=self.items['work'].target;step=self.items['inductive_step'].target
+            if (isinstance(work,MathRow) and isinstance(step,MathRow)
+                    and 'eq' in work.parts and 'eq' in step.parts and 'call' not in work.parts):
+                work.shift((step.part('eq').get_left()[0]-work.part('eq').get_left()[0],0,0))
 
     def _text_width(self,slot):
         if slot in self.frame.rows:
@@ -1019,36 +1136,33 @@ class ViewTransition:
                 if source is None:
                     term_sources=getattr(item.target,'_copy_sources',{})
                     if term_sources:
-                        route=getattr(type(self.incoming),'definition_route',None)
-                        motions.extend(ApplyDefinition(term_sources[key].mobject,None,part,
-                            via=route(self.incoming,term_sources[key].mobject,part) if route else ())
-                                       if key in term_sources else FadeIn(part)
-                                       for key,part in live.parts.items())
+                        motions.extend(_definition_copies(self.incoming,term_sources,live))
+                        motions.extend(FadeIn(part) for key,part in live.parts.items() if key not in term_sources)
                     else:
                         entering=getattr(type(live),'enter_animation',None)
                         if entering is None and isinstance(live,(Text,SingleStringMathTex)) and crosses_moving_art(item.target):
                             delayed_labels.append(live)
                         else:motions.append(entering(live) if entering else FadeIn(live))
                 else:
+                    route=getattr(type(self.incoming),'definition_route',None)
+                    via=item.via or (route(self.incoming,source.mobject,live) if route else ())
                     motions.append(ApplyDefinition(source.mobject, None, live,
-                        via=item.via, path_arc=item.path_arc, preserve_destination_layout=True,copy_only=True))
+                        via=via, path_arc=item.path_arc, preserve_destination_layout=True,copy_only=True))
             for key in self.retained:
                 name, item = self.new[key]
                 live = item.object.mobject
                 if isinstance(live, MathRow):
                     use = self.definition_uses.get(name)
                     borrowed=self.borrowed[key]
-                    for term,source in borrowed.items():
-                        destination=item.target.part(term)
-                        route=getattr(type(self.incoming),'definition_route',None)
-                        motions.append(ApplyDefinition(source.mobject,None,destination,copy_only=True,
-                            via=route(self.incoming,source.mobject,destination) if route else ()))
+                    motions.extend(_definition_copies(self.incoming,borrowed,item.target))
                     if use:
                         arc=use.path_arc
+                        route=getattr(type(self.incoming),'definition_route',None)
+                        via=use.via or (route(self.incoming,use.source.mobject,item.target.part(use.part)) if route else ())
                         # A proof substitution often moves a wide fraction
                         # down and left. Bow toward its destination column,
                         # clear of the unchanged terms to its right.
-                        if isinstance(self.incoming,ProofSlide) and not use.via and not arc:
+                        if isinstance(self.incoming,ProofSlide) and not via and not arc:
                             source=use.source.mobject;destination=item.target.part(use.part)
                             delta=destination.get_center()-source.get_center()
                             if delta[1]<-.1 and abs(delta[0])>.1:
@@ -1061,13 +1175,18 @@ class ViewTransition:
                                 right=self.incoming.layout.body.width/2
                                 if all(left<=point[0]-source.width/2 and point[0]+source.width/2<=right for point in centers):
                                     arc=candidate
-                        motions.append(ApplyDefinition(use.source.mobject, live.part(use.part),
-                            item.target.part(use.part), via=use.via, path_arc=arc,
-                            preserve_destination_layout=True))
+                        def transfer(use=use,live=live,item=item,via=via,arc=arc):
+                            return ApplyDefinition(use.source.mobject, live.part(use.part),
+                                item.target.part(use.part), via=via, path_arc=arc,
+                                preserve_destination_layout=True)
                     skip = tuple(borrowed)+((use.part,) if use else ())
-                    motions += [animation for animation in live.motions_to(item.target, skip=skip)
+                    local = [animation for animation in live.motions_to(item.target, skip=skip)
                                 if not hasattr(animation, "target_mobject")
                                 or not _same_picture(animation.mobject, animation.target_mobject)]
+                    if use:
+                        motions.append(Succession(AnimationGroup(*local,run_time=.25),
+                            _deferred(transfer,run_time=.75)) if local else transfer())
+                    else:motions.extend(local)
                 elif hasattr(type(live),'motions_to') and hasattr(type(live),'adopt_layout'):
                     use=self.definition_uses.get(name)
                     borrowed=self.borrowed[key]
@@ -1192,6 +1311,8 @@ def _adopt(live, target):
 
 def _copy_layout_metadata(source,destination):
     copy_semantics(source,destination)
+    for name in getattr(source,'_algovis_content_fields',()):
+        if hasattr(source,name):setattr(destination,name,getattr(source,name))
     if hasattr(source,'_algovis_relative_font_scale'):
         destination._algovis_relative_font_scale=source._algovis_relative_font_scale
     if hasattr(source,'_algovis_font_scale_reason'):

@@ -11,6 +11,218 @@ from tests.test_composition import apply
 
 
 class SceneAnimationTests(unittest.TestCase):
+    def test_component_reveals_survive_the_entire_lesson_timeline(self):
+        from algovis import Checklist,PseudocodePanel,RecapScene
+        for component,states in [(Checklist(['First','Second']),[{'visible':1},{'visible':2},{'recursion_brace':True}]),
+                (PseudocodePanel(['array','function','check','store']).with_state(visible_lines=(1,)),
+                 [{'visible_lines':(0,1)},{'visible_lines':(0,1,2)},{'visible_lines':(0,1,2,3)}])]:
+            view=ColumnSlide();handle=view.add('component',component)
+            film=LessonAnimation();group=film.group('Retain declared component reveals')
+            group.add(view,reason='Introduce the component')
+            for state in states:
+                view=view.fork().refine('component',**state);group.add(view,reason='Reveal the specified content')
+            scene=Scene();current=None
+            def transition(view,**options):
+                nonlocal current
+                apply(ViewTransition(current,view),scene);current=view
+            film.play(SimpleNamespace(transition_to=transition))
+            if isinstance(component,Checklist):
+                self.assertEqual(component.visible,2)
+                self.assertTrue(component.recursion_brace)
+                self.assertTrue(all(row.get_fill_opacity()>.9 for row in component.rows))
+                self.assertGreater(component.brace_label.get_fill_opacity(),.9)
+            else:
+                self.assertTrue(all(line.get_fill_opacity()>.9 for line in component.lines))
+
+    def test_refinement_rejects_undeclared_component_visibility_state(self):
+        class Undeclared(Text):
+            def with_state(self,*,visible):return self.copy().set_opacity(int(visible))
+        view=ColumnSlide();view.add('component',Undeclared('Do not discard this reveal'))
+        with self.assertRaisesRegex(ValueError,'declared content model'):
+            view.fork().refine('component',visible=False)
+
+    def test_code_reveal_keeps_its_opaque_background_and_text_in_one_owner(self):
+        from algovis import PseudocodePanel
+        panel=PseudocodePanel(['array','def f(state):','return answer']).with_state(visible_lines=(1,2))
+        target=panel.with_state(visible_lines=(0,1,2))
+        motions=panel.motions_to(target)
+        self.assertEqual(len(motions),1)
+        self.assertIs(motions[0].mobject,panel)
+        self.assertLess(panel.submobjects.index(panel.background),panel.submobjects.index(panel.lines))
+
+    def test_proof_substitution_prepares_suffix_and_routes_below_its_baseline(self):
+        from algovis import ProofSlide
+        proof=ProofSlide(profile='worked')
+        proof.add('definitions',Equation({'definition':'f(n)=f(n-1)+n'}))
+        proof.add('claim',Equation({'claim':r'P(n):f(n)=1+2+\cdots+n'}))
+        proof.add('base_case',Equation({'base':'f(0)=0'}))
+        hypothesis=proof.add('induction_hypothesis',Equation({'hypothesis':r'f(k)=','sum':r'1+2+\cdots+k'}))
+        proof.add('inductive_step',Equation({'call':'f(k+1)','eq':'=','child':'f(k)','plus':'+','next':'(k+1)'}))
+        proof.add('work',Equation({'eq':'=','child':'f(k)','plus':'+','next':'(k+1)'}))
+        scene=Scene();proof.install(scene)
+        target=proof.fork().substitute('work',from_definition=hypothesis.part('sum'),child=r'1+2+\cdots+k')
+        row=target.target('work');via=target.definition_route(hypothesis.part('sum').mobject,row.part('child'))
+        self.assertEqual(len(via),3)
+        self.assertLess(via[-1][1]+row.part('child').height/2,row.part('next').get_bottom()[1])
+        from algovis import ApplyDefinition
+        with patch('algovis.composition.ApplyDefinition',wraps=ApplyDefinition) as transfer:
+            apply(ViewTransition(proof,target),scene)
+            self.assertEqual(transfer.call_count,1)
+            self.assertTrue(np.allclose(proof.object('work').mobject.part('next').get_center(),row.part('next').get_center()))
+
+    def test_fitted_cards_keep_their_geometry_during_other_cards_metric_updates(self):
+        from algovis import IllustratedItem,ItemCollection,SelectionScene
+        cards=[IllustratedItem(np.full((12,16,4),255,dtype=np.uint8),'item',i+1,
+            metric_reserve={'weight':1,'value':10}) for i in range(6)]
+        view=SelectionScene();view.add('items',ItemCollection(*cards,columns=6),slot='items')
+        film=LessonAnimation();group=film.group('Populate the same fitted cards')
+        group.add(view,reason='Introduce the cards')
+        for i in range(6):
+            view=view.fork().refine('items',index=i,weight=1,value=10)
+            group.add(view,reason='Populate only the named card')
+        group.compile();initial=group.beats[0].scene
+        self.assertLess(initial.items['items'].fit_scale,1)
+        expected=[card.frame.height for card in initial.target('items').cards]
+        scene=Scene();current=None
+        def transition(view,**options):
+            nonlocal current
+            apply(ViewTransition(current,view),scene);current=view
+            for index,card in enumerate(cards):
+                self.assertAlmostEqual(card.frame.height,expected[index])
+                for metric in (card.weight,card.value):
+                    self.assertGreater(metric.get_bottom()[1],card.frame.get_bottom()[1]+.02)
+        film.play(SimpleNamespace(transition_to=transition))
+
+    def test_contiguous_definition_terms_share_one_copy_route_and_keep_their_identities(self):
+        from algovis import ProofSlide,ApplyDefinition
+        proof=ProofSlide(profile='worked')
+        source=proof.add('definitions',Equation({'call':'f(n)','eq':'=','child':'f(n-1)','plus':'+','n':'n'}))
+        proof.add('claim',Equation({'p':r'P(n):f(n)=1+2+\cdots+n'}))
+        proof.add('base_case',Equation({'b':'f(0)=0'}))
+        step=proof.add('inductive_step',Equation({'call':'f(k+1)'}))
+        scene=Scene();proof.install(scene)
+        next_proof=proof.fork().revise('inductive_step',{'call':'f(k+1)','eq':'=',
+            'child':source.part('child'),'plus':source.part('plus'),'n':source.part('n')})
+        with patch('algovis.composition.ApplyDefinition',wraps=ApplyDefinition) as transfer:
+            apply(ViewTransition(proof,next_proof),scene)
+            self.assertEqual(transfer.call_count,1)
+            self.assertEqual(len(transfer.call_args.args[0]),3)
+            self.assertEqual(len(transfer.call_args.kwargs['via']),2)
+        self.assertEqual(step.mobject.slot_tex['child'],'f(n-1)')
+        self.assertIs(source.mobject.part('child'),proof.object('definitions').mobject.part('child'))
+
+    def test_intrinsic_state_survives_regrouping_and_later_caption_only_beats(self):
+        from algovis import ObjectRow,PairedScene
+        from algovis.review.inspection import visible_opacity
+        tree=RecursiveTree(lambda n:(str(n),[(n-1,)] if n else []),(3,),profile='compact',reveal_depth=0)
+        first=PairedScene(pairs=(('step','trees'),))
+        first.add('step','Choose a smaller input',slot='left')
+        first.add('trees',ObjectRow(tree),slot='right')
+        second=first.fork().remove('trees')
+        second.add('trees',ObjectRow(tree),slot='right')
+        third=second.fork().remove('step');third.add('step','Assume that smaller answer is correct',slot='left')
+        fourth=third.fork().remove('step');fourth.add('step','Use that answer without revealing later descendants',slot='left')
+        scene=Scene();current=None
+        def transition(view,**options):
+            nonlocal current
+            apply(ViewTransition(current,view),scene);current=view
+        def intrinsic(operation,**options):
+            start(operation,scene);finish(operation,scene)
+        renderer=SimpleNamespace(transition_to=transition,open_view=intrinsic)
+        film=LessonAnimation();group=film.group('A partially revealed tree')
+        group.add(first,reason='Show the parent')
+        child=tree.tree_structure['children'][0]
+        group.action(lambda:tree.get_node_reveal_anim(child),reason='Show only one child')
+        from algovis import SemanticChange
+        group.action(lambda:SemanticChange(child['mobject'],status='known'),reason='Assume the child answer is correct')
+        group.add(second,reason='Regroup without changing revealed nodes')
+        group.add(third,reason='Explain the assumed child answer')
+        group.add(fourth,reason='Keep the same partially revealed tree')
+        film.play(renderer)
+        for data,depth in tree.iter_nodes():
+            if depth<=1:self.assertGreater(visible_opacity(data['label']),.9)
+            else:self.assertLess(visible_opacity(data['label']),.01)
+        self.assertEqual(child['mobject'].semantics.status,'known')
+
+    def test_regrouping_a_partially_drawn_tree_preserves_hidden_descendants(self):
+        from algovis import ObjectRow,PairedScene,ViewScene
+        from algovis.review.inspection import visible_opacity
+        one=RecursiveTree(lambda n:(str(n),[(n-1,)] if n else []),(3,),profile='compact',reveal_depth=0)
+        halves=RecursiveTree(lambda n:(str(n),[(n-1,),(n-1,)] if n else []),(2,),profile='compact',reveal_depth=0)
+        first=PairedScene(pairs=(('step','trees'),))
+        first.add('step','Choose smaller inputs',slot='left');first.add('trees',ObjectRow(one),slot='right')
+        second=first.fork().remove('trees');second.add('trees',ObjectRow(one,halves),slot='right')
+        film=LessonAnimation();group=film.group('Tree alternatives')
+        group.add(first,reason='First alternative')
+        group.add(second,reason='Second alternative shares the same first tree')
+        group.compile();a,b=[beat.scene for beat in group.beats]
+        scene=ViewScene();scene.setup();apply(ViewTransition(None,a),scene)
+        animation=one.get_node_reveal_anim(one.tree_structure['children'][0]);start(animation,scene);finish(animation,scene)
+        b.retain_live_models(a);apply(ViewTransition(a,b),scene)
+        for data,depth in one.iter_nodes():
+            self.assertGreater(visible_opacity(data['label']),.9) if depth<=1 else self.assertLess(visible_opacity(data['label']),.01)
+        for data,depth in halves.iter_nodes():
+            self.assertGreater(visible_opacity(data['label']),.9) if depth==0 else self.assertLess(visible_opacity(data['label']),.01)
+
+    def test_domino_motion_reserves_its_height_and_animates_complete_labeled_cells(self):
+        from algovis import InductionChain
+        chain=InductionChain(3,known=(0,1,2),dominoes=True)
+        first=CenteredScene();first.add('implication',Equation({'p':r'P(k)\Longrightarrow P(k+1)'}));first.add('cases',chain)
+        scene=Scene();first.install(scene)
+        caption=first.object('implication').mobject
+        animation=chain.as_dominoes()
+        self.assertFalse(any(child.mobject is case.box or child.mobject is case.label for child in animation.animations for case in chain.cases))
+        start(animation,scene)
+        for alpha in (.25,.5,.75,1):
+            animation.interpolate(alpha)
+            for case in chain.cases:self.assertLess(case.box.get_top()[1],caption.get_bottom()[1]-.1)
+        finish(animation,scene)
+        for case in chain.cases:
+            self.assertEqual(case.box.get_stroke_color(),chain.theme.success)
+            np.testing.assert_allclose(case.label.get_center(),case.box.get_center(),atol=1e-7)
+
+    def test_every_case_in_a_plural_propagation_visibly_pulses_and_becomes_known(self):
+        from algovis import InductionChain
+        from dataclasses import replace
+        chain=InductionChain(4,theme=replace(DEFAULT_THEME,success='#55CC88'));scene=Scene();scene.add(chain)
+        widths=[case.width for case in chain.cases]
+        centers=[case.get_center().copy() for case in chain.cases]
+        animation=chain.propagate((0,1,2,3),trigger='in every case',reason='Propagate the implication')
+        start(animation,scene)
+        for index in range(4):
+            animation.interpolate((index+.5)/4)
+            self.assertGreater(chain.cases[index].width,widths[index]*1.1)
+        finish(animation,scene)
+        for index,case in enumerate(chain.cases):
+            self.assertAlmostEqual(case.width,widths[index])
+            np.testing.assert_allclose(case.get_center(),centers[index])
+            self.assertEqual(case.semantics.status,'computed')
+        self.assertEqual(animation._algovis_attention['trigger'],'in every case')
+
+    def test_vertical_tree_edges_meet_the_frame_centers_before_and_after_reveal(self):
+        from algovis import ViewScene
+        tree=RecursiveTree(lambda n:(str(n),[(n-1,)] if n else []),(2,),profile='compact',reveal_depth=0)
+        scene=ViewScene();scene.setup();view=TreeScene();view.add('tree',tree,slot='diagram');view.install(scene)
+        for parent,_ in tree.iter_nodes():
+            for child in parent['children']:
+                animation=tree.get_node_reveal_anim(child);start(animation,scene);finish(animation,scene)
+        for data,_ in tree.iter_nodes():
+            for child,edge in zip(data['children'],data['edges']):
+                self.assertAlmostEqual(edge.get_start()[0],data['shape'].get_x())
+                self.assertAlmostEqual(edge.get_end()[0],child['shape'].get_x())
+                self.assertAlmostEqual(edge.get_start()[1],data['shape'].get_bottom()[1])
+                self.assertAlmostEqual(edge.get_end()[1],child['shape'].get_top()[1])
+
+    def test_generalized_sequence_retains_its_values_and_ends_at_a_symbolic_state(self):
+        first=CenteredScene();sequence=StateSequence(['1','1','2'],indices=True,known=True)
+        first.add('sequence',sequence)
+        last=first.fork().refine('sequence',continuation=True,final_index='n')
+        scene=Scene();first.install(scene);apply(ViewTransition(first,last),scene)
+        self.assertEqual([cell.label.tex_string for cell in sequence.row],['1','1','2'])
+        self.assertEqual(sequence.terminal.label.tex_string,'f[n]')
+        self.assertGreater(sequence.terminal.get_left()[0],sequence.ellipsis.get_right()[0])
+        self.assertEqual(sequence.terminal.semantics.status,'computed')
+
     def test_adding_a_row_to_the_same_view_does_not_replay_its_definition_use(self):
         from algovis import ApplyDefinition
         first=CenteredScene();source=first.add('source',Equation({'call':'f(n)'}))
@@ -233,7 +445,7 @@ class SceneAnimationTests(unittest.TestCase):
         self.assertEqual(group.beats[-1].scene.target('recurrence').slot_tex['call'],'f(i,w)')
         self.assertEqual(first.target('recurrence').slot_tex['call'],'f(i)')
 
-    def test_domino_conversion_retains_readable_labels_below_the_falling_boxes(self):
+    def test_domino_conversion_retains_the_proposition_inside_its_falling_frame(self):
         from algovis import InductionChain,ViewScene
         chain=InductionChain(3)
         scene=ViewScene();scene.setup();scene.add(chain)
@@ -241,17 +453,19 @@ class SceneAnimationTests(unittest.TestCase):
         compiled=scene._compile_view_native(operation)
         self.assertIs(compiled.operations[0],operation)
         operation._setup_scene(scene);operation.begin();operation.finish();operation.clean_up_from_scene(scene)
-        label_positions=[case.label.get_center().copy() for case in chain.cases]
         for case in chain.cases:
-            self.assertLess(case.label.get_top()[1],case.box.get_bottom()[1])
+            np.testing.assert_allclose(case.label.get_center(),case.box.get_center())
+            self.assertLess(case.label.width,case.box.width)
         for left,right in zip(chain.cases,chain.cases[1:]):
             self.assertGreater(right.label.get_left()[0]-left.label.get_right()[0],.1)
         falling=chain.fall(0);falling._setup_scene(scene);falling.begin();falling.interpolate(.5)
         for case in chain.cases:
             from algovis.review.inspection import visible_opacity
             self.assertGreater(visible_opacity(case.label),.9)
-        for case,position in zip(chain.cases,label_positions):
-            np.testing.assert_allclose(case.label.get_center(),position)
+        for case in chain.cases:
+            # Asymmetric glyph ink can shift its bounding-box center slightly
+            # under rigid rotation. It must remain inside its physical domino.
+            self.assertLess(np.linalg.norm(case.label.get_center()-case.box.get_center()),.03)
         self.assertTrue(all(float(np.max(part.get_stroke_opacity()))==0
             for part in chain.arrows.family_members_with_points()))
         falling.finish()

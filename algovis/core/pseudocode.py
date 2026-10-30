@@ -6,12 +6,14 @@ from ..frames import PanelFrame
 
 class PseudocodePanel(VGroup):
     """A lightweight code panel with synchronized line highlighting."""
+    _algovis_content_fields=('visible_lines',)
 
     def __init__(self, lines, title="Pseudocode", font="Consolas",
                  font_size=24, width=None, line_buff=None,
                  theme=DEFAULT_THEME, **kwargs):
         super().__init__(**kwargs)
         self.theme = theme
+        self.visible_lines=tuple(range(len(lines)))
         line_buff = DEFAULT_SPACING.tight + 0.04 if line_buff is None else line_buff
         self.lines = VGroup(*[
             Text(
@@ -68,5 +70,20 @@ class PseudocodePanel(VGroup):
 
     def with_state(self,*,visible_lines):
         target=self.copy()
+        target.visible_lines=tuple(visible_lines)
         for index,line in enumerate(target.lines):line.set_opacity(1 if index in visible_lines else 0)
         return target
+
+    def adopt_layout(self,target):
+        from ..composition import _adopt
+        for line,planned in zip(self.lines,target.lines):_adopt(line,planned)
+        for live,planned in ((self.background,target.background),(self.title,target.title),(self.cursor,target.cursor)):
+            _adopt(live,planned)
+        self.visible_lines=target.visible_lines
+        self.submobjects=[self.background,self.title,self.lines,self.cursor]
+        return self
+
+    def motions_to(self,target,*,skip=()):
+        # One owner keeps the opaque panel behind its text during movement.
+        # Animating the background after separate line roots paints over them.
+        return [Transform(self,target)]
