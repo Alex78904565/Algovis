@@ -325,6 +325,15 @@ These are agent verification and regression checks, not new viewer endorsements.
 Use this before handing over a preview. These are recurring failures to prevent,
 not suggestions for the author to check again.
 
+The required review sequence is now **images -> written observations -> explicit
+standards/notes/narration/code comparison -> repair -> new image observations**.
+Use [the workflow](ANIMATION_SELF_REVIEW.md#observe-the-images-then-compare) and
+[its template](templates/VISUAL_OBSERVATION_REVIEW.md). Descriptions must state
+the visible relationships within each panel, not repeat the intended layout.
+Code is evidence of a cause, not an authority that can excuse what the viewer
+sees. A well-written report still needs honest visual judgment; it is not an
+automatic approval mechanism.
+
 | Complaint pattern | What the agent must check |
 |---|---|
 | Random, early, or late pulses and boxes | Every attention effect has a specific spoken referent. Compare its actual rendered start with that word, including time spent in preceding animations. Remove effects without an instructional reason. |

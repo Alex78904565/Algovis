@@ -5,6 +5,66 @@ and [the recurring feedback reference](RECURRING_REVIEW_FEEDBACK.md).
 The agent owns this work across the whole lesson. The viewer's selected section,
 approval status, and willingness to watch another preview do not limit it.
 
+## Observe the images, then compare
+
+Every visual verification record must include image-derived observations and
+an explicit comparison, using the [review template](templates/VISUAL_OBSERVATION_REVIEW.md).
+Do not substitute a contact-sheet count, a source-code description, or a passing
+geometry report for either step. This is a human/agent review procedure; writing
+the report does not mechanically certify that the images are good.
+
+1. **Capture the actual revision.** Generate contact sheets from the encoded
+   video: settled compositions, before/during/after each change, internal helper
+   boundaries, and affected section joins. Record video hash, frame numbers,
+   frame rate and times. Inspect native frames or crops when a sheet is too
+   small to read. Do not certify a frame you cannot read.
+2. **Describe what is visible first.** Before consulting the animation notes
+   or implementation for this comparison, write observations from the images.
+   Identify actual text/math, visible groups, relative placement, alignment,
+   spacing, type hierarchy, colors, and what remains or changes between samples.
+   Describe each panel separately as well as the whole composition. Say where
+   an equation sits relative to its panel and neighboring artwork, not merely
+   that it is "centered." Distinguish visible facts from uncertainty. Do not
+   infer an animation from its class name, cue label, or intended purpose. Prior
+   familiarity is not an independent blind review; do not present it as one.
+3. **Compare observations with the requirements.** For each applicable criterion,
+   link the specific standard, observation IDs/frame evidence, animation note,
+   surrounding timestamped narration, and relevant implementation. The standards
+   and current explicit author instructions supply the acceptance criteria;
+   notes describe intent and code explains causes. Matching the code cannot
+   excuse a visible standards violation. If intent conflicts with an applicable
+   standard, repair the plan/code; resolve material ambiguity with the author.
+   Flag stale or conflicting notes explicitly. Do not rewrite a requirement
+   merely to make the current render pass; identify the author instruction or
+   narration revision that supersedes it, or leave the discrepancy open.
+   Record `pass`, `fail`, `unverified`, or `not applicable`, with a reason.
+4. **Repair, render, observe again.** A failure or missing required evidence
+   prevents signoff for that criterion. Preserve the original failed observation
+   and working parts, repair the shared cause where appropriate, then repeat the
+   image description and comparison on the new encoded revision. A changed
+   implementation alone does not close the finding. Link both records in the
+   handoff and state the actual scope; do not promote local success to a
+   whole-lesson approval.
+
+The comparison must cover layout/grouping and typography; semantic color;
+mathematics and visual prerequisites; retained work and section continuity;
+spoken references and attention; and motion/lifecycle where applicable. Require
+specific observations rather than blanket adjectives such as "clean" or
+"professional." An unchanged feature can inherit only specific still-valid
+evidence, never an invalidated signoff. Keep viewer endorsement separate.
+
+Static images cannot establish exact word synchronization, smooth motion, or
+sound quality. Compare the actual rendered intervals with timestamped words,
+inspect denser frames/playback for motion, and review audio separately. Mark
+those checks unverified when their evidence is missing; do not silently call
+them inapplicable or pass them from a still image.
+
+Example: "The short equation panel shares the tall item panel's top edge; its
+lower margin is much larger than its upper margin" exposes a placement problem.
+"The combined content fits and is centered" does not test the required
+independent centering of those two panels. The observation must be precise
+enough to discover the failure before consulting the layout implementation.
+
 ## Required evidence
 
 For reopened feedback, invalidate the affected visual signoff. Write a small

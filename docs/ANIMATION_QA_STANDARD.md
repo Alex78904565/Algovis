@@ -135,7 +135,10 @@ across layout changes.
   first row; adding a line must not make earlier rows drift horizontally.
 - Center a compact standalone argument vertically too. Reserve its completed
   height before the first reveal. Keep corresponding comparison columns on a
-  shared vertical envelope rather than centering each side independently.
+  shared vertical envelope. When panels have different roles, such as problem
+  data beside a worked calculation, center each panel independently; a shared
+  top can leave the shorter panel too high even if their combined bounds are
+  centered. Check both panels, including their captions, separately.
 - Plan the completed composition before its incremental reveals. For a layout
   repair, compare a few sketches and record the chosen arrangement. Use named
   rows and nested regions rather than a new coordinate for every object.
@@ -247,15 +250,26 @@ recurred during review.
 3. **Static preflight:** run the project audit and resolve its errors.
 4. **Section render:** render affected sections separately so fixes can be
    checked without rebuilding the entire video.
-5. **Frame audit:** inspect the first, middle, and final frame of each transition.
-6. **Playback audit:** watch once with narration and music, then once muted.
-7. **Annotation pass:** answer or fix every queued note.
-8. **User review:** fixes move to `pending_review`; only the reviewer marks them
+5. **Image observations:** inspect contact sheets and native frames, including
+   internal phases. Write concrete descriptions of what is visible before
+   consulting the animation notes/code for the comparison. Identify placement
+   within each panel as well as the complete frame; a vague "looks clean" is
+   not evidence.
+6. **Standards comparison:** compare those descriptions against the applicable
+   standards, animation notes, timestamped narration, and code. Record a
+   criterion-specific verdict and evidence using the
+   [observation review workflow](ANIMATION_SELF_REVIEW.md#observe-the-images-then-compare).
+   Fix failures and repeat on the new encoded revision; code matching intent
+   cannot override a visible violation. Missing evidence stays unverified.
+7. **Playback audit:** watch once with narration and music, then once muted.
+   State any unavailable perceptual check instead of claiming it passed.
+8. **Annotation pass:** answer or fix every queued note.
+9. **User review:** fixes move to `pending_review`; only the reviewer marks them
    `resolved`. Handle every open note across the project, including drafts
    and follow-up questions, regardless of the selected section or its approval
    status. Section approval is the user's judgment of the lesson in context;
    it never limits which notes the agent handles.
-9. **Assembly:** compile the complete video only after every section clears its
+10. **Assembly:** compile the complete video only after every section clears its
    agent verification checks. Outstanding `pending_review` notes and the user's
    section approvals never prevent fixing or checking the rest of the project.
 
@@ -263,6 +277,8 @@ recurred during review.
 
 A section is ready only when all answers are yes:
 
+- Is there an image-derived description and a standards comparison for the
+  exact reviewed revision, with each applicable criterion accounted for?
 - Does each event start on the phrase that motivates it?
 - Is the viewer's attention directed to exactly the object being discussed?
 - Is there one stable composition for each idea rather than a rapid slideshow?
