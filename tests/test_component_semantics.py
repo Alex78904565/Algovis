@@ -2,7 +2,7 @@ import unittest
 from unittest.mock import patch
 
 import numpy as np
-from manim import MathTex, Rectangle, Scene, Text, VGroup, UP
+from manim import MathTex, Rectangle, Scene, Text, VGroup, UP, ManimColor
 
 from algovis import (CallNode, DEFAULT_THEME, LessonStyle, MathRow, Proof,
                      ProofRow, RecursiveTree, SemanticChange, SemanticProperties,
@@ -10,6 +10,37 @@ from algovis import (CallNode, DEFAULT_THEME, LessonStyle, MathRow, Proof,
 
 
 class SemanticPropertyTests(unittest.TestCase):
+    def test_induction_status_tints_the_frame_without_changing_label_ink(self):
+        from algovis import INDUCTION_STATE_CELL_STYLE
+        from manim import interpolate_color
+        cell=StateCell('P(0)',width=1.4,style=INDUCTION_STATE_CELL_STYLE)
+        original_fill=cell.box.get_fill_color()
+        change=SemanticChange(cell,status='known')
+        self.assertEqual(cell.box.get_fill_color(),original_fill)
+        change.begin();change.interpolate(.5)
+        self.assertNotEqual(cell.box.get_fill_color(),original_fill)
+        self.assertEqual(cell.label.get_color(),cell.theme.foreground)
+        change.finish()
+        self.assertEqual(cell.box.get_stroke_color(),cell.theme.success)
+        self.assertEqual(cell.box.get_fill_color(),interpolate_color(ManimColor(cell.theme.background),ManimColor(cell.theme.success),.3))
+        self.assertAlmostEqual(cell.box.get_fill_opacity(),INDUCTION_STATE_CELL_STYLE.fill_opacity)
+        self.assertEqual(cell.label.get_color(),cell.theme.foreground)
+
+    def test_tinted_frame_still_obeys_evaluation_precedence(self):
+        from algovis import INDUCTION_STATE_CELL_STYLE
+        from manim import interpolate_color
+        cell=StateCell('5',style=INDUCTION_STATE_CELL_STYLE,status='computed',evaluation='bad')
+        self.assertEqual(cell.box.get_stroke_color(),cell.theme.danger)
+        self.assertEqual(cell.box.get_fill_color(),interpolate_color(ManimColor(cell.theme.background),ManimColor(cell.theme.danger),.3))
+        self.assertEqual(cell.label.get_color(),cell.theme.foreground)
+
+    def test_ordinary_cell_semantics_preserve_existing_nonstatus_fill(self):
+        cell=StateCell('5')
+        cell.box.set_fill(DEFAULT_THEME.primary,opacity=.2)
+        set_semantics(cell,status='computed')
+        self.assertEqual(cell.box.get_fill_color(),DEFAULT_THEME.primary)
+        self.assertAlmostEqual(cell.box.get_fill_opacity(),.2)
+
     def test_scale_attention_preserves_live_semantic_paint_at_intermediate_frames(self):
         from algovis import Pulse
         cell = StateCell('5')
@@ -64,6 +95,16 @@ class SemanticPropertyTests(unittest.TestCase):
 
 
 class SharedConstructionTests(unittest.TestCase):
+    def test_population_keeps_the_opted_in_status_tint_and_white_value(self):
+        from algovis import INDUCTION_STATE_CELL_STYLE
+        from manim import interpolate_color
+        cell=StateCell('',style=INDUCTION_STATE_CELL_STYLE)
+        animation=cell.populate(1);scene=Scene();scene.add(cell)
+        animation._setup_scene(scene);animation.begin();animation.finish();animation.clean_up_from_scene(scene)
+        self.assertEqual(cell.box.get_fill_color(),interpolate_color(ManimColor(cell.theme.background),ManimColor(cell.theme.success),.3))
+        self.assertEqual(cell.label.get_color(),cell.theme.foreground)
+        self.assertEqual(cell.label.tex_string,'1')
+
     def test_merging_a_named_call_into_its_value_adopts_the_new_glyph_calibration(self):
         from algovis.layout import measured_font_size
         source=StateCell('f(3)');target=StateCell('2')

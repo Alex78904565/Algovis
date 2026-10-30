@@ -64,6 +64,9 @@ def set_semantics(mobject, properties=None, *, theme=None, part=None, channel=No
     mobject._semantic_channel = channel
     mobject._algovis_semantics = asdict(properties)
     mobject._algovis_semantic_role = properties.role
+    paint=getattr(type(mobject),'apply_semantic_paint',None)
+    if paint is not None:
+        paint(mobject,properties,theme,part=part,channel=channel)
     return mobject
 
 

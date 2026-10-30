@@ -41,6 +41,12 @@ ViewTransition                difference between compositions, played by SlideSc
 
 These visual classes compose `SemanticProperties` and shared style/layout
 objects. They do not need a deep inheritance tree merely to obtain a theme.
+`StateCellStyle.semantic_fill_strength` can opt a framed component into a
+semantic tint while preserving neutral label ink. `set_semantics` invokes the
+component's `apply_semantic_paint` hook after resolving properties. The shared
+`INDUCTION_STATE_CELL_STYLE` is used for proposition/domino cells and assumed
+recursive children; shape changes preserve its fill instead of repainting it
+locally. Defaults for ordinary state/array cells remain unchanged.
 `ProofFrame`, `EquationFrame` and `ColumnLayout` are layout strategies;
 `PanelFrame`, `CaseEquation` and `ChapterMarker` serve distinct visual meanings.
 A comparison panel, a state cell and a bag's capacity meter are not interchangeable

@@ -83,6 +83,12 @@ Domino labels now belong inside wider dominoes and move with them, continuously
 reusing the proposition boxes. This supersedes the earlier below-box placement
 while preserving the endorsed contact physics. Smaller-instance trees continue
 through an ellipsis to a base input, and assumed child results are green.
+The author's clarification defers to semantic meaning: boxed induction states
+carry known/assumed correctness with a green frame and restrained fill while
+their labels remain white. Apply the shared induction cell style to the tree
+children as well as the proposition/domino chain. Preserve that status through
+the box-to-domino morph and fall; do not rely on green borders alone or switch
+the meaning of green to "fallen." Unboxed assumed formulas can use green ink.
 Connect rectangular nodes by center-ray/frame intersections; a support corner
 can produce a diagonal edge even when parent and child are perfectly vertical.
 Check initial geometry, cached reveals and later reflow, not only node centers.

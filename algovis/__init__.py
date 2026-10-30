@@ -2,7 +2,7 @@ from .core.math import Function, ApplyFunction, ApplyDefinition, Substitute
 from .core.trees import RecursiveTree, NodeState
 from .core.induction import MonotonicVisualizer, InductionStep
 from .core.dominoes import DominoGeometry
-from .core.structures import (CellState, StateCell, StateRow, StateCellStyle, CallNode,
+from .core.structures import (CellState, StateCell, StateRow, StateCellStyle, INDUCTION_STATE_CELL_STYLE, CallNode,
     DEFAULT_STATE_CELL_STYLE, DPTable, DPWorkflow, HashTable, GraphVis)
 from .core.state_space import StateSpaceVisualizer, StateParameter, BinaryStateVector
 from .core.pseudocode import PseudocodePanel

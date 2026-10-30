@@ -6,7 +6,7 @@ from manim import (AnimationGroup,Axes,Create,DOWN,Dot,FadeIn,FadeOut,LEFT,Line,
 from ..layout import LessonStyle,assign_scene_typography
 from ..theme import DEFAULT_THEME
 from ..semantics import SemanticChange
-from .structures import StateRow
+from .structures import StateRow,INDUCTION_STATE_CELL_STYLE
 from .dominoes import DominoGeometry
 
 
@@ -254,10 +254,11 @@ class TreeAnnotation(VGroup):
 
 class InductionChain(VGroup):
     """The same case boxes can become a contact-driven domino chain."""
-    def __init__(self,count=5,*,known=(),dominoes=False,theme=DEFAULT_THEME):
+    def __init__(self,count=5,*,known=(),dominoes=False,theme=DEFAULT_THEME,cell_style=None):
         from manim import Arrow
         self.theme=theme
-        self.cases=StateRow([rf'P({index})' for index in range(count)],theme=theme,gap=.55)
+        self.cases=StateRow([rf'P({index})' for index in range(count)],theme=theme,gap=.55,
+            style=cell_style or INDUCTION_STATE_CELL_STYLE)
         from ..semantics import set_semantics
         for index in known:set_semantics(self.cases[index],status='computed',theme=theme)
         self.arrows=VGroup(*(Arrow(a.get_right(),b.get_left(),buff=.09,color=theme.muted,
@@ -286,7 +287,7 @@ class InductionChain(VGroup):
         A plural phrase can advance several cases in sequence. Their internal
         phases belong to this one verified trigger, rather than invented words.
         """
-        from manim import UpdateFromAlphaFunc,interpolate_color,there_and_back,ManimColor
+        from manim import UpdateFromAlphaFunc,interpolate_color,there_and_back
         from ..semantics import set_semantics
         if not str(trigger).strip() or not str(reason).strip():
             raise ValueError('Correctness propagation needs its spoken trigger and purpose')
@@ -296,7 +297,7 @@ class InductionChain(VGroup):
         original={i:self.cases[i].copy() for i in indices}
         colors={i:self.cases[i].box.get_stroke_color() for i in indices}
         arrow_colors={i:self.arrows[i-1].get_color() for i in indices if i}
-        success=ManimColor(self.theme.success)
+        painted={i:set_semantics(original[i].copy(),status='computed',theme=self.theme) for i in indices}
         def update(_chain,alpha):
             for phase,index in enumerate(indices):
                 progress=np.clip(alpha*len(indices)-phase,0,1)
@@ -308,8 +309,11 @@ class InductionChain(VGroup):
                 case.box.set_points(target.box.get_points())
                 for live,reference in zip(case.label.get_family(),target.label.get_family()):
                     if live.has_points():live.set_points(reference.get_points())
-                case.box.set_stroke(interpolate_color(colors[index],success,progress))
-                if index:self.arrows[index-1].set_color(interpolate_color(arrow_colors[index],success,progress))
+                destination=painted[index].box
+                case.box.set_stroke(interpolate_color(colors[index],destination.get_stroke_color(),progress))
+                case.box.set_fill(interpolate_color(original[index].box.get_fill_color(),destination.get_fill_color(),progress),
+                    opacity=(1-progress)*original[index].box.get_fill_opacity()+progress*destination.get_fill_opacity())
+                if index:self.arrows[index-1].set_color(interpolate_color(arrow_colors[index],destination.get_stroke_color(),progress))
                 if progress>=1:set_semantics(case,status='computed',theme=self.theme)
         animation=UpdateFromAlphaFunc(self,update,rate_func=linear)
         animation._algovis_component_process=True
@@ -322,7 +326,8 @@ class InductionChain(VGroup):
         # The physical contact model and readable labels share one spacing.
         width,height,gap=self._domino_metrics()
         targets=VGroup(*(Rectangle(width=width,height=height,color=case.box.get_stroke_color(),
-            fill_color=self.theme.surface,fill_opacity=1) for case in self.cases)).arrange(RIGHT,buff=gap).move_to(self.cases)
+            fill_color=case.box.get_fill_color(),fill_opacity=case.box.get_fill_opacity())
+            for case in self.cases)).arrange(RIGHT,buff=gap).move_to(self.cases)
         self.geometry=DominoGeometry(width=width,height=height,gap=gap)
         cells=[]
         for case,target in zip(self.cases,targets):
@@ -345,6 +350,7 @@ class InductionChain(VGroup):
     def fall(self,front):
         from manim import UpdateFromAlphaFunc,DR,PI,smooth
         from ..layout import measured_font_size
+        from ..semantics import set_semantics
         if not hasattr(self,'upright'):
             self.upright=[case.copy() for case in self.cases]
             self.pivots=[case.box.get_corner(DR) for case in self.upright]
@@ -360,5 +366,5 @@ class InductionChain(VGroup):
                         # Rotating an unchanged font changes its ink bounds,
                         # not its point size. Keep that distinction measured.
                         live._algovis_font_reference=(measured_font_size(reference),float(live.height))
-                if index<=front:case.box.set_stroke(self.theme.success).set_fill(self.theme.success,opacity=.5)
+                if index<=front:set_semantics(case,status='computed',theme=self.theme)
         return UpdateFromAlphaFunc(self,update)

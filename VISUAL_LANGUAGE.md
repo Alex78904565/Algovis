@@ -69,6 +69,21 @@ evaluation remains green.
 
 ## Attention without changing meaning
 
+For boxed propositions and assumed smaller instances in an induction
+explanation, the **frame carries the status**: use a green border with a
+restrained green-tinted fill for known/assumed-correct cases, keeping labels
+neutral white for contrast. The same treatment persists when proposition
+boxes become dominoes and fall. Green means the case is established or
+assumed within the inductive argument, not that the tile has physically fallen.
+Unboxed assumed formulas use green ink. These share a meaning without requiring
+green text on a green shape.
+
+Use the shared `INDUCTION_STATE_CELL_STYLE`; its tint is derived from semantic
+properties and the theme, so a negative evaluation still takes precedence.
+The frame retains its background opacity to keep tree edges behind the node.
+Ordinary array/call cells retain their established style unless explicitly
+given this induction treatment.
+
 Prefer a temporary outline, underline, arrow, or small scale pulse when the
 narration refers to an object whose semantic role has not changed. Do not
 permanently recolor it just to direct attention. When an object's role really

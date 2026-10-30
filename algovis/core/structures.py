@@ -16,9 +16,15 @@ class StateCellStyle:
     stroke_width: float = 2.2
     fill_opacity: float = .94
     horizontal_padding: float = .16
+    semantic_fill_strength: float = 0.
+
+    def __post_init__(self):
+        if not math.isfinite(self.semantic_fill_strength) or not 0<=self.semantic_fill_strength<=1:
+            raise ValueError('Semantic fill strength must be between zero and one')
 
 
 DEFAULT_STATE_CELL_STYLE = StateCellStyle()
+INDUCTION_STATE_CELL_STYLE = StateCellStyle(semantic_fill_strength=.3)
 
 
 class CellState(enum.Enum):
@@ -65,6 +71,19 @@ class StateCell(VGroup):
             semantics=SemanticProperties(role,status,evaluation)
         if semantics is not None:
             set_semantics(self,semantics,theme=theme,part='box',channel='stroke')
+
+    def apply_semantic_paint(self,properties,theme,*,part,channel):
+        """Tint the owned frame while preserving neutral, readable label ink.
+
+        Blend an opaque background rather than making edges behind a tree node
+        visible through a translucent status overlay. Ordinary cells retain
+        their existing fill unless their style opts into semantic tinting.
+        """
+        strength=self.frame_style.semantic_fill_strength
+        if strength and part=='box' and channel=='stroke':
+            colored=properties.status not in (None,'unseen') or properties.evaluation is not None
+            color=interpolate_color(ManimColor(theme.background),ManimColor(properties.color(theme)),strength if colored else 0)
+            self.box.set_fill(color,opacity=self.frame_style.fill_opacity)
 
     def apply_scene_typography(self,typography,*,group):
         # A cell owns the relationship between its frame and its label. It

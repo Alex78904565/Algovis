@@ -276,6 +276,23 @@ class SceneAnimationTests(unittest.TestCase):
             self.assertEqual(case.box.get_stroke_color(),chain.theme.success)
             np.testing.assert_allclose(case.label.get_center(),case.box.get_center(),atol=1e-7)
 
+    def test_induction_status_fill_survives_the_domino_morph_and_fall(self):
+        from algovis import InductionChain
+        chain=InductionChain(3,known=(0,1,2),dominoes=True)
+        scene=Scene();scene.add(chain)
+        colors=[case.box.get_fill_color() for case in chain.cases]
+        morph=chain.as_dominoes();start(morph,scene);finish(morph,scene)
+        for case,color in zip(chain.cases,colors):
+            self.assertEqual(case.box.get_fill_color(),color)
+            self.assertEqual(case.label.get_color(),chain.theme.foreground)
+        motion=chain.fall(0);start(motion,scene)
+        for alpha in (.25,.5,.75,1):
+            motion.interpolate(alpha)
+            for case,color in zip(chain.cases,colors):
+                self.assertEqual(case.box.get_fill_color(),color)
+                self.assertEqual(case.label.get_color(),chain.theme.foreground)
+        finish(motion,scene)
+
     def test_every_case_in_a_plural_propagation_visibly_pulses_and_becomes_known(self):
         from algovis import InductionChain
         from dataclasses import replace
