@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 from ..theme import DEFAULT_THEME
 from ..semantics import SemanticProperties, set_semantics, copy_semantics
+from ..layout import LessonTypography, LessonStyle, measured_font_size
 
 
 @dataclass(frozen=True)
@@ -34,7 +35,7 @@ class StateCell(VGroup):
     ``color`` controls the border, while the value keeps its neutral ink.
     """
 
-    def __init__(self, value, *, width=1.06, height=.78, value_scale=.64,
+    def __init__(self, value, *, width=1.06, height=.78, value_scale=None,
                  color=None, theme=DEFAULT_THEME, style=None, frame_shape='box',
                  semantics=None, role='current',status=None,evaluation=None, **kwargs):
         self.theme = theme
@@ -50,17 +51,34 @@ class StateCell(VGroup):
             self.box = Circle(radius=width/2,stroke_color=color or theme.primary,
                 stroke_width=self.frame_style.stroke_width,fill_color=theme.background,
                 fill_opacity=self.frame_style.fill_opacity)
-        self.label = value if isinstance(value,Mobject) else MathTex(str(value), color=theme.foreground).scale(value_scale)
+        value_size=LessonTypography().equation if value_scale is None else 48*value_scale
+        self.label = value if isinstance(value,Mobject) else MathTex(str(value),font_size=value_size,color=theme.foreground)
+        self.label._algovis_empty_font_size=value_size
         if self.label.width > width-self.frame_style.horizontal_padding:
             raise ValueError("StateCell value exceeds its width; reserve a wider cell")
         self.label.move_to(self.box)
-        self._value_font_size=float(getattr(self.label,'font_size',48*value_scale)) if self.label.height>0 else 48*value_scale
+        self._value_font_size=float(getattr(self.label,'font_size',value_size)) if self.label.height>0 else value_size
         self._initial_box_height=float(self.box.height)
         super().__init__(self.box, self.label, **kwargs)
         if semantics is None and (color is None or status is not None or evaluation is not None):
             semantics=SemanticProperties(role,status,evaluation)
         if semantics is not None:
             set_semantics(self,semantics,theme=theme,part='box',channel='stroke')
+
+    def apply_scene_typography(self,typography,*,group):
+        # A cell owns the relationship between its frame and its label. It
+        # receives a scene type role without scaling a lone glyph independently
+        # of the component's population policy.
+        role='label' if isinstance(self,CallNode) else 'equation'
+        size=float(measured_font_size(self.label) or 0)
+        desired=typography.size(role)
+        if size>0 and self.label.height>0:
+            self.label.scale(desired/size).move_to(self.box)
+            if self.label.width>self.box.width-self.frame_style.horizontal_padding:
+                raise ValueError('Cell text exceeds its component; reserve a wider cell')
+        self.label._algovis_empty_font_size=desired
+        self._value_font_size=desired*self._initial_box_height/self.box.height
+        LessonStyle._watch_type(self.label,group+'/cells',role)
 
     def populate(self,value,*,status='computed',evaluation=None):
         """Plan value entry and its status together; live content stays untouched."""
@@ -69,7 +87,8 @@ class StateCell(VGroup):
                       color=self.theme.foreground).move_to(target.box)
         if label.width>target.box.width-self.frame_style.horizontal_padding*self.box.height/self._initial_box_height:
             raise ValueError('Value exceeds the cell; reserve a wider cell')
-        target.label.become(label);target.label.tex_string=str(value)
+        target.label=label
+        target.submobjects[1]=label
         # Manim's become adopts geometry, not the TeX font reference. An
         # initially empty label has a zero reference height; retain the new
         # reference so later scaling and reviewer measurements stay finite.
@@ -80,19 +99,80 @@ class StateCell(VGroup):
         set_semantics(target,properties,theme=self.theme,part='box',channel='stroke',**changes)
         return _CellPopulation(self,target,str(value))
 
+    def adopt_layout(self,target):
+        """Retain the cell and label identities, discard transform padding."""
+        self.box.become(target.box)
+        self.label.become(target.label)
+        self.label.points=target.label.points.copy()
+        self.label.submobjects=[part.copy() for part in target.label.submobjects]
+        for field in ('tex_string','initial_height','_font_size','_algovis_empty_font_size'):
+            if hasattr(target.label,field):setattr(self.label,field,getattr(target.label,field))
+        self._value_font_size=target._value_font_size
+        self._initial_box_height=target._initial_box_height
+        self.submobjects=[self.box,self.label]
+        copy_semantics(target,self)
+        group=getattr(target.label,'_algovis_typography_group',
+                      getattr(self.label,'_algovis_typography_group',None))
+        if group:
+            LessonStyle._watch_type(self.label,group,
+                getattr(target.label,'_algovis_type_role',getattr(self.label,'_algovis_type_role','equation')))
+        return self
 
-class _CellPopulation(Transform):
+    def motions_to(self,target):
+        class CellMove(Transform):
+            def finish(motion):
+                super().finish()
+                motion.mobject.adopt_layout(motion.target_mobject)
+        return [CellMove(self,target)]
+
+
+class _CellPopulation(Animation):
+    """Reveal a value at its cell centre; never morph an empty SVG into it."""
     def __init__(self,cell,target,value):
         self.value=value
-        super().__init__(cell,target)
+        self.target_mobject=target
+        self.canonical_label=target.label.copy()
+        self.entering_label=target.label.copy()
+        self.retiring_label=cell.label.copy()
+        self.process=AnimationGroup(Transform(cell.box,target.box),
+            FadeOut(self.retiring_label),FadeIn(self.entering_label),lag_ratio=0)
+        self.animations=self.process.animations
+        self.host_scene=None
+        super().__init__(cell)
+
+    def _setup_scene(self,scene):
+        self.host_scene=scene
+        self.process._setup_scene(scene)
+
+    def begin(self):
+        self.mobject.label.set_opacity(0)
+        self.process.begin()
+
+    def interpolate(self,alpha):
+        self.process.interpolate(alpha)
 
     def finish(self):
-        super().finish()
-        cell=self.mobject
-        cell.box,cell.label=cell[0],cell[1]
+        self.process.finish()
+        cell=self.mobject;label=self.canonical_label
+        # Keep the value slot's identity, with exactly the new glyphs. Temporary
+        # local fades never change its geometry or move numbers across the row.
+        cell.label.points=label.points.copy()
+        cell.label.submobjects=[part.copy() for part in label.submobjects]
         cell.label.tex_string=self.value
-        cell.label.initial_height=self.target_mobject.label.initial_height
+        cell.label.initial_height=label.initial_height
+        cell.label._font_size=label._font_size
+        cell.label.set_fill(label.get_fill_color(),opacity=1)
+        if getattr(cell.label,'_algovis_typography_group',None):
+            LessonStyle._watch_type(cell.label,cell.label._algovis_typography_group,
+                                    cell.label._algovis_type_role)
         copy_semantics(self.target_mobject,cell)
+        if self.host_scene is not None:
+            self.host_scene.remove(*self.entering_label.get_family(),*self.retiring_label.get_family())
+
+    def clean_up_from_scene(self,scene):
+        self.process.clean_up_from_scene(scene)
+        scene.remove(*self.entering_label.get_family(),*self.retiring_label.get_family())
+        super().clean_up_from_scene(scene)
 
 
 class CallNode(StateCell):
@@ -100,22 +180,35 @@ class CallNode(StateCell):
 
     def __init__(self,label,*,minimum_radius=.34,padding=.12,shape='square',
                  color=None,theme=DEFAULT_THEME,style=None,**kwargs):
-        if shape not in ('square','circle'):
-            raise ValueError('Call node shape must be square or circle')
+        if shape not in ('square','circle','box'):
+            raise ValueError('Call node shape must be square, box or circle')
         if 'semantics' not in kwargs and (color is None or color==theme.node):
             kwargs['semantics']=SemanticProperties(role='node')
         radius=max(minimum_radius,label.width/2+padding,label.height/2+padding)
-        super().__init__(label,width=2*radius,height=2*radius,color=color or theme.node,
-            theme=theme,style=style,frame_shape='box' if shape=='square' else 'circle',**kwargs)
+        height=2*max(minimum_radius,label.height/2+padding) if shape=='box' else 2*radius
+        super().__init__(label,width=2*radius,height=height,color=color or theme.node,
+            theme=theme,style=style,frame_shape='box' if shape in ('square','box') else 'circle',**kwargs)
 
 
 class StateRow(VGroup):
     """A row of the standard cells, with room for a plus or short arrow."""
 
     def __init__(self, values, *, gap=.42, theme=DEFAULT_THEME, cell_type=StateCell, **cell_options):
+        self.gap=gap
         super().__init__(*[cell_type(value, theme=theme, **cell_options)
                            for value in values])
         self.arrange(RIGHT, buff=gap)
+
+    def apply_scene_typography(self,typography,*,group):
+        center=self.get_center()
+        for cell in self:cell.apply_scene_typography(typography,group=group)
+        self.arrange(RIGHT,buff=self.gap).move_to(center)
+
+    def adopt_layout(self,target):
+        if len(self)!=len(target):raise ValueError('Changing a state row length requires an explicit row model')
+        for cell,destination in zip(self,target):cell.adopt_layout(destination)
+        self.gap=target.gap
+        return self
 
 
 class DPTable(VGroup):

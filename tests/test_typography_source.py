@@ -98,6 +98,25 @@ class Lesson:
         with self.assertRaisesRegex(ValueError,'Cannot locate'):
             audit_source('class Lesson: pass',scene='Lesson')
 
+    def test_imported_builder_cannot_hide_manual_font_sizing(self):
+        with TemporaryDirectory(dir=Path.cwd()/'.qa') as folder:
+            root=Path(folder);(root/'algovis').mkdir()
+            (root/'builders').mkdir();(root/'builders/__init__.py').write_text('')
+            (root/'builders/lesson.py').write_text('from .content import equation\ndef build(scene): equation()\n')
+            (root/'builders/content.py').write_text('def equation(): return MathTex("x",font_size=41)\n')
+            path=root/'entry.py'
+            path.write_text('from builders import lesson as content\nclass Clip:\n def construct(self): content.build(self)\n')
+            with self.assertRaisesRegex(ValueError,'Scene typography migration required'):
+                require_scene_typography(path,'Clip')
+
+    def test_helper_container_scaling_and_placement_are_rejected(self):
+        with TemporaryDirectory(dir=Path.cwd()/'.qa') as folder:
+            root=Path(folder);(root/'algovis').mkdir()
+            path=root/'entry.py'
+            path.write_text('class Clip:\n def construct(self):\n  make_equation().scale(.9).move_to([1,2,0])\n')
+            with self.assertRaisesRegex(ValueError,'Scene typography migration required'):
+                require_scene_typography(path,'Clip')
+
     def test_parked_code_after_return_does_not_pollute_active_inventory(self):
         report=audit_source('''
 class Lesson:

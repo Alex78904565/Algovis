@@ -43,8 +43,10 @@ class LessonLayoutTests(unittest.TestCase):
         style=LessonStyle()
         source=style.math(r'\#\text{ operations}',r'\ge',peers='proof')
         destination=style.math(r'\#\text{ operations}',peers='proof')
+        destination_parts=list(destination.submobjects)
         transfer=ApplyDefinition(source[0],None,destination)
-        self.assertEqual(len(destination.submobjects),len(source[0].submobjects))
+        self.assertEqual(destination.submobjects,destination_parts)
+        self.assertTrue(transfer._glyph_aligned_copy)
         scene=object.__new__(Scene);scene.mobjects=[source,destination]
         scene._review_object_ids={};scene._review_next_object_id=1
         scene._review_object_label=lambda obj:getattr(obj,'tex_string','')

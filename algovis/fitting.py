@@ -69,10 +69,10 @@ def relative_font_scale(mobject, factor):
         part._algovis_relative_font_scale=float(factor)
 
 
-def plain_text(text, width, *, theme, wrap=True):
+def plain_text(text, width, *, theme, wrap=True, typography=None, type_role='body'):
     """Wrap ordinary prose before shrinking; equations retain their syntax."""
-    style = LessonStyle(theme=theme)
-    make = lambda value: style.text(value)
+    style = LessonStyle(theme=theme, **({'typography': typography} if typography else {}))
+    make = lambda value: style.text(value, type_role=type_role)
     if not wrap:
         return make(text)
     lines = []

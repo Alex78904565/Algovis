@@ -54,3 +54,19 @@ class PseudocodePanel(VGroup):
 
     def step(self, index, *animations):
         return AnimationGroup(self.highlight_line(index), *animations)
+
+    def apply_scene_typography(self,typography,*,group):
+        from ..layout import assign_scene_typography
+        center=self.get_center()
+        for line in self.lines:assign_scene_typography(line,typography,group=group,role='label')
+        assign_scene_typography(self.title,typography,group=group,role='label')
+        self.lines.arrange(DOWN,aligned_edge=LEFT,buff=.22)
+        self.background.stretch_to_fit_width(self.lines.width+.65).stretch_to_fit_height(self.lines.height+.9)
+        self.lines.move_to(self.background).shift(DOWN*.15)
+        self.title.next_to(self.background.get_top(),DOWN,buff=.18)
+        self.move_to(center)
+
+    def with_state(self,*,visible_lines):
+        target=self.copy()
+        for index,line in enumerate(target.lines):line.set_opacity(1 if index in visible_lines else 0)
+        return target

@@ -64,6 +64,29 @@ class SemanticPropertyTests(unittest.TestCase):
 
 
 class SharedConstructionTests(unittest.TestCase):
+    def test_merging_a_named_call_into_its_value_adopts_the_new_glyph_calibration(self):
+        from algovis.layout import measured_font_size
+        source=StateCell('f(3)');target=StateCell('2')
+        source.apply_scene_typography(LessonStyle().typography,group='cells')
+        target.apply_scene_typography(LessonStyle().typography,group='cells')
+        source_label=source.label
+        motion=source.motions_to(target)[0];motion.begin();motion.finish()
+        self.assertIs(source.label,source_label)
+        self.assertAlmostEqual(measured_font_size(source.label),measured_font_size(target.label))
+        self.assertEqual(source.label.tex_string,'2')
+
+    def test_a_new_cell_value_stays_centred_throughout_its_reveal(self):
+        cell=StateCell('').shift(UP*2)
+        label=cell.label
+        animation=cell.populate(1)
+        scene=Scene();scene.add(cell);animation._setup_scene(scene);animation.begin()
+        for progress in (.1,.3,.6,.9):
+            animation.interpolate(progress)
+            np.testing.assert_allclose(animation.entering_label.get_center(),cell.box.get_center())
+        animation.finish();animation.clean_up_from_scene(scene)
+        self.assertIs(cell.label,label)
+        self.assertEqual(cell.label.tex_string,'1')
+        np.testing.assert_allclose(cell.label.get_center(),cell.box.get_center())
     def test_population_waits_until_playback_and_keeps_value_and_frame_in_one_cell(self):
         cell=StateCell('')
         animation=cell.populate(1)

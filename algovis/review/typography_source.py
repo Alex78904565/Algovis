@@ -13,7 +13,7 @@ import json
 from pathlib import Path
 
 TEXT = {'Text', 'MarkupText', 'Tex', 'MathTex', 'SingleStringMathTex', 'MathRow',
-        'DecimalNumber', 'Integer'}
+        'DecimalNumber', 'Integer', 'TextObject', 'Equation'}
 DIAGRAMS = {'RecursiveTree', 'StateRow', 'StateCell', 'CallNode', 'CapacityChoiceStory',
             'CapacityBag', 'RoadTripStory', 'CityRouteStory', 'Axes', 'NumberLine',
             'Rectangle', 'RoundedRectangle', 'Circle', 'Dot', 'Line', 'Arrow',
@@ -21,6 +21,8 @@ DIAGRAMS = {'RecursiveTree', 'StateRow', 'StateCell', 'CallNode', 'CapacityChoic
 SIZE_METHODS = {'scale', 'scale_to_fit_width', 'scale_to_fit_height', 'set_width',
                 'set_height', 'stretch_to_fit_width', 'stretch_to_fit_height',
                 'match_width', 'match_height', 'set_font_size'}
+POSITION_METHODS={'move_to','next_to','align_to','shift','set_x','set_y','set_z',
+                  'arrange','arrange_in_grid','to_edge','to_corner','center'}
 
 
 def name(node):
@@ -192,13 +194,65 @@ def audit_source(text, *, path='<source>', scene=None):
 def require_scene_typography(path, scene):
     """Reject known manual text sizing without relying on opt-in peer tags."""
     path = Path(path)
-    report = audit_source(path.read_text(encoding='utf-8-sig'), path=str(path), scene=scene)
-    problems = [record for record in report['findings'] if record['disposition'] == 'migration_required']
+    report = audit_scene_project(path, scene)
+    problems = [record for record in report['findings'] if record['category'] in
+                ('absolute_font_size','manual_text_scale','container_size_review','manual_scene_placement')]
     if problems:
         details = '; '.join(f"{record['owner']}:{record['line']} {record['category']}" for record in problems[:5])
         raise ValueError(f'Scene typography migration required ({len(problems)} manual text sizing decisions): {details}. '
                          'Use scene defaults and declared relative font scales; the previous preview remains available.')
     return report
+
+
+def audit_scene_project(path, scene):
+    """Include local authoring imports, so a small entrypoint cannot hide sizing.
+
+    Shared library modules have their own component-policy audit. Every imported
+    authoring module is conservatively inventoried in full, including callbacks
+    and builder functions invoked through an alias. No imports are executed.
+    """
+    path=Path(path).resolve()
+    root=next((parent for parent in path.parents if (parent/'algovis').is_dir()),path.parent)
+    pending=[(path,scene)];seen=set();reports=[]
+    while pending:
+        current,entry=pending.pop()
+        if current in seen:continue
+        seen.add(current)
+        content=current.read_text(encoding='utf-8-sig')
+        module_report=audit_source(content,path=str(current),scene=entry)
+        reports.append(module_report)
+        tree=ast.parse(content)
+        # Layout belongs to shared scenes/components. Moving a container or a
+        # helper-returned equation is just as manual as moving raw MathTex.
+        source=Source(content,str(current))
+        active=set(source.reachable(entry)) if entry else None
+        placements=[source.record(node,source.owner(node),'manual_scene_placement',
+                    source.kind(node.func.value,source.owner(node)),node.func.attr)
+            for node in ast.walk(tree) if isinstance(node,ast.Call) and isinstance(node.func,ast.Attribute)
+            and node.func.attr in POSITION_METHODS and (active is None or source.owner(node) in active)]
+        module_report['findings'].extend(placements)
+        for node in ast.walk(tree):
+            modules=[]
+            if isinstance(node,ast.Import):modules=[alias.name for alias in node.names]
+            elif isinstance(node,ast.ImportFrom):
+                if node.level:
+                    base=current.parent
+                    for _ in range(node.level-1):base=base.parent
+                    try:prefix='.'.join(base.relative_to(root).parts)
+                    except ValueError:continue
+                    module='.'.join(part for part in (prefix,node.module) if part)
+                else:module=node.module or ''
+                modules=[module,*[module+'.'+alias.name for alias in node.names]]
+            for module in modules:
+                if module.split('.')[0] in ('algovis','manim','numpy'):continue
+                candidate=root.joinpath(*module.split('.'))
+                for imported in (candidate.with_suffix('.py'),candidate/'__init__.py'):
+                    if imported.is_file() and imported not in seen:pending.append((imported,None))
+    findings=[finding for report in reports for finding in report['findings']]
+    return {'path':str(path),'scene':scene,'modules':reports,'findings':findings,
+            'counts':dict(Counter(item['category'] for item in findings)),
+            'compliant':not findings,
+            'scope':'Entry scene and all local authoring imports; shared component policies audited separately. No visual signoff.'}
 
 
 def main(argv=None):

@@ -183,16 +183,67 @@ class EquationFrame:
 class CaseEquation(VGroup):
     """Shared lhs/brace/left-aligned alternatives, using the supplied objects."""
 
-    def __init__(self, lhs, rows, *, compact=False, theme=DEFAULT_THEME, style=None, **kwargs):
+    def __init__(self, lhs, rows, *, compact=False, show_brace=None,theme=DEFAULT_THEME, style=None, **kwargs):
+        self.theme,self.compact=theme,compact
+        self.show_brace=show_brace
         self.style = style or DEFAULT_FRAME_STYLE
         self.lhs = lhs
         self.rows = rows if isinstance(rows, VGroup) else VGroup(*rows)
         self.rows.arrange(DOWN, aligned_edge=LEFT,
                           buff=self.style.compact_case_gap if compact else self.style.case_gap)
         self.brace = Brace(self.rows, LEFT, color=theme.foreground)
+        self.brace.set_opacity(1 if self.show_brace is True or (self.show_brace is None and len(self.rows)>1) else 0)
         lhs.next_to(self.brace, LEFT, buff=self.style.case_lhs_gap)
         super().__init__(lhs, self.brace, self.rows, **kwargs)
         self._algovis_layout_component = "CaseEquation"
+
+    def apply_scene_typography(self,typography,*,group):
+        from .layout import assign_scene_typography
+        center=self.get_center()
+        assign_scene_typography(self.lhs,typography,group=group)
+        for row in self.rows:assign_scene_typography(row,typography,group=group)
+        self.rows.arrange(DOWN,aligned_edge=LEFT,buff=self.style.compact_case_gap if self.compact else self.style.case_gap)
+        self.brace.become(Brace(self.rows,LEFT,color=self.brace.get_color()))
+        self.brace.set_opacity(1 if self.show_brace is True or (self.show_brace is None and len(self.rows)>1) else 0)
+        self.lhs.next_to(self.brace,LEFT,buff=self.style.case_lhs_gap)
+        self.move_to(center)
+
+    def part(self,name):
+        if name=='lhs':return self.lhs
+        if name=='brace':return self.brace
+        if name.startswith('row:'):return self.rows[int(name.split(':')[1])]
+        raise KeyError(name)
+
+    def with_state(self,*,lhs=None,rows=None):
+        return CaseEquation(lhs.copy() if lhs is not None else self.lhs.copy(),
+            [row.copy() for row in (rows if rows is not None else self.rows)],
+            style=self.style,theme=self.theme,compact=self.compact,show_brace=self.show_brace).move_to(self)
+
+    def motions_to(self,target,*,skip=()):
+        from manim import FadeIn,FadeOut,Transform
+        from .core.math_row import MathRow
+        motions=[]
+        for name,(old,new) in zip(['lhs',*(f'row:{index}' for index in range(len(self.rows)))],
+                                [(self.lhs,target.lhs),*zip(self.rows,target.rows)]):
+            ignored=tuple(path[len(name)+1:] for path in skip if path.startswith(name+'.'))
+            motions.extend(old.motions_to(new,skip=ignored) if isinstance(old,MathRow) and isinstance(new,MathRow)
+                           else [Transform(old,new)])
+        motions.append(Transform(self.brace,target.brace))
+        motions.extend(FadeOut(row) for row in self.rows[len(target.rows):])
+        motions.extend(FadeIn(row) for row in target.rows[len(self.rows):])
+        return motions
+
+    def adopt_layout(self,target):
+        from .composition import _adopt
+        _adopt(self.lhs,target.lhs)
+        self.brace.become(target.brace)
+        adopted=[]
+        for index,row in enumerate(target.rows):
+            live=self.rows[index] if index<len(self.rows) else row.copy()
+            _adopt(live,row);adopted.append(live)
+        self.rows.submobjects=adopted
+        self.submobjects=[self.lhs,self.brace,self.rows]
+        return self
 
 
 class PanelFrame(RoundedRectangle):

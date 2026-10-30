@@ -132,7 +132,7 @@ class Later(DeferredAnimation):
 
 
 def _layout_group(mob):
-    return type(mob) in (Group, VGroup)
+    return type(mob) in (Group, VGroup) or getattr(mob,'_algovis_layout_container',False)
 
 
 def _cut(mob, focus=()):
@@ -452,7 +452,6 @@ class ViewSceneMixin:
         return super().begin_narration(*args, **kwargs)
 
     def bind_attention(self, target, cue, **options):
-        target = target.mobject if isinstance(target, SlideObject) else target
         binding = attention_declaration(target, cue, **options)
         self._validate_attention_registration(binding)
         self._word_attention.append(binding)
@@ -490,11 +489,13 @@ class ViewSceneMixin:
             anchor = self.narration.word_anchor(binding.cue)
             delay = anchor['start']-start
             if delay < -.001 or delay >= duration-.001: continue
+            try:target=binding.artwork
+            except (KeyError,IndexError):target=None
             present = {id(part) for part in self.get_mobject_family_members()}
             revealing = any(_kind(prepare_animation(operation)) == 'reveal'
-                            and binding.target in prepare_animation(operation).mobject.get_family()
+                            and target in prepare_animation(operation).mobject.get_family()
                             for operation in operations)
-            if revealing and id(binding.target) not in present and binding.callback is None:
+            if revealing and id(target) not in present and binding.callback is None:
                 binding.fired = True  # The reveal itself supplies the attention.
                 continue
             if delay+binding.duration > duration+.001:
@@ -547,6 +548,8 @@ class ViewSceneMixin:
 
     def _compile_view_native(self, specification):
         animation = prepare_animation(specification)
+        if getattr(animation,'_algovis_component_process',False):
+            return _ViewPhase(self,(animation,),run_time=animation.run_time)
         if (isinstance(animation, ApplyDefinition) or getattr(animation, '_algovis_attention', None)
                 or getattr(animation, '_algovis_focus_target', None)):
             return _ViewPhase(self, (animation,), run_time=animation.run_time)

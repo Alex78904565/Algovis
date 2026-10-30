@@ -51,7 +51,8 @@ class AutomaticFittingTests(unittest.TestCase):
 
     def test_readability_failure_rolls_back_the_whole_plan(self):
         view=ColumnSlide()
-        view.add('note',Text('Small text already',font_size=16))
+        view.add('note','Small text already',font_scale=16/26,
+                 font_reason='Exercise the readability boundary')
         original=view.target('note').get_all_points().copy()
         with self.assertRaisesRegex(ValueError,'text too small'):
             view.add('wide',self.wide(view))
@@ -79,7 +80,8 @@ class AutomaticFittingTests(unittest.TestCase):
         self.assertEqual(target.native_layout_findings(),[])
         self.assertAlmostEqual(view.target('label:inductive_step').get_top()[1],target.get_top()[1])
         self.assertAlmostEqual(target.get_left()[0],view.frame.left[0])
-        self.assertAlmostEqual(view.items['inductive_step'].fit_scale,.85)
+        self.assertAlmostEqual(target.font_size,33.6)
+        self.assertAlmostEqual(view.items['inductive_step'].fit_scale,1.)
 
     def test_custom_policy_is_explicit_and_validated(self):
         with self.assertRaises(ValueError):FitPolicy(min_scale=0)
@@ -116,8 +118,8 @@ class RelativeFontTests(unittest.TestCase):
     def test_relative_font_sizes_preserve_the_requested_hierarchy(self):
         view=ColumnSlide()
         view.add('body','The main explanation')
-        view.add('note','A supporting note',font_scale=.85)
-        view.add('emphasis','The important bit',font_scale=1.2)
+        view.add('note','A supporting note',font_scale=.85,font_reason='Supporting explanation')
+        view.add('emphasis','The important bit',font_scale=1.2,font_reason='Primary takeaway')
         self.assertAlmostEqual(view.target('body').font_size,26)
         self.assertAlmostEqual(view.target('note').font_size,26*.85)
         self.assertAlmostEqual(view.target('emphasis').font_size,26*1.2)
@@ -126,15 +128,15 @@ class RelativeFontTests(unittest.TestCase):
     def test_relative_sizes_survive_a_shared_automatic_fit(self):
         view=ColumnSlide()
         view.add('body','The main explanation')
-        view.add('note','A supporting note',font_scale=.85)
+        view.add('note','A supporting note',font_scale=.85,font_reason='Supporting explanation')
         view.add('wide',Rectangle(width=view._text_width('body')/.85,height=.5))
         self.assertAlmostEqual(view.target('note').font_size/view.target('body').font_size,.85)
 
     def test_fork_can_change_font_scale_without_touching_the_live_object(self):
         first=ColumnSlide()
-        handle=first.add('note','A supporting note',font_scale=.85)
+        handle=first.add('note','A supporting note',font_scale=.85,font_reason='Supporting explanation')
         first.install(Scene())
-        second=first.fork().set_font_scale('note',1.1)
+        second=first.fork().set_font_scale('note',1.1,reason='Promote the explanation')
         self.assertIs(second.object('note'),handle)
         self.assertAlmostEqual(handle.mobject.font_size,26*.85)
         self.assertAlmostEqual(second.target('note').font_size,26*1.1)
@@ -144,9 +146,9 @@ class RelativeFontTests(unittest.TestCase):
         from algovis import ViewTransition
         from tests.test_composition import apply
         first=ColumnSlide()
-        handle=first.add('call',MathRow({'f':'f(', 'i':'i', 'end':')'}),font_scale=1.2)
+        handle=first.add('call',MathRow({'f':'f(', 'i':'i', 'end':')'}),font_scale=1.2,font_reason='Primary example')
         scene=Scene();first.install(scene)
-        second=first.fork().set_font_scale('call',.8).substitute('call',i='i+1')
+        second=first.fork().set_font_scale('call',.8,reason='Retain as a reference').substitute('call',i='i+1')
         apply(ViewTransition(first,second),scene)
         self.assertAlmostEqual(handle.mobject.font_size,33.6*.8)
         self.assertEqual(handle.mobject.native_layout_findings(),[])
@@ -159,8 +161,8 @@ class RelativeFontTests(unittest.TestCase):
         for scale in (0,-1,float('nan')):
             with self.assertRaises(ValueError):view.add('bad','Text',font_scale=scale)
         with self.assertRaisesRegex(ValueError,'text too small'):
-            view.add('tiny','Text',font_scale=.5)
-        with self.assertRaises(TypeError):view.add('diagram',Rectangle(),font_scale=.8)
+            view.add('tiny','Text',font_scale=.5,font_reason='Exercise the readability boundary')
+        with self.assertRaises(TypeError):view.add('diagram',Rectangle(),font_scale=.8,font_reason='Invalid diagram override')
         self.assertEqual(view.items,{})
 
     def test_intentional_relative_sizes_are_not_reported_as_a_peer_font_error(self):

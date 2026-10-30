@@ -23,6 +23,68 @@ spoken word timing in the review even when endpoints pass.
 
 Shared timeline checks from the migration:
 
+- Reusing a shared object in a new layout during preplanning must carry its
+  latest authored content, not the live object's earlier, unplayed placeholder.
+  Keep this planning model separate from live geometry and immutable timeline
+  snapshots. A group must measure the completed recurrence it will really show.
+  Check the first frame after regrouping: knapsack previously reverted to
+  "most value" while introducing its base case. Explicitly earlier forked
+  views remain earlier states; a reused object or its copy inherits the latest
+  authored refinement. After playback, intrinsic results are the live state.
+
+- Opaque component frames must stay behind their labels and illustrations
+  while a child animates as an independent scene root. Inspect intermediate
+  semantic-color changes, not only the consolidated endpoint. Retired semantic
+  children must also stay hidden when a later process adds their parent again;
+  FadeOut cleanup restores source opacity unless the component records its
+  new hidden state. The encoded audit caught both the card-covering-picture
+  case and case labels returning inside the dominoes. These are shared
+  lifecycle checks, not reasons to rewrite a working lesson layout.
+  Revealing an outline must restore its stroke, not set the opacity of every
+  channel to one: that turns a location ring into a disk over its city number,
+  or an open graph curve into a filled polygon. Inspect the actual named text
+  under markers during the concrete examples.
+
+- Freezing a beat must preserve its definition-transfer instruction. An
+  authoring fork clears a preceding one-time application; a timeline snapshot
+  must retain the application belonging to that exact beat through fitting and
+  playback. Inspect the real travel, not only a correctly substituted endpoint.
+  A lost instruction silently turns a requested copy into a glyph morph.
+- Components adopt their semantic children separately when adding attachments.
+  A whole-container transform can pad a newly added count-label group with
+  copies of the tree's node group. Check the exact number of labels, node
+  identities, invisible future attachments, and the resulting layout bounds.
+  Reserve an attachment's later space before revealing it on its spoken cue.
+- A later fade must discover its painted children when that phase starts.
+  Cell moves can replace SVG glyph children with clean destination glyphs;
+  a fade constructed earlier then holds stale child references and hides the
+  box while leaving its new value behind. Check a fold's discarded nodes after
+  moving the survivors away: a correct-looking merged endpoint can conceal
+  these orphan values until the next motion exposes them.
+
+- Plan fitting over the complete animation sequence for one explanation,
+  especially every step of an induction proof. The first state must reserve
+  later fractions, longer equations and additional rows. Use one common scale
+  and shared row envelopes; do not refit only the currently visible contents.
+  Verify identical peer type sizes and unchanged baselines across the planned
+  states, and inspect the actual transitions. Reserved space does not authorize
+  revealing later text early. If the complete group cannot fit readably, revise
+  its layout before rendering. Do not add another step after its layout has
+  already been played without replanning that group.
+- A proof conclusion in the footer is still a peer of its proof sentences:
+  include it in the common body fit. A diagram's axes may shrink to fit their
+  region, but their labels must retain the scene's label typography. Inspect
+  those labels against adjacent captions; whole-diagram scaling can otherwise
+  create an unexplained second label size.
+- Inspect definition-copy routes through concrete examples. A value travelling
+  from stored answers in one column to a case in the other must not cross item
+  pictures or their labels. Use the comparison layout's gutter when an
+  intervening object blocks the direct route, preserving the visible original.
+- Intrinsic processes must survive a subsequent scene transition. Planning a
+  later caption before a cell-fill or tree-reveal action must not restore blank
+  values or revive hidden branches. Check model reconciliation as well as final
+  object identities. Definition references can resolve an earlier planned
+  term at playback; do not render an earlier scene early merely to access it.
 - Automatic fitting and automatic font assignment are different requirements.
   A canvas containing manually scaled text still violates the scene-typography
   paradigm even when every animation goes through the view compiler. Inventory

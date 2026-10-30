@@ -818,7 +818,8 @@ class SlideSceneMixin:
             raise ValueError('A view transition needs a positive finite duration')
         if self.current_slide is not None:
             raise ValueError('Adopt the legacy composition with set_view before using view transitions')
-        if self.narration is not None and cue is None:
+        continuation=getattr(self,'_review_active_cue',{}).get('wordSequence',{}).get('phase',False)
+        if self.narration is not None and cue is None and not continuation:
             raise ValueError('A narrated view transition needs a spoken cue')
         if cue is not None:
             if self.narration is None:
@@ -842,6 +843,12 @@ class SlideSceneMixin:
             self._view_transition_active = False
         plan.commit(self)
         self.current_view = view.fork()
+        if hasattr(self,'_view_steps'):
+            self._view_steps.append({'start':float(self.renderer.time)-run_time,
+                'end':float(self.renderer.time),'cue':cue or getattr(self,'_review_active_cue',{}).get('cue'),'completed':True,
+                'layout':type(view).__name__,'difference':plan.describe(),
+                'composition':view.layout_report(),
+                'locations':{name:item.slot for name,item in view.items.items()}})
         return view
 
     def get_moving_and_static_mobjects(self, animations):

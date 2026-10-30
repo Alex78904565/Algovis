@@ -158,7 +158,8 @@ class MathRow(MathTex):
         if hasattr(target, '_sum_contract'): self._sum_contract = target._sum_contract
         if getattr(self, '_algovis_typography_group', None):
             from ..layout import LessonStyle
-            LessonStyle._watch_type(self,self._algovis_typography_group,'equation')
+            LessonStyle._watch_type(self,self._algovis_typography_group,
+                                    getattr(self,'_algovis_type_role','equation'))
         return self
 
     def native_layout_findings(self, tolerance=.003):

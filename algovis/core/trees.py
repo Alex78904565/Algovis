@@ -5,6 +5,8 @@ import numpy as np
 from ..theme import DEFAULT_THEME
 from .structures import CallNode
 from ..semantics import SemanticProperties, SemanticChange
+from ..layout import LessonStyle, LessonTypography,measured_font_size
+from ..utils.effects import DeferredAnimation
 
 class NodeState(enum.Enum):
     PENDING = 1
@@ -16,13 +18,20 @@ class RecursiveTree(VGroup):
     A tree that builds itself based on a recursive rule and tracks evaluation states.
     """
     def __init__(self, branching_fn, root_args, depth_limit=5, height=1.15,
-                 width=1.15, node_radius=0.34, label_scale=0.58,
+                 width=1.15, node_radius=0.34, label_scale=None,
                  node_padding=0.12, node_factory=None, node_color=None,
                  state_key=None, level_fn=None, node_shape="circle",
                  node_style=None, node_type=CallNode,
+                 reveal_depth=None,
+                 backbone_space=False,
+                 profile='standard',
                  theme=DEFAULT_THEME,
                  **kwargs):
         super().__init__(**kwargs)
+        if profile not in ('standard','compact'):raise ValueError('Unknown tree profile')
+        if profile=='compact':
+            width,height,node_radius,node_padding,node_shape=1.,.7,.20,.08,'box'
+        self.profile=profile
         self.theme = theme
         self.branching_fn = branching_fn
         self.depth_limit = depth_limit
@@ -38,6 +47,8 @@ class RecursiveTree(VGroup):
         self.node_shape = node_shape
         self.node_style = node_style
         self.node_type = node_type
+        self.reveal_depth=reveal_depth
+        self.backbone_space=backbone_space
         self.state_key = state_key or (lambda args: tuple(args))
         self.level_fn = level_fn
         self.memoized_graph = None
@@ -79,11 +90,26 @@ class RecursiveTree(VGroup):
         # Draw edges first, then nodes, so lines never cut through circles/text.
         self._create_edges(self.tree_structure)
         self.add(self.edges, self.nodes)
+        if backbone_space:
+            self.backbone_anchor=VectorizedPoint(self._backbone_tail_position())
+            self.add(self.backbone_anchor)
+
+    def _backbone_tail_position(self):
+        chain=[];cursor=self.tree_structure
+        while True:
+            chain.append(cursor)
+            if not cursor['children']:break
+            cursor=cursor['children'][0]
+        if len(chain)<2:return chain[-1]['mobject'].get_center()
+        a,b=(node['mobject'].get_center() for node in chain[-2:])
+        return b+(b-a)
 
     def _build_node_data(self, args, depth):
         label_str, child_args = self.branching_fn(*args)
 
-        label = MathTex(label_str, color=self.theme.foreground).scale(self.label_scale)
+        size=LessonTypography().label if self.label_scale is None else 48*self.label_scale
+        label = MathTex(label_str,font_size=size,color=self.theme.foreground)
+        label._algovis_empty_font_size=size
         if self.node_factory is None:
             # Fixed-radius nodes clipped wider labels such as f(12).  Treat the
             # configured radius as a minimum and grow to fit the rendered label.
@@ -118,6 +144,158 @@ class RecursiveTree(VGroup):
                 node_data["children"].append(child_data)
 
         return node_data
+
+    def apply_scene_typography(self,typography,*,group):
+        """The tree reflows its boxes and edges when its label role changes."""
+        if hasattr(self,'leaf_numbers'):
+            for label in self.leaf_numbers:
+                label.scale(typography.label/label.font_size)
+                LessonStyle._watch_type(label,group+'/leaf-counts','label')
+        if all(abs(float(measured_font_size(data['label']))-typography.label)<1e-6 for data,_ in self.iter_nodes()):
+            for data,_ in self.iter_nodes():LessonStyle._watch_type(data['label'],group+'/tree-labels','label')
+            return
+        center=self.get_center()
+        edge_opacities=[edge.get_stroke_opacity() for edge in self.edges]
+        for data,_ in self.iter_nodes():
+            label=data['label'];current=float(measured_font_size(label))
+            if current>0 and label.height>0:label.scale(typography.label/current)
+            if self.node_factory is None:
+                radius=max(self.node_radius,label.width/2+self.node_padding,
+                           label.height/2+self.node_padding)
+                box=data['shape'];box.stretch_to_fit_width(2*radius)
+                box.stretch_to_fit_height(2*max(self.node_radius,label.height/2+self.node_padding)
+                                          if self.node_shape=='box' else 2*radius)
+                label.move_to(box)
+            LessonStyle._watch_type(label,group+'/tree-labels','label')
+        heights={}
+        for data,depth in self.iter_nodes():
+            level=self._display_level(data,depth)
+            heights[level]=max(heights.get(level,0),data['mobject'].height)
+            data['edges']=[]
+        self.level_y_positions={0:0.}
+        for depth in range(1,max(heights,default=0)+1):
+            self.level_y_positions[depth]=self.level_y_positions[depth-1]-max(
+                self.level_spacing,heights.get(depth-1,0)/2+heights.get(depth,0)/2+.16)
+        self._position_nodes(self.tree_structure,x=0,depth=0)
+        self.edges.submobjects=[]
+        self._create_edges(self.tree_structure)
+        for edge,opacity in zip(self.edges,edge_opacities):edge.set_stroke(opacity=opacity)
+        self.move_to(center)
+        self._arrange_attachments()
+
+    def enter_animation(self):
+        if self.reveal_depth is None:return FadeIn(self)
+        self.prepare_layered_unroll()
+        return self.get_depth_reveal_anim(0,self.reveal_depth)
+
+    def layout_in(self,width,height,typography):
+        """Use available scene space before shrinking the complete diagram."""
+        center=self.get_center()
+        layers=self.get_layers()
+        leaves=sum(not data['children'] for data,_ in self.iter_nodes())
+        self.sibling_spacing=min(self.sibling_spacing,width/max(1,leaves))
+        largest=max(data['mobject'].height for data,_ in self.iter_nodes())
+        levels=max((self._display_level(data,depth) for data,depth in self.iter_nodes()),default=0)
+        if self.backbone_space:levels+=1
+        self.level_spacing=min(self.level_spacing,max(.1,(height-largest)/max(1,levels)))
+        heights={}
+        opacities=[edge.get_stroke_opacity() for edge in self.edges]
+        for data,depth in self.iter_nodes():
+            level=self._display_level(data,depth)
+            heights[level]=max(heights.get(level,0),data['mobject'].height)
+            data['edges']=[]
+        self.level_y_positions={0:0.}
+        for level in range(1,levels+1):
+            gap=max(self.level_spacing,heights.get(level-1,0)/2+heights.get(level,0)/2+.16)
+            self.level_y_positions[level]=self.level_y_positions[level-1]-gap
+        self._position_nodes(self.tree_structure,x=0,depth=0)
+        self.edges.submobjects=[]
+        self._create_edges(self.tree_structure)
+        if self.backbone_space:self.backbone_anchor.move_to(self._backbone_tail_position())
+        for edge,opacity in zip(self.edges,opacities):edge.set_stroke(opacity=opacity)
+        self.move_to(center)
+        self._arrange_attachments()
+
+    def _arrange_attachments(self):
+        if hasattr(self,'leaf_numbers'):
+            leaves=sorted((data for data,_ in self.iter_nodes() if not data['children']),
+                          key=lambda data:data['mobject'].get_x())
+            for label,data in zip(self.leaf_numbers,leaves):label.next_to(data['mobject'],DOWN,buff=.09)
+
+    def motions_to(self,target):return [Transform(self,target)]
+
+    def _extra_parts(self):
+        parts={}
+        if hasattr(self,'leaf_numbers'):parts['counts']=self.leaf_numbers
+        if hasattr(self,'backbone_anchor'):parts['backbone']=self.backbone_anchor
+        known={id(self.nodes),id(self.edges),*(id(part) for part in parts.values())}
+        parts.update({f'attachment:{index}':part for index,part in enumerate(
+            part for part in self.submobjects if id(part) not in known)})
+        return parts
+
+    def motions_to(self,target):
+        from ..composition import _same_picture
+        if len(self.nodes)!=len(target.nodes) or len(self.edges)!=len(target.edges):
+            raise ValueError('Changing tree topology requires an explicit tree process')
+        motions=[]
+        for live,destination in [(self.edges,target.edges),*zip(self.nodes,target.nodes)]:
+            if not _same_picture(live,destination):motions.append(Transform(live,destination))
+        old,new=self._extra_parts(),target._extra_parts()
+        for name,part in old.items():
+            if name not in new:motions.append(FadeOut(part))
+            elif not _same_picture(part,new[name]):motions.append(Transform(part,new[name]))
+        motions.extend(FadeIn(part) for name,part in new.items() if name not in old)
+        return motions
+
+    def adopt_layout(self,target):
+        # Adopt semantic children separately. Whole-tree become/Transform pads
+        # a new leaf-count group with copies of the node group, creating phantom
+        # calls and duplicate count labels before the next layout is measured.
+        old_extras=self._extra_parts()
+        self.edges.become(target.edges.copy())
+        for (data,_),(destination,_) in zip(self.iter_nodes(),target.iter_nodes()):
+            if hasattr(type(data['mobject']),'adopt_layout'):
+                data['mobject'].adopt_layout(destination['mobject'])
+                data['label']=data['mobject'].label
+                data['shape']=data['circle']=data['mobject'].box
+            else:data['mobject'].become(destination['mobject'])
+            data['state']=destination['state']
+        extras=[]
+        for name,part in target._extra_parts().items():
+            live=old_extras.get(name)
+            if live is None:live=part.copy()
+            elif name=='counts':
+                labels=[]
+                for index,label in enumerate(part):
+                    value=live[index] if index<len(live) else label.copy()
+                    value.become(label.copy())
+                    value.submobjects=[child.copy() for child in label.submobjects]
+                    value.tex_string=label.tex_string
+                    value.initial_height=label.initial_height
+                    value._font_size=label._font_size
+                    labels.append(value)
+                live.submobjects=labels
+            else:live.become(part.copy())
+            if name=='counts':self.leaf_numbers=live
+            if name=='backbone':self.backbone_anchor=live
+            extras.append(live)
+        if 'counts' not in target._extra_parts() and hasattr(self,'leaf_numbers'):del self.leaf_numbers
+        self.submobjects=[self.edges,self.nodes,*extras]
+        self.level_spacing=target.level_spacing
+        self.sibling_spacing=target.sibling_spacing
+        self.level_y_positions=target.level_y_positions.copy()
+        if hasattr(self,'_layered_unroll_nodes'):
+            self._layered_unroll_nodes=[(data['mobject'],data['mobject'].copy().set_opacity(1),depth)
+                                        for data,depth in self.iter_nodes()]
+            self._layered_unroll_edges=[]
+            for parent,depth in self.iter_nodes():
+                for child,edge in zip(parent['children'],parent['edges']):
+                    direction=child['shape'].get_center()-parent['shape'].get_center()
+                    full=Line(parent['shape'].get_boundary_point(direction),
+                              child['shape'].get_boundary_point(-direction),
+                              color=edge.get_stroke_color(),stroke_width=edge.get_stroke_width())
+                    self._layered_unroll_edges.append((edge,full,depth+1))
+        return self
 
     def _display_level(self, node_data, recursion_depth):
         if self.level_fn is None:
@@ -174,6 +352,109 @@ class RecursiveTree(VGroup):
                 yield from walk(child, depth + 1)
 
         yield from walk(self.tree_structure, 0)
+
+    def _prepare_leaf_counts(self):
+        leaves=sorted((data for data,_ in self.iter_nodes() if not data['children']),
+                      key=lambda data:data['mobject'].get_x())
+        self.leaf_numbers=VGroup(*(LessonStyle(theme=self.theme).math(str(index),
+            type_role='label',status='computed').next_to(data['mobject'],DOWN,buff=.09)
+            for index,data in enumerate(leaves,1)))
+        self.add(self.leaf_numbers)
+        return leaves
+
+    def with_state(self,*,leaf_counts):
+        target=self.copy()
+        if leaf_counts and not hasattr(target,'leaf_numbers'):
+            target._prepare_leaf_counts();target.leaf_numbers.set_opacity(0)
+        elif not leaf_counts and hasattr(target,'leaf_numbers'):
+            target.remove(target.leaf_numbers);del target.leaf_numbers
+        return target
+
+    def count_leaves(self):
+        """Number leaves beside their calls without replacing the call labels."""
+        leaves=sorted((data for data,_ in self.iter_nodes() if not data['children']),
+                      key=lambda data:data['mobject'].get_x())
+        if not hasattr(self,'leaf_numbers'):self._prepare_leaf_counts()
+        self.leaf_numbers.set_opacity(1)
+        return AnimationGroup(*(SemanticChange(data['mobject'],status='computed',theme=self.theme)
+                                for data in leaves),
+                              LaggedStart(*(FadeIn(label) for label in self.leaf_numbers),lag_ratio=.12))
+
+    def annotate(self,node,content,*,side='left'):
+        from .teaching import TreeAnnotation
+        note=TreeAnnotation(node['mobject'],content,side=side,theme=self.theme)
+        self.add(note)
+        return FadeIn(note)
+
+    def backbone(self):
+        """Keep the first occurrence down the first branch, plus missing states."""
+        kept=[];cursor=self.tree_structure
+        while True:
+            kept.append(cursor)
+            if not cursor['children']:break
+            cursor=cursor['children'][0]
+        keys={self.state_key(node['args']) for node in kept}
+        # A leaf sibling can supply a distinct base state (e.g. Fibonacci 1).
+        for node,_ in self.iter_nodes():
+            if not node['children'] and self.state_key(node['args']) not in keys:
+                kept.append(node);keys.add(self.state_key(node['args']))
+        return kept
+
+    def fold_to_backbone(self,values):
+        """Resolve a state, then fold its duplicate subtrees, from bottom to top."""
+        kept=self.backbone();resolved=set()
+        def resolve(node):
+            key=self.state_key(node['args'])
+            resolved.add(key)
+            return DeferredAnimation(lambda node=node,key=key:node['mobject'].populate(values[key]),run_time=.34)
+        operations=[]
+        # A distinct base sibling belongs in the retained state sequence, but
+        # a base case does not recursively call that sibling. Place it beyond
+        # the spine and retire its old dependency edge instead of inventing one.
+        spine=[];cursor=self.tree_structure
+        while True:
+            spine.append(cursor)
+            if not cursor['children']:break
+            cursor=cursor['children'][0]
+        extra=[node for node in kept if all(node is not member for member in spine)]
+        for node in extra:
+            old_edge=next(edge for parent,_ in self.iter_nodes()
+                for child,edge in zip(parent['children'],parent['edges']) if child is node)
+            operations.append(AnimationGroup(Transform(node['mobject'],node['mobject'].copy().move_to(
+                self._backbone_tail_position())),FadeOut(old_edge),run_time=.35))
+        for node in sorted((n for n in kept if not n['children']),key=lambda n:self.state_key(n['args'])):
+            operations.append(resolve(node))
+        steps=self.get_backbone_collapse_steps(kept,order='bottom_up')
+        for index,step in enumerate(steps):
+            canonical=step['canonical']
+            if canonical is not None and self.state_key(canonical['args']) not in resolved:
+                operations.append(resolve(canonical))
+            # Build this fold only when it starts: prior resolutions and folds
+            # change the live node labels and positions.
+            operations.append(DeferredAnimation(lambda index=index:self.get_backbone_collapse_animations(
+                kept,order='bottom_up',merge_run_time=.58,fade_run_time=.04,
+                move_edges=False,edge_fade_run_time=.04)[index],run_time=.66))
+        for node in sorted(kept,key=lambda n:self.state_key(n['args'])):
+            if self.state_key(node['args']) not in resolved:operations.append(resolve(node))
+        return Succession(*operations)
+
+    def merge_backbone_into(self,sequence):
+        """Survivors travel into the already visible array cells beneath them."""
+        kept=sorted(self.backbone(),key=lambda node:self.state_key(node['args']))
+        if len(kept)!=len(sequence.row):raise ValueError('One destination cell is required per retained state')
+        class MergeIntoCells(AnimationGroup):
+            _algovis_component_process=True
+            def clean_up_from_scene(group,scene):
+                super().clean_up_from_scene(scene)
+                # The destination cells already exist. Retire the coincident
+                # travelling artwork only after it has arrived, without a
+                # second fade across the readable stored answer.
+                for node in kept:node['mobject'].set_opacity(0)
+        return Succession(FadeOut(self.edges,run_time=.15),
+            MergeIntoCells(*(motion for node,cell in zip(kept,sequence.row)
+                for motion in (node['mobject'].motions_to(cell)
+                    if hasattr(type(node['mobject']),'motions_to') else [Transform(node['mobject'],cell)])),
+                lag_ratio=0,run_time=1))
 
     def get_layers(self):
         """Return node-data lists grouped by depth, from root to leaves."""
@@ -347,16 +628,18 @@ class RecursiveTree(VGroup):
 
         def fade_in_place(mobjects, run_time):
             """Fade a moved group without interpolating its geometry again."""
-            styled_members = []
-            for member in mobjects.family_members_with_points():
-                styled_members.append((
-                    member,
-                    member.get_fill_opacity(),
-                    member.get_stroke_opacity(),
-                    member.get_background_stroke_opacity(),
-                ))
+            styled_members = None
 
             def update(_mobject, alpha):
+                nonlocal styled_members
+                # A preceding cell move adopts clean destination glyphs.
+                # Discover them when fading actually starts, not while the
+                # future fade is constructed. Cached old glyph references
+                # leave the newly adopted values visible without their boxes.
+                if styled_members is None:
+                    styled_members=[(member,member.get_fill_opacity(),
+                        member.get_stroke_opacity(),member.get_background_stroke_opacity())
+                        for member in mobjects.family_members_with_points()]
                 remaining = 1 - alpha
                 for member, fill, stroke, background in styled_members:
                     member.set_fill(opacity=fill * remaining)
@@ -385,9 +668,10 @@ class RecursiveTree(VGroup):
                 )
                 if current_target is not None:
                     node_target = current_target["mobject"].copy()
-                    merge_animations.append(Transform(
-                        current["mobject"], node_target,
-                    ))
+                    live=current['mobject']
+                    if hasattr(type(live),'motions_to'):
+                        merge_animations.extend(live.motions_to(node_target))
+                    else:merge_animations.append(Transform(live,node_target))
                 else:
                     merge_animations.append(
                         current["mobject"].animate.move_to(destination)

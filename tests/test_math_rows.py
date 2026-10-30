@@ -99,7 +99,7 @@ class MathRowTests(unittest.TestCase):
         glyphs = lambda mob: [p for p in mob.family_members_with_points()
                              if not isinstance(p, VectorizedPoint)]
         expected = [p.points.copy() for p in glyphs(destination)]
-        transfer = ApplyDefinition(source, None, destination)
+        transfer = ApplyDefinition(source, None, destination,path_arc=0)
         # A composed sequence may move the reference before activating its copy.
         source.shift([1, .3, 0])
         original = source.get_all_points().copy()
@@ -107,15 +107,15 @@ class MathRowTests(unittest.TestCase):
         transfer._setup_scene(scene); transfer.begin(); transfer.interpolate(0)
         for actual, reference in zip(glyphs(transfer.traveller), glyphs(source)):
             np.testing.assert_allclose(actual.points, reference.points)
-        transfer.interpolate(.70)
-        landed = [p.points.copy() for p in glyphs(transfer.traveller)]
-        for alpha in (.75, .85, .95):
+        beginning=[p.points.copy() for p in glyphs(transfer.traveller)]
+        for alpha in (.25, .5, .75, .95):
             transfer.interpolate(alpha)
             actual = glyphs(transfer.traveller)
             self.assertEqual(len(actual), len(expected))
-            progress = transfer.animations[0].animations[1].rate_func((alpha-.7)/.3)
-            for glyph, start, end in zip(actual, landed, expected):
-                np.testing.assert_allclose(glyph.points, (1-progress)*start+progress*end, atol=1e-7)
+            if alpha==.5:
+                for glyph,start,end in zip(actual,beginning,expected):
+                    np.testing.assert_allclose(glyph.points,(start+end)/2,atol=1e-7)
+        self.assertTrue(transfer._algovis_copy_contract['formattingDuringTravel'])
         transfer.finish(); transfer.clean_up_from_scene(scene)
         np.testing.assert_allclose(source.get_all_points(), original)
         self.assertEqual(destination.parts, parts)

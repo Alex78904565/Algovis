@@ -22,22 +22,56 @@ def measured_font_size(mobject):
         if sizes:
             return float(np.median(sizes))
     reference = getattr(mobject, "_algovis_font_reference", None)
-    if reference and reference[1] > 0:
-        return reference[0]*float(mobject.height)/reference[1]
-    return getattr(mobject, "font_size", None)
+    if reference:
+        return reference[0]*float(mobject.height)/reference[1] if reference[1]>0 else reference[0]
+    try:return getattr(mobject, "font_size", None)
+    except ZeroDivisionError:return getattr(mobject,'_algovis_empty_font_size',None)
 
 
 @dataclass(frozen=True)
 class LessonTypography:
+    heading: float = 38
+    display: float = 54
     equation: float = 33.6
     body: float = 26
     label: float = 20
     note: float = 18
+    proof_label: float = 16
 
     def size(self, role):
-        if role not in ("equation", "body", "label", "note"):
+        if role not in self.__dataclass_fields__:
             raise ValueError(f"Unknown typography role: {role!r}")
         return getattr(self, role)
+
+
+def assign_scene_typography(mobject, typography, *, group, role=None):
+    """Assign a detached object's natural size before its scene lays it out.
+
+    A component can own internal geometry and expose its own typography hook.
+    Plain equation/text objects always receive a scene role, including operators.
+    No visible source object is mutated while a future scene is prepared.
+    """
+    hook = getattr(type(mobject), 'apply_scene_typography', None)
+    if hook is not None:
+        hook(mobject, typography, group=group)
+        return mobject
+    if isinstance(mobject, (Text, SingleStringMathTex)):
+        chosen = role or getattr(mobject, '_algovis_type_role', None)
+        chosen = chosen or ('body' if isinstance(mobject, Text) else 'equation')
+        factor = float(getattr(mobject, '_algovis_relative_font_scale', 1.))
+        size = measured_font_size(mobject)
+        if size and size > 0 and mobject.height>0:
+            mobject.scale(typography.size(chosen)*factor/size)
+        mobject._algovis_scene_typography = True
+        mobject._algovis_type_role = chosen
+        LessonStyle._watch_type(mobject, group, chosen,
+                                typography.size(chosen)*factor)
+    elif not mobject.has_points() and mobject.submobjects:
+        # Layout containers are not a typography escape hatch. Semantic
+        # components with painted frames retain their internal label policy.
+        for child in mobject.submobjects:
+            assign_scene_typography(child, typography, group=group, role=role)
+    return mobject
 
 
 @dataclass(frozen=True)
@@ -57,15 +91,15 @@ class LessonStyle:
     def _mark(obj, role, type_role, peers):
         obj._algovis_semantic_role = role
         obj._algovis_type_role = type_role
-        if peers:
-            LessonStyle._watch_type(obj, peers, type_role)
+        LessonStyle._watch_type(obj, peers or f'component/{role}/{type_role}', type_role)
         return obj
 
     @staticmethod
     def _watch_type(obj, peers, type_role, inherited_size=None):
         obj._algovis_type_role = type_role
         obj._algovis_typography_group = peers
-        size = getattr(obj,"font_size",inherited_size)
+        try:size=getattr(obj,'font_size',inherited_size)
+        except ZeroDivisionError:size=getattr(obj,'_algovis_empty_font_size',inherited_size)
         pieces = [child for child in obj.submobjects
                   if isinstance(getattr(child,"tex_string",None),str)]
         if pieces:

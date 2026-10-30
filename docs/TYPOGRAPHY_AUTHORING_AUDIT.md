@@ -16,9 +16,10 @@ The intended contract remains:
 
 `LessonStyle.watch` registers a diagnostic peer relationship. It does not assign
 a scene's default size, prohibit scaling, or certify unregistered neighboring
-objects. Existing automatic views preserve the caller's natural font size before
-fitting. These limitations must be addressed during the typography migration;
-do not present an opt-in peer check or a view-compiled timeline as that migration.
+objects. The detached scene layouts now assign role defaults before fitting;
+`SceneSequence` plans a common fit across every state of one explanation.
+The source guard separately rejects manual sizing in lesson builders. All three
+contracts are necessary; an opt-in peer check alone cannot establish migration.
 
 ## Source inventory
 
@@ -41,7 +42,8 @@ unconditional return is excluded. Imported component implementations need their
 own inventory. Unknown containers remain explicitly unclassified. Dynamic Python
 execution means a static call graph is conservative, not complete execution proof.
 
-The reviewer checks known manual text sizing before launching Manim when its
+The reviewer follows local authoring imports and checks known manual text sizing
+before launching Manim when its
 source and entry scene are configured. This check does not depend on `watch`
 registration. A rejected attempt retains the previous published preview. Use
 `--source lesson.py` or a catalog's `source` field. The supported legacy production

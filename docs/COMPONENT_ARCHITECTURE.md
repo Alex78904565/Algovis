@@ -8,6 +8,11 @@ when the new construction has substantially different meaning or behavior.
 ## Structure
 
 ```text
+LessonAnimation               the narration timeline
+└── SceneSequence              all planned states of one explanation/proof
+    ├── scene states          final layouts, with a shared fitting contract
+    └── component actions     intrinsic motion on verified spoken cues
+
 Manim VGroup
 ├── StateCell                  one framed state/value
 │   └── CallNode               a recursive call; grows around its label
@@ -68,6 +73,14 @@ carries a visible copy to the target, and keeps the original if it is retained
 in the next view. Ordinary Manim `mobject.copy()` remains an unrelated copy;
 explicit provenance avoids accidentally turning every cloned style or target
 into an instructional transfer.
+
+Content planning has its own clock too. Explicit `refine`, `revise`, `substitute`
+and `reword` edits remember a detached model on the shared object. Passing it
+to another layout, or copying it before playback, uses that latest authored
+content. It never changes its live geometry or previously saved scene states.
+After playback, subsequent authoring inherits the actual live result, including
+intrinsic component actions. Use an earlier view's fork to revisit an explicitly
+earlier state, rather than rebuilding it from an unplayed live placeholder.
 
 Copies inherit their source formatting by default. A destination may intentionally
 use another shared type role or declared relative scale, such as moving a large
@@ -171,11 +184,75 @@ repeated explanatory rows or to bypass the ink-level layout audit.
 
 ## Fit content by default
 
-Implementation status: fitting and relative-size support are available, but
-prepared raw Manim objects still retain their supplied natural font sizes.
-View compilation alone does not establish scene-owned typography. Use the
-[source sizing audit](TYPOGRAPHY_AUTHORING_AUDIT.md) to identify remaining manual
-construction before claiming a production migration is complete.
+Scene typography assigns role defaults to incoming text and equations before
+fitting. A supplied absolute font size does not override that policy. Reusable
+components receive the same typography contract and own their internal reflow.
+Check the active lesson builders as well as the library: implementing this
+policy is not evidence that every existing clip has been migrated.
+The [source audit](TYPOGRAPHY_AUTHORING_AUDIT.md) follows local authoring imports
+and rejects manual sizing and placement in lesson builders.
+
+### Plan an explanation's complete layout before its first step
+
+Scaling belongs to the sequence containing the related scenes. A proof's early
+state must account for its later fractions, additional lines and substitutions.
+Use a named group and add every state before playback:
+
+```python
+movie = LessonAnimation()
+proof_steps = movie.group('Induction proof')
+proof = ProofSlide('Induction')
+hypothesis = proof.add('induction_hypothesis', Equation({
+    'call': 'f(k)', 'eq': '=', 'value': r'\frac{k(k+1)}2'}))
+proof.add('inductive_step', Equation({
+    'call': 'f(k+1)', 'eq': '=', 'child': 'f(k)', 'rest': '+(k+1)'}))
+proof_steps.add(proof, on='next_case', reason='Start the larger instance')
+applied = proof.fork().substitute(
+    'inductive_step', child=r'\frac{k(k+1)}2',
+    from_definition=hypothesis.part('value'))
+proof_steps.add(applied, on='use_hypothesis',
+                reason='Carry the hypothesis into its application')
+movie.play(self)
+```
+
+The group measures all detached states, chooses one fitting scale per type/layout
+channel, and reserves each proof row's maximum height and mathematical ascent
+and descent. Earlier states have that same layout even when later content has
+not yet appeared. Planning never inserts future objects into a visible scene.
+Unreadable content fails before the group starts; it cannot silently acquire a
+new scale partway through. A played group is sealed. A different explanation
+can start a new group; a longer proof needs to be replanned as a complete group.
+Nested groups inherit their enclosing group's fitting contract.
+
+A proof's conclusion shares its body fit even when it occupies the footer.
+Graph components reflow their coordinate geometry to keep labels at the scene's
+label size. A comparison layout routes a copied definition through its gutter
+when the direct path intersects another retained object. These are shared
+layout policies rather than per-scene offsets.
+
+The timeline stores `snapshot()` plans, preserving the definition applications
+attached to that exact transition. An ordinary authoring `fork()` begins the next
+state and clears those one-time applications. Fitting and playback must not turn
+a requested definition transfer into an ordinary text morph.
+
+Intrinsic processes also need a future envelope. A `RouteTrace` reserves its
+complete route and cost line while revealing one city at a time; a tree can
+reserve hidden leaf counts with `view.refine('tree', leaf_counts=True)`.
+Components with structurally different attachments transition their named children
+separately, avoiding Manim's container-padding copies. Illustrated objects share
+unchanged image buffers between plans and detach them before opacity or color
+changes, so planning many states does not duplicate the same bitmap repeatedly.
+
+Use `view.copy('row')` to copy a planned state that has not played yet, and
+`view.part('row', 'term')` to borrow a term introduced by an earlier planned
+state. The mathematical content is known while authoring; its actual source
+artwork is resolved when the copy plays. The source must then be visible.
+Intrinsic cell filling and tree revealing also survive the next scene: the
+timeline carries their live results into unchanged component models while
+preserving explicit content and semantic edits in the destination.
+
+Review manifests record the sequence name and common fit. A passing layout
+contract still needs encoded-frame, copy-route, cue and audio inspection.
 
 `SlideView`, `ColumnSlide`, `SplitSlide`, `EquationSlide` and `ProofSlide` fit
 their detached targets before arranging them. Plain strings use the shared body
@@ -194,7 +271,7 @@ board.add('recurrence', MathRow({'call':'f(i,w)', 'rhs':'=...'}), column='right'
 The default `FitPolicy` permits scaling down to 72% and requires text to stay at
 least 16 points. Content that still cannot fit fails with a readable-capacity
 error: split the explanation or select a more suitable layout. Use
-`auto_fit=False` to keep exact authored sizes, or pass
+`auto_fit=False` to disable fitting while retaining scene typography, or pass
 `auto_fit=FitPolicy(min_scale=.85, min_font_size=20)` for stricter limits.
 `layout_report()` records the actual scale as well as alignment overrides.
 Prepared diagram canvases retain their explicit component geometry; a raw Manim
@@ -204,9 +281,12 @@ Declare a relative type hierarchy with `font_scale`, rather than choosing local
 point sizes:
 
 ```python
-board.add('note', 'A smaller supporting explanation.', font_scale=.85)
-board.add('important', MathRow({'value':'f(1,0)'}), column='right', font_scale=1.2)
-refined = board.fork().set_font_scale('note', .9)
+board.add('note', 'A smaller supporting explanation.', font_scale=.85,
+          font_reason='Supporting context below the main result')
+board.add('important', MathRow({'value':'f(1,0)'}), column='right', font_scale=1.2,
+          font_reason='The requested answer is the focus of this composition')
+refined = board.fork().set_font_scale('note', .9,
+                                    reason='Keep supporting context subordinate')
 ```
 
 The final size is the natural role size times `font_scale` times the shared fit
@@ -372,6 +452,16 @@ are adopted too. Partial editable equations use `MathRow` planning and commit,
 or `substitute_on_cue`, so a digit is never merely centered on an old letter.
 
 ## Extending the system
+
+`ConversionScene` has `left`, `right` and `connector` locations. Supply a
+heading/call `MathStack` on each side; the connector aligns between the calls.
+Adding cost rows below preserves that alignment. Use ordinary `ComparisonScene`
+for independent arguments rather than putting a directional arrow in one column.
+
+`MapScene` reserves `meaning` above a centered `map`, plus the shared footer for
+route traces. Instance data can grow without moving the map or its hidden
+prices, traveler and dashboard. Outline reveals preserve transparent fills so
+the current city stays readable.
 
 Before adding drawing code, inventory earlier and later occurrences. Reuse an
 existing component, supply a style/layout strategy, or subclass it for a genuine

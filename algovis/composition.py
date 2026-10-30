@@ -11,6 +11,7 @@ from contextlib import contextmanager
 from copy import copy
 from dataclasses import dataclass, replace
 import warnings
+from itertools import count
 
 import numpy as np
 from manim import AnimationGroup, FadeIn, FadeOut, Group, Mobject, Succession, Text, Transform, VGroup, Wait, config
@@ -19,9 +20,9 @@ from .core.math import ApplyDefinition
 from .core.math_row import MathRow
 from .core.proof import first_line_of
 from .frames import EquationFrame, ProofFrame
-from .layout import ColumnLayout
+from .layout import ColumnLayout, LessonTypography, assign_scene_typography
 from .fitting import FitArea, FitPolicy, plain_text, relative_font_scale
-from .semantics import copy_semantics
+from .semantics import copy_semantics, set_semantics
 from .theme import DEFAULT_THEME
 from .utils.effects import DeferredAnimation
 
@@ -41,26 +42,68 @@ class SlideObject:
         self.copied_from = copied_from
 
     def copy(self):
-        return SlideObject(self.mobject.copy(), copied_from=self)
+        return SlideObject(self.planned_mobject.copy(), copied_from=self)
+
+    @property
+    def planned_mobject(self):
+        """The latest authored content, independent of the live render clock."""
+        return self._planned_model if '_planned_model' in self.__dict__ else self.mobject
+
+    @property
+    def tex(self):return self.planned_mobject.tex_string
+
+    def __deepcopy__(self,memo):
+        # A logical reference in an equation or layout keeps its live identity.
+        # Explicit copy() is the operation that creates a new visual identity.
+        memo[id(self)]=self
+        return self
+
 
     def part(self, name):
         """Select a stable named mathematical term as a copy source."""
-        if not isinstance(self.mobject, MathRow):
-            raise TypeError("Named terms require a MathRow")
-        part = self.mobject.part(name)
+        if '_planned_model' in self.__dict__:
+            part=self.planned_mobject
+            for key in name.split('.'):part=part.part(key)
+            return PlannedPart(self,name,part.tex_string,
+                meaning=getattr(part,'semantics',None),theme=getattr(part,'_semantic_theme',None))
+        if not hasattr(type(self.mobject),'part'):
+            raise TypeError("Named terms require a component with named parts")
+        part=self.mobject
+        for key in name.split('.'):
+            part=part.part(key)
         part._view_attention_term = True
         return SlideObject(part)
 
     def on_word(self, cue, *, style='auto', reason, duration=.45, callback=None):
         """Declare attention once; ViewSceneMixin schedules its spoken trigger."""
         from .attention import attention_declaration
-        binding = attention_declaration(self.mobject, cue, style=style, reason=reason,
+        anchor=self.owner.mobject if isinstance(self,PlannedPart) else self.mobject
+        if isinstance(self,PlannedPart) and style=='auto':style='box'
+        binding = attention_declaration(self, cue, style=style, reason=reason,
                                         duration=duration, callback=callback)
-        declarations = list(getattr(self.mobject, '_view_word_attention', ()))
+        declarations = list(getattr(anchor, '_view_word_attention', ()))
         declarations.append(binding)
-        self.mobject._view_word_attention = declarations
-        self.mobject._view_attention_owner = id(self.mobject)
+        anchor._view_word_attention = declarations
+        anchor._view_attention_owner = id(anchor)
         return self
+
+
+class PlannedPart(SlideObject):
+    """A term's planned content now, and its actual source artwork at playback."""
+    def __init__(self,owner,path,tex,*,meaning=None,theme=None):
+        self.owner,self.path,self._tex=owner,path,tex
+        self.copied_from=None
+        if meaning is not None:self.semantics=meaning
+        if theme is not None:self._semantic_theme=theme
+
+    @property
+    def tex(self):return self._tex
+
+    @property
+    def mobject(self):
+        result=self.owner.mobject
+        for key in self.path.split('.'):result=result.part(key)
+        return result
 
 
 @dataclass
@@ -77,6 +120,7 @@ class Placement:
     offset_reason: str = ''
     fit_scale: float = 1.
     font_scale: float = 1.
+    font_reason: str = ''
 
 
 class LayoutOverrideWarning(UserWarning):
@@ -108,6 +152,7 @@ def _same_picture(first, second):
             return False
         for attribute in attributes:
             x, y = getattr(left, attribute, None), getattr(right, attribute, None)
+            if x is y:continue
             if x is None or y is None:
                 if x is not y:
                     return False
@@ -118,12 +163,32 @@ def _same_picture(first, second):
     return True
 
 
+def _content_model(mob):
+    """Content and semantic component options, independent of layout/paint."""
+    fields=('slot_tex','tex_string','text','profile','reveal_depth','columns',
+            'weight_visible','value_visible','capacity','current_val')
+    values=tuple((field,repr(getattr(mob,field))) for field in fields if field in mob.__dict__)
+    return (type(mob),values,tuple(_content_model(child) for child in mob.submobjects))
+
+
+def _semantic_edits(before,after,path=()):
+    if getattr(before,'semantics',None)!=getattr(after,'semantics',None):
+        if hasattr(after,'semantics'):yield path,after
+    for index,(old,new) in enumerate(zip(before.submobjects,after.submobjects)):
+        yield from _semantic_edits(old,new,(*path,index))
+
+
 class SlideView:
     """A final composition built from detached targets and stable live objects."""
 
-    def __init__(self, title=None, *, theme=DEFAULT_THEME, layout=None, auto_fit=True):
+    _type_groups = count(1)
+
+    def __init__(self, title=None, *, theme=DEFAULT_THEME, layout=None, auto_fit=True,
+                 typography=None):
         from .presentation import Slide, SlideLayout
         self.theme = theme
+        self.typography = typography or LessonTypography()
+        self._type_group = f'{type(self).__name__}/{next(self._type_groups)}'
         self.layout = layout or SlideLayout()
         self.fit_policy = auto_fit if isinstance(auto_fit,FitPolicy) else FitPolicy(enabled=bool(auto_fit))
         self._fit_report = []
@@ -141,6 +206,9 @@ class SlideView:
     def fork(self):
         """Copy the layout, retaining the identities of all its live objects."""
         view = copy(self)
+        if hasattr(self,'frame'):
+            view.frame=copy(self.frame)
+            view.frame.rows=self.frame.rows.copy()
         view.items = OrderedDict((name, replace(item, target=item.target.copy()))
                                  for name, item in self.items.items())
         # A previous substitution explains that transition only.
@@ -153,32 +221,102 @@ class SlideView:
     def object(self, name):
         return self.items[name].object
 
+    def snapshot(self):
+        """Freeze this exact beat, including its definition-transfer intent.
+
+        fork() starts a new authored state and clears a preceding transition's
+        one-shot copies. The timeline must preserve those copies when storing
+        and compiling the state that actually applies them.
+        """
+        view=self.fork()
+        view.definition_uses=self.definition_uses.copy()
+        return view
+
     def target(self, name):
         """The detached final artwork, useful for inspecting or styling a view."""
         return self.items[name].target
 
-    def _insert(self, name, value, slot, *, via=(), path_arc=0, font_scale=None):
+    def _remember_model(self,name):
+        # Only explicit authoring edits update this content snapshot. Fitting,
+        # forks and compiler snapshots must not overwrite it while measuring
+        # an earlier beat. No live geometry is touched.
+        item=self.items[name]
+        item.object._planned_model=item.target.copy()
+        item.object._planned_model._algovis_font_scale_reason=item.font_reason
+        relative_font_scale(item.object._planned_model,item.font_scale)
+
+    def copy(self,name):
+        """Copy this planned state, even when its earlier beat has not played."""
+        return SlideObject(self.target(name).copy(),copied_from=self.object(name))
+
+    def part(self,name,path):
+        """Borrow a named term from this scene's planned object state."""
+        target=self.target(name)
+        for key in path.split('.'):target=target.part(key)
+        return PlannedPart(self.object(name),path,target.tex_string,
+                           meaning=getattr(target,'semantics',None),
+                           theme=getattr(target,'_semantic_theme',None))
+
+    def retain_live_models(self,previous):
+        """Carry intrinsic process results into unchanged planned components.
+
+        Scene layout still owns their new positions. Explicit content edits
+        remain authoritative; explicit semantic edits apply over the live state.
+        This keeps an early-planned next scene from undoing a population/reveal.
+        """
+        prior={id(item.object.mobject):item for item in previous.items.values()}
+        with self._editing():
+            for name,item in self.items.items():
+                old=prior.get(id(item.object.mobject))
+                if old is None or _content_model(old.target)!=_content_model(item.target):continue
+                live=item.object.mobject.copy()
+                factor=getattr(live,'_algovis_view_fit_scale',1.)
+                if factor!=1:live.scale(1/factor)
+                live._algovis_view_fit_scale=1.
+                for path,meaning in _semantic_edits(old.target,item.target):
+                    node=live
+                    for index in path:node=node.submobjects[index]
+                    copy_semantics(meaning,node);set_semantics(node)
+                if hasattr(item.target,'_copy_sources'):live._copy_sources=item.target._copy_sources.copy()
+                role='heading' if item.slot=='header' else 'proof_label' if item.slot.startswith('label:') else None
+                assign_scene_typography(live,self.typography,group=self._type_group,role=role)
+                inherited=getattr(live,'_algovis_relative_font_scale',1.)
+                live.scale(item.font_scale/inherited)
+                self.items[name]=replace(item,target=live,fit_scale=1.)
+        return self
+
+    def _insert(self, name, value, slot, *, via=(), path_arc=0, font_scale=None,
+                font_reason=None):
         if name in self.items:
             raise ValueError(f"Duplicate slide item: {name!r}; use move or substitute")
         if isinstance(value,str):
             value = plain_text(value,self._text_width(slot),theme=self.theme,
-                               wrap=self.fit_policy.enabled and self.fit_policy.wrap_text)
+                               wrap=self.fit_policy.enabled and self.fit_policy.wrap_text,
+                               typography=self.typography)
         handle = _object(value)
-        target = handle.mobject.copy()
+        target = handle.planned_mobject.copy()
         prior_fit = getattr(target,'_algovis_view_fit_scale',1.)
         if prior_fit != 1:
             target.scale(1/prior_fit)
         target._algovis_view_fit_scale = 1.
         inherited=getattr(target,'_algovis_relative_font_scale',1.)
         factor=inherited if font_scale is None else float(font_scale)
+        reason = font_reason or getattr(target,'_algovis_font_scale_reason','')
+        if factor != 1 and not str(reason).strip():
+            raise ValueError('A relative font override needs font_reason explaining its hierarchy')
+        role = ('heading' if slot == 'header' else 'proof_label' if slot.startswith('label:')
+                else 'note' if slot == 'footer' else None)
+        assign_scene_typography(target,self.typography,group=self._type_group,role=role)
         relative_font_scale(target,factor)
         target.scale(factor/inherited)
+        target._algovis_font_scale_reason=str(reason)
         metrics = {}
         if isinstance(target, MathRow):
             metrics = dict(ascent=float(target.get_top()[1]-target.baseline),
                            descent=float(target.baseline-target.get_bottom()[1]),
                            baseline_offset=float(target.baseline-target.get_y()))
-        self.items[name] = Placement(handle, target, slot, tuple(via), path_arc, font_scale=factor, **metrics)
+        self.items[name] = Placement(handle, target, slot, tuple(via), path_arc,
+                                     font_scale=factor,font_reason=str(reason), **metrics)
         return handle
 
     @contextmanager
@@ -187,6 +325,8 @@ class SlideView:
         previous, previous_uses = self.items, self.definition_uses
         previous_defaults, previous_warnings = self._default_centers, set(self._warned_offsets)
         previous_fit = self._fit_report
+        previous_frame_rows=self.frame.rows.copy() if hasattr(self,'frame') else None
+        previous_proof_regions=getattr(self,'_proof_regions',{}).copy()
         self.items = OrderedDict((name, replace(item, target=item.target.copy()))
                                  for name, item in previous.items())
         self.definition_uses = dict(previous_uses)
@@ -205,22 +345,30 @@ class SlideView:
             self.items, self.definition_uses = previous, previous_uses
             self._default_centers, self._warned_offsets = previous_defaults, previous_warnings
             self._fit_report = previous_fit
+            if previous_frame_rows is not None:self.frame.rows=previous_frame_rows
+            if hasattr(self,'_proof_regions'):self._proof_regions=previous_proof_regions
             raise
 
-    def add(self, name, value, *, region="body", via=(), path_arc=0, font_scale=None):
+    def add(self, name, value, *, region="body", via=(), path_arc=0, font_scale=None,
+            font_reason=None):
         """Place an object in a named safe region without touching the live one."""
         with self._editing():
-            handle = self._insert(name, value, region, via=via, path_arc=path_arc,font_scale=font_scale)
+            handle = self._insert(name, value, region, via=via, path_arc=path_arc,
+                                  font_scale=font_scale,font_reason=font_reason)
         return handle
 
-    def set_font_scale(self, name, factor):
+    def set_font_scale(self, name, factor, *, reason):
         """Change a text size relative to its natural role, without coordinates."""
         factor=float(factor)
+        if not str(reason).strip():
+            raise ValueError('A relative font override needs a hierarchy reason')
         with self._editing():
             item=self.items[name]
             relative_font_scale(item.target,factor)
             self._scale_item(item,factor/item.font_scale)
             item.font_scale=factor
+            item.font_reason=str(reason)
+            item.target._algovis_font_scale_reason=str(reason)
         return self
 
     def move(self, name, *, region, via=(), path_arc=0):
@@ -254,6 +402,10 @@ class SlideView:
         return {'layout':type(self).__name__, 'overrides':overrides,
                 'autoFit':self.fit_policy.enabled,'fitting':[dict(item) for item in self._fit_report],
                 'fontScales':{name:item.font_scale for name,item in self.items.items() if item.font_scale!=1},
+                'fontReasons':{name:item.font_reason for name,item in self.items.items() if item.font_scale!=1},
+                'sceneTypography':{name:self.typography.size(name) for name in self.typography.__dataclass_fields__},
+                'layoutGroup':getattr(self,'_sequence_layout_name',None),
+                'sharedFit':getattr(self,'_sequence_fit_scales',{}),
                 'reviewAlignment':bool(overrides), 'manyOverrides':len(overrides)>=3}
 
     @staticmethod
@@ -286,14 +438,26 @@ class SlideView:
                 for item in self.items.values():
                     source=getattr(item.target,'_algovis_source_text',None)
                     if source is not None:
-                        wrapped=plain_text(source,self._text_width(item.slot)/item.font_scale,theme=self.theme)
+                        role=getattr(item.target,'_algovis_type_role','body')
+                        wrapped=plain_text(source,self._text_width(item.slot)/item.font_scale,
+                                           theme=self.theme,typography=self.typography,type_role=role)
                         copy_semantics(item.target,wrapped)
+                        if hasattr(wrapped,'semantics'):set_semantics(wrapped)
+                        else:wrapped.set_color(item.target.get_color())
+                        wrapped._algovis_font_scale_reason=item.font_reason
+                        relative_font_scale(wrapped,item.font_scale)
                         wrapped.scale(item.font_scale)
+                        assign_scene_typography(wrapped,self.typography,group=self._type_group,role=role)
                         item.target=wrapped
             for item in self.items.values():relative_font_scale(item.target,item.font_scale)
             areas=self._fit_areas();scales={}
             for area in areas:
                 scales[area.group]=min(scales.get(area.group,1.),area.scale(self._height))
+            for group,factor in getattr(self,'_sequence_fit_scales',{}).items():
+                if group not in scales:continue
+                if scales[group]<factor-1e-6:
+                    raise ValueError('Content exceeds its planned animation-group envelope; replan the complete group')
+                scales[group]=factor
             fitted=set()
             for area in areas:
                 factor=scales[area.group]
@@ -330,6 +494,65 @@ class SlideView:
                     _object(from_definition), next(iter(parts)), tuple(via), path_arc)
             else:
                 self.definition_uses.pop(name, None)
+        self._remember_model(name)
+        return self
+
+    def refine(self,name,**state):
+        """Plan a component's next semantic state without changing live artwork."""
+        with self._editing():
+            item=self.items[name]
+            if not hasattr(type(item.target),'with_state'):
+                raise TypeError('This component does not expose a semantic state model')
+            self.items[name]=replace(item,target=item.target.with_state(**state))
+        self._remember_model(name)
+        return self
+
+    def apply_definition(self,name,path,source,tex):
+        """Carry a definition into a named term inside a case equation."""
+        item=self.items[name]
+        if not hasattr(type(item.target),'with_state') or not path.startswith('row:'):
+            raise TypeError('Nested definition application requires a named case row')
+        row_name,term=path.split('.',1)
+        index=int(row_name.split(':')[1])
+        rows=[row.copy() for row in item.target.rows]
+        rows[index]=rows[index].next_layout(**{term:tex})
+        self.refine(name,rows=rows)
+        self.definition_uses[name]=DefinitionUse(_object(source),path)
+        return self
+
+    def revise(self,name,parts,*,meanings=None):
+        """Add/remove named terms while preserving every unchanged term owner."""
+        with self._editing():
+            item=self.items[name]
+            if not isinstance(item.target,MathRow):raise TypeError('Revising named terms requires an equation')
+            sources={key:value for key,value in parts.items() if isinstance(value,SlideObject)}
+            values={key:(value.tex if key in sources else value) for key,value in parts.items()}
+            target=item.target.next_layout(values)
+            target._copy_sources=sources
+            for key,source in sources.items():
+                copy_semantics(source if isinstance(source,PlannedPart) else source.mobject,target.part(key))
+                if hasattr(target.part(key),'semantics'):set_semantics(target.part(key))
+            for key,properties in (meanings or {}).items():
+                set_semantics(target.part(key),properties,theme=self.theme)
+            self.items[name]=replace(item,target=target)
+        self._remember_model(name)
+        return self
+
+    def set_meaning(self,name,*,part=None,**properties):
+        with self._editing():
+            target=self.items[name].target
+            if part is not None:target=target.part(part)
+            set_semantics(target,theme=self.theme,**properties)
+        self._remember_model(name)
+        return self
+
+    def reword(self,name,content):
+        """Edit prose in place, preserving its role, identity and scene defaults."""
+        with self._editing():
+            item=self.items[name]
+            if not isinstance(item.target,Text):raise TypeError('Rewording requires a text object')
+            item.target._algovis_source_text=str(content)
+        self._remember_model(name)
         return self
 
     def _arrange(self):
@@ -459,10 +682,11 @@ class EquationSlide(SlideView):
         self.frame = EquationFrame(profile, theme=kwargs.get("theme", DEFAULT_THEME))
         super().__init__(title, **kwargs)
 
-    def add(self, row, value, *, via=(), path_arc=0, font_scale=None):
+    def add(self, row, value, *, via=(), path_arc=0, font_scale=None,font_reason=None):
         if row not in self.frame.rows:
             raise ValueError(f"Unknown equation row: {row!r}")
-        return super().add(row, value, region=row, via=via, path_arc=path_arc,font_scale=font_scale)
+        return super().add(row, value, region=row, via=via, path_arc=path_arc,
+                           font_scale=font_scale,font_reason=font_reason)
 
     def _region(self, slot):
         return self.layout.body if slot in self.frame.rows else super()._region(slot)
@@ -485,22 +709,35 @@ class EquationSlide(SlideView):
 
 class ProofSlide(SlideView):
     """Named proof rows with the existing shared rail and first-line alignment."""
+    row_gap=.17
 
     def __init__(self, title=None, *, profile="compact", **kwargs):
         self.frame = ProofFrame(profile, theme=kwargs.get("theme", DEFAULT_THEME))
         super().__init__(title, **kwargs)
+        self.frame.rows['conclusion']=self.layout.footer.center[1]
         self._insert("proof_rail", self.frame.divider, "chrome")
 
-    def add(self, row, value, *, via=(), path_arc=0, font_scale=None):
+    def add(self, row, value, *, via=(), path_arc=0, font_scale=None,font_reason=None):
         key = str(row).upper().replace("_", " ")
-        if key not in self.frame.LABELS:
+        if key not in self.frame.LABELS and row not in self.frame.rows:
             raise ValueError(f"Unknown proof row: {row!r}")
+        key=key if key in self.frame.LABELS else row
         if any(item.slot == key for item in self.items.values()):
             raise ValueError(f"Duplicate proof row: {row!r}; use substitute")
         with self._editing():
-            handle = self._insert(row, value, key, via=via, path_arc=path_arc,font_scale=font_scale)
-            self._insert("label:"+row, self.frame.labels_by_name[key], "label:"+row)
+            handle = self._insert(row, value, key, via=via, path_arc=path_arc,
+                                  font_scale=font_scale,font_reason=font_reason)
+            if key in self.frame.LABELS and 'label:'+row not in self.items:
+                self._insert("label:"+row, self.frame.labels_by_name[key], "label:"+row)
         return handle
+
+    def label(self,row):
+        """Name a proof stage before its content is spoken, without dummy math."""
+        key=str(row).upper().replace('_',' ')
+        if key not in self.frame.LABELS:raise ValueError('Unknown proof label')
+        with self._editing():
+            self._insert('label:'+row,self.frame.labels_by_name[key],'label:'+row)
+        return self
 
     def remove(self, name):
         with self._editing():
@@ -510,32 +747,97 @@ class ProofSlide(SlideView):
         return self
 
     def _region(self, slot):
+        if slot=='conclusion':return self.layout.footer
         if slot == "chrome":
             from .presentation import SlideRegion
             return SlideRegion((0, 0, 0), self.layout.body.width, float(config.frame_height))
-        if slot in self.frame.LABELS or slot.startswith("label:"):
+        if slot in self.frame.rows and slot in getattr(self,'_proof_regions',{}):
+            return self._proof_regions[slot]
+        if slot in self.frame.rows or slot.startswith("label:"):
             return self.layout.body
         return super()._region(slot)
 
+    def row_envelopes(self):
+        slots=(*self.frame.LABELS,'work')
+        minimums={'DEFINITIONS':.9,'work':.75}
+        metrics={slot:{'height':minimums.get(slot,.52),'ascent':0.,'descent':0.} for slot in slots}
+        for item in self.items.values():
+            if item.slot in metrics:
+                if isinstance(item.target,MathRow):
+                    # Reserve a fraction-sized envelope from the beginning.
+                    # A later numerator must not lift an unchanged f(k) or push
+                    # it into the row above while preserving its baseline.
+                    item.ascent=max(item.ascent,.5*self.typography.equation/33.6)
+                    item.descent=max(item.descent,.25*self.typography.equation/33.6)
+                row=metrics[item.slot]
+                row['height']=max(row['height'],self._height(item))
+                if isinstance(item.target,MathRow):
+                    row['ascent']=max(row['ascent'],item.ascent)
+                    row['descent']=max(row['descent'],item.descent)
+        return metrics
+
+    def _plan_rows(self,metrics=None,*,scale=None):
+        from .presentation import SlideRegion
+        metrics=metrics or getattr(self,'_sequence_proof_envelopes',None) or self.row_envelopes()
+        slots=tuple(metrics)
+        shared_scale=scale if scale is not None else getattr(self,'_sequence_fit_scales',{}).get('body',1.)
+        heights={slot:row['height']*shared_scale for slot,row in metrics.items()}
+        available=self.layout.body.height-self.row_gap*(len(slots)-1)
+        ratio=min(1.,available/sum(heights.values()))
+        top=self.layout.body.center[1]+self.layout.body.height/2
+        left=self.frame.left[0]
+        width=self.layout.body.center[0]+self.layout.body.width/2-left
+        self._proof_regions={}
+        for slot in slots:
+            height=heights[slot]*ratio
+            y=top-height/2
+            self.frame.rows[slot]=y
+            row=next((item for item in self.items.values() if item.slot==slot),None)
+            if row is not None and isinstance(row.target,MathRow):
+                ascent=metrics[slot]['ascent']*shared_scale
+                descent=metrics[slot]['descent']*shared_scale
+                self.frame.rows[slot]-=row.baseline_offset+(ascent-descent)/2
+            self._proof_regions[slot]=SlideRegion((left+width/2,y,0),width,height)
+            top-=height+self.row_gap
+
     def _arrange(self):
+        fit=next((area['scale'] for area in self._fit_report if area['group']=='body'),1.)
+        self._plan_rows(getattr(self,'_row_plan_metrics',None),scale=fit)
         for name, item in self.items.items():
-            if item.slot in self.frame.LABELS:
+            if item.slot in self.frame.rows:
                 _frame_row(self.frame, item)
             elif item.slot not in ("chrome",) and not item.slot.startswith("label:"):
                 item.target.move_to(self.layout.region(item.slot).center)
         for name, item in self.items.items():
             if item.slot.startswith("label:"):
-                row = self.items[item.slot[6:]]
-                target = self.frame.label_target(row.slot, first_line_of(row.target))
+                row = self.items.get(item.slot[6:])
+                key=item.slot[6:].upper().replace('_',' ')
+                target=(self.frame.label_target(row.slot,first_line_of(row.target)) if row is not None
+                        else self.frame.labels_by_name[key].copy().set_y(self.frame.rows[key]))
                 item.target.become(target)
 
     def _text_width(self,slot):
-        if slot in self.frame.LABELS:
+        if slot in self.frame.rows:
             return self.layout.body.center[0]+self.layout.body.width/2-self.frame.left[0]
         return super()._text_width(slot)
 
     def _fit_areas(self):
-        return _frame_fit_areas(self,self.frame.rows,self.frame.left[0])
+        # Measure natural content once. Re-measuring already fitted prose in
+        # _arrange would shrink its reserved row for a second time.
+        self._row_plan_metrics=getattr(self,'_sequence_proof_envelopes',None) or self.row_envelopes()
+        self._plan_rows(self._row_plan_metrics)
+        areas=[]
+        for item in self.items.values():
+            if item.slot in self._proof_regions:
+                region=self._proof_regions[item.slot]
+                areas.append(FitArea('body',[item],region.width,region.height))
+            elif item.slot in ('header','footer','conclusion'):
+                region=self.layout.footer if item.slot=='conclusion' else self._region(item.slot)
+                # A conclusion is another proof sentence, even though its
+                # location is the footer. Fit it with its body-text peers.
+                areas.append(FitArea('body' if item.slot=='conclusion' else item.slot,
+                                     [item],region.width,region.height))
+        return areas
 
 
 class ViewTransition:
@@ -556,7 +858,7 @@ class ViewTransition:
                 mob, target = item.object.mobject, item.target
                 is_new_copy = entering and item.object.copied_from is not None and id(mob) not in old_roots
                 descendants = {id(part) for part in mob.get_family()[1:]}
-                layout_group = type(mob) in (Group, VGroup)
+                layout_group = type(mob) in (Group, VGroup) or getattr(mob,'_algovis_layout_container',False)
                 extracting = id(mob) not in other_roots and bool(descendants & other_roots)
                 if not is_new_copy and (layout_group or extracting) and mob.submobjects:
                     if mob.has_points():
@@ -574,6 +876,12 @@ class ViewTransition:
         self.retained = [key for key in self.new if key in self.old]
         self.entering = [key for key in self.new if key not in self.old]
         self.exiting = [key for key in self.old if key not in self.new]
+        self.borrowed={}
+        for key,(_name,item) in self.new.items():
+            prior=self.old[key][1].target if key in self.old else None
+            previous=getattr(prior,'_copy_sources',{})
+            self.borrowed[key]={term:source for term,source in getattr(item.target,'_copy_sources',{}).items()
+                if previous.get(term) is not source or getattr(prior,'slot_tex',{}).get(term)!=item.target.slot_tex[term]}
         self._scheduled = ()
         # Semantic components remain atomic unless a child is explicitly moved
         # out. Layout groups were expanded above, preserving their child IDs.
@@ -614,12 +922,17 @@ class ViewTransition:
                    if self.new[key][1].object.copied_from is not None]
         sources += [use.source for name, use in self.incoming.definition_uses.items()
                     if id(self.incoming.items[name].object.mobject) in self.retained]
+        sources += [source for key,(_name,item) in self.new.items()
+                    if item.object.copied_from is None
+                    for source in self.borrowed[key].values()]
         def visible_source(source):
             mob = source.mobject
             painted = [part for part in mob.get_family() if part.has_points()]
             return id(mob) in present or (painted and all(id(part) in present for part in painted))
         if any(not visible_source(source) for source in sources):
-            raise ValueError("A copy source must already be visible at the transition")
+            missing=[getattr(source.mobject,'tex_string',type(source.mobject).__name__)
+                     for source in sources if not visible_source(source)]
+            raise ValueError(f'A copy source must already be visible at the transition: {missing}')
         source_family = {id(obj) for source in sources for obj in source.mobject.get_family()}
         copy_owners = {key for key in self.exiting
                        if source_family & {id(obj) for obj in self.old[key][1].object.mobject.get_family()}}
@@ -634,23 +947,63 @@ class ViewTransition:
                 live = item.object.mobject
                 _adopt(live, item.target)
                 if source is None:
-                    motions.append(FadeIn(live))
+                    term_sources=getattr(item.target,'_copy_sources',{})
+                    if term_sources:
+                        motions.extend(ApplyDefinition(term_sources[key].mobject,None,part)
+                                       if key in term_sources else FadeIn(part)
+                                       for key,part in live.parts.items())
+                    else:
+                        entering=getattr(type(live),'enter_animation',None)
+                        motions.append(entering(live) if entering else FadeIn(live))
                 else:
                     motions.append(ApplyDefinition(source.mobject, None, live,
-                        via=item.via, path_arc=item.path_arc, preserve_destination_layout=True))
+                        via=item.via, path_arc=item.path_arc, preserve_destination_layout=True,copy_only=True))
             for key in self.retained:
                 name, item = self.new[key]
                 live = item.object.mobject
                 if isinstance(live, MathRow):
                     use = self.incoming.definition_uses.get(name)
+                    borrowed=self.borrowed[key]
+                    for term,source in borrowed.items():
+                        motions.append(ApplyDefinition(source.mobject,None,item.target.part(term),copy_only=True))
                     if use:
+                        arc=use.path_arc
+                        # A proof substitution often moves a wide fraction
+                        # down and left. Bow toward its destination column,
+                        # clear of the unchanged terms to its right.
+                        if isinstance(self.incoming,ProofSlide) and not use.via and not arc:
+                            source=use.source.mobject;destination=item.target.part(use.part)
+                            delta=destination.get_center()-source.get_center()
+                            if delta[1]<-.1 and abs(delta[0])>.1:
+                                from manim.utils.paths import path_along_arc
+                                candidate=float(np.sign(delta[0])*np.pi/2)
+                                path=path_along_arc(candidate)
+                                centers=[path(source.get_center()[None,:],destination.get_center()[None,:],alpha)[0]
+                                         for alpha in np.linspace(0,1,21)]
+                                left=self.incoming.frame.left[0]
+                                right=self.incoming.layout.body.width/2
+                                if all(left<=point[0]-source.width/2 and point[0]+source.width/2<=right for point in centers):
+                                    arc=candidate
                         motions.append(ApplyDefinition(use.source.mobject, live.part(use.part),
-                            item.target.part(use.part), via=use.via, path_arc=use.path_arc,
+                            item.target.part(use.part), via=use.via, path_arc=arc,
                             preserve_destination_layout=True))
-                    skip = (use.part,) if use else ()
+                    skip = tuple(borrowed)+((use.part,) if use else ())
                     motions += [animation for animation in live.motions_to(item.target, skip=skip)
                                 if not hasattr(animation, "target_mobject")
                                 or not _same_picture(animation.mobject, animation.target_mobject)]
+                elif hasattr(type(live),'motions_to') and hasattr(type(live),'adopt_layout'):
+                    use=self.incoming.definition_uses.get(name)
+                    if use:
+                        def at_path(root,path):
+                            for part in path.split('.'):root=root.part(part)
+                            return root
+                        destination=at_path(item.target,use.part)
+                        route=getattr(type(self.incoming),'definition_route',None)
+                        via=use.via or (route(self.incoming,use.source.mobject,destination) if route else ())
+                        motions.append(ApplyDefinition(use.source.mobject,at_path(live,use.part),
+                            destination,via=via,path_arc=use.path_arc,preserve_destination_layout=True))
+                        motions.extend(live.motions_to(item.target,skip=(use.part,)))
+                    elif not _same_picture(live,item.target):motions.extend(live.motions_to(item.target))
                 elif not _same_picture(live, item.target):
                     motions.append(Transform(live, item.target, path_arc=item.path_arc))
             changing = AnimationGroup(*motions) if motions else Wait(.001)
@@ -695,6 +1048,9 @@ class ViewTransition:
                 continue
             if key in self.retained and isinstance(live, MathRow):
                 live.commit(item.target, scene)
+            elif key in self.retained and hasattr(type(live),'adopt_layout'):
+                scene.remove(*live.get_family(),*item.target.get_family())
+                live.adopt_layout(item.target)
             for old, new in zip(live.get_family(), item.target.get_family()):
                 _copy_layout_metadata(new,old)
             live._algovis_view_fit_scale=getattr(item.target,'_algovis_view_fit_scale',1.)
@@ -709,8 +1065,15 @@ class ViewTransition:
 
 
 def _adopt(live, target):
-    if isinstance(live, MathRow):
+    if hasattr(type(live),'adopt_layout'):
         live.adopt_layout(target)
+    elif isinstance(live,Group) and not isinstance(live,VGroup):
+        # Group supports raster/vector composition but its unpainted root has
+        # no color interpolator. Adopt the actual children, as Transform does,
+        # without calling Mobject.become on that layout-only root.
+        if len(live.submobjects)!=len(target.submobjects):
+            raise ValueError('Changing a mixed component’s children requires its own adoption protocol')
+        for child,destination in zip(live.submobjects,target.submobjects):_adopt(child,destination)
     else:
         live.become(target)
     for old, new in zip(live.get_family(), target.get_family()):
@@ -722,6 +1085,8 @@ def _copy_layout_metadata(source,destination):
     copy_semantics(source,destination)
     if hasattr(source,'_algovis_relative_font_scale'):
         destination._algovis_relative_font_scale=source._algovis_relative_font_scale
+    if hasattr(source,'_algovis_font_scale_reason'):
+        destination._algovis_font_scale_reason=source._algovis_font_scale_reason
     if isinstance(source,Text) and isinstance(destination,Text):
         # Reflow changes the block height, not its font size. Manim's geometric
         # become/Transform does not adopt these Pango font-reference fields.
@@ -731,6 +1096,11 @@ def _copy_layout_metadata(source,destination):
         destination.initial_height=source.initial_height
         for name in ('_algovis_source_text','_algovis_label'):
             if hasattr(source,name):setattr(destination,name,getattr(source,name))
+    if getattr(source,'_algovis_scene_typography',False):
+        from .layout import LessonStyle, measured_font_size
+        destination._algovis_scene_typography=True
+        LessonStyle._watch_type(destination,source._algovis_typography_group,
+                                source._algovis_type_role,measured_font_size(source))
 
 
 def _frame_fit_areas(view, rows, left):
@@ -739,7 +1109,10 @@ def _frame_fit_areas(view, rows, left):
     anchors=sorted({float(rows[item.slot]) for item in view.items.values() if item.slot in rows})
     areas=[]
     for item in view.items.values():
-        if item.slot in rows:
+        if item.slot=='conclusion':
+            region=view.layout.footer
+            areas.append(FitArea('footer',[item],region.width,region.height))
+        elif item.slot in rows:
             y=rows[item.slot]
             upper=min([top,*[other for other in anchors if other>y]])
             lower=max([bottom,*[other for other in anchors if other<y]])

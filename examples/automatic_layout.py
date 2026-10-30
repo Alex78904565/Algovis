@@ -11,7 +11,8 @@ class AutomaticLayout(ViewScene):
         board.add('explanation',
             'Keep the definition on screen while each choice leads to a smaller problem. '
             'The layout wraps ordinary prose and keeps the left edges aligned.')
-        board.add('note','A smaller supporting note uses the same layout.',font_scale=.85)
+        board.add('note','A smaller supporting note uses the same layout.',font_scale=.85,
+                  font_reason='Supporting note beside the main explanation')
         board.add('recurrence',MathRow({'call':'f(n)', 'rhs':'=f(n-1)+n'}),column='right')
         board.add('states',StateRow(['1','2','3','4'],width=1.4,theme=self.theme),column='right')
         self.transition_to(board,run_time=.8)

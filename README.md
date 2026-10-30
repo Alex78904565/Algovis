@@ -69,6 +69,7 @@ manim -pql examples/extensible_components.py SharedCellsExample ProofExample
 manim -pql examples/layout_transitions.py LayoutTransitions ProofTransitions
 manim -pql examples/word_attention.py WordAttentionExample
 manim -pql examples/automatic_layout.py AutomaticLayout
+manim -pql examples/scene_animation.py SceneAnimationExample
 ```
 
 See [the component architecture](docs/COMPONENT_ARCHITECTURE.md) for the shared
@@ -81,6 +82,13 @@ to retain it, call its `copy()` to carry a new copy from the original, or fork
 the layout and substitute one named equation term. See
 [composition planning](docs/COMPONENT_ARCHITECTURE.md#plan-compositions-then-transition).
 
+For a proof or derivation, put every planned step in a named
+`LessonAnimation.group(...)` before playback. Its `SceneSequence` measures the
+whole explanation and shares its fitting scale and proof-row reservations.
+Later content stays hidden until its cue; adding a fraction or another row
+does not resize the earlier steps. See the
+[complete-layout example](examples/scene_animation.py).
+
 `ViewScene` also supports overlapping/staggered component animations and
 automatic object attention on verified narration words. Declare, for example,
 `equation.part('argument').on_word('input_size', style='box', duration=.5,
@@ -92,8 +100,9 @@ Shared view layouts wrap ordinary prose and fit related objects together by
 default, while retaining readable type and aligned baselines. Use `auto_fit=False`
 for exact sizes or `FitPolicy` for different limits. See
 [automatic fitting](docs/COMPONENT_ARCHITECTURE.md#fit-content-by-default).
-Use `font_scale=.85` or `1.2` on a text/equation item for an explicit relative
-size; the layout preserves that hierarchy when it fits the scene.
+Use `font_scale=.85` or `1.2` with a descriptive `font_reason` on a text/equation
+item for an intentional relative size. The layout preserves that hierarchy
+when it fits the complete scene group; an unexplained override is rejected.
 
 ## Try the browser reviewer
 

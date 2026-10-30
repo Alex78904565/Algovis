@@ -1,6 +1,5 @@
 from manim import *
 import re
-from collections import defaultdict, deque
 
 class Function(VGroup):
     """
@@ -112,7 +111,7 @@ class ApplyDefinition(AnimationGroup):
 
     def __init__(self, definition, application, result, *, path_arc=-PI / 8, via=(),
                  definition_label=None, result_label=None,
-                 preserve_destination_layout=False, **kwargs):
+                 preserve_destination_layout=False, copy_only=None, **kwargs):
         if definition is application:
             raise ValueError("The definition and its application must be distinct")
         if result is definition or result is application:
@@ -132,56 +131,6 @@ class ApplyDefinition(AnimationGroup):
 
         source_text = ''.join(formula_text(definition).split())
         target_text = ''.join(formula_text(result).split())
-        if (source_text and source_text == target_text and not preserve_destination_layout
-                and not getattr(result, '_algovis_preserve_structure', False)):
-            # Inspection contracts belong to the destination's role, even
-            # when its glyphs come from a differently sized reference row.
-            contracts = defaultdict(deque)
-            for part in result.get_family():
-                text = getattr(part, 'tex_string', None)
-                if isinstance(text, str):
-                    # Include unregistered occurrences too. A condition's w
-                    # need not share the role of an argument's earlier w.
-                    contracts[text].append((
-                        getattr(part, '_algovis_typography_group', None),
-                        getattr(part, '_algovis_type_role', 'equation')))
-            # An identical formula must travel as a rigid copy. Manim's
-            # hierarchy matching can otherwise pair the zero in f(0) with
-            # the zero after '=' when a VGroup lands in a MathTex object.
-            destination = definition.copy()
-            destination.scale_to_fit_height(result.height).move_to(result)
-            # Canonicalizing the geometry must not discard a caller's uniform
-            # semantic destination color (e.g. green for a proved conclusion).
-            result_colors = {part.get_color().to_hex()
-                             for part in result.family_members_with_points()}
-            if len(result_colors) == 1:
-                destination.set_color(next(iter(result_colors)))
-            # become() aligns mismatched families, padding a single MathTex
-            # part into several copies when the source is a selected term.
-            # Preserve the rigid copy's actual hierarchy as well as its paint.
-            result.become(destination)
-            result.submobjects = [child.copy() for child in destination.submobjects]
-            for part in result.get_family():
-                # The rigid copy's calibrated font reference still measures
-                # its scaled geometry. A selected MathTexPart may have no
-                # native font_size, so keep that reference while retagging.
-                for attribute in ('_algovis_typography_group', '_algovis_type_role'):
-                    if hasattr(part, attribute):
-                        delattr(part, attribute)
-            from ..layout import LessonStyle
-            for part in result.get_family():
-                matching = contracts.get(getattr(part, 'tex_string', None))
-                if not matching:
-                    continue
-                peers, role = matching.popleft()
-                if peers:
-                    LessonStyle._watch_type(part, peers, role)
-                else:
-                    # A parent may just have registered its whole formula;
-                    # preserve a destination child's explicit exception.
-                    for attribute in ('_algovis_typography_group', '_algovis_type_role'):
-                        if hasattr(part, attribute):
-                            delattr(part, attribute)
         # Carry only the actual glyphs. A backing rectangle looked like a
         # chunk of the slide being picked up and could obscure other rows.
         # Keep a visible copy throughout arrival and local substitution;
@@ -213,18 +162,22 @@ class ApplyDefinition(AnimationGroup):
         source_ink, target_ink = ink(definition), ink(result)
         equivalent_structured = bool(
             source_text and source_text == target_text
-            and getattr(result, '_algovis_preserve_structure', False)
         )
         if equivalent_structured and len(source_ink) != len(target_ink):
             raise ValueError(f'Equivalent structured copies require matching visible glyphs '
                              f'({len(source_ink)} source, {len(target_ink)} destination); '
                              'select the formula without extra artwork or repair its glyph ownership')
         self._glyph_aligned_copy = equivalent_structured
+        self._continuous_copy = (bool(copy_only) if copy_only is not None else
+            bool(equivalent_structured or (not source_text and not target_text
+                                          and type(definition) is type(result))))
         self._algovis_copy_contract = {
             'equivalentFormula': bool(source_text and source_text == target_text),
             'structuredDestination': bool(getattr(result, '_algovis_preserve_structure', False)),
             'strategy': 'glyphs' if self._glyph_aligned_copy else 'native',
             'sourceGlyphs': len(source_ink), 'destinationGlyphs': len(target_ink),
+            'formattingDuringTravel': self._continuous_copy,
+            'pathArc':float(path_arc),'waypoints':len(via),
         }
         # A previous parentheses-to-brackets transform can subdivide a
         # glyph's curves. The visible glyph still corresponds to the same
@@ -242,21 +195,25 @@ class ApplyDefinition(AnimationGroup):
         self._copy_formula = copy_formula
         self.travelling_formula = copy_formula(definition)
         self.traveller = self.travelling_formula.set_z_index(30)
-        landing = self.traveller.copy().move_to(result)
+        self._arrival_target = copy_formula(result) if self._glyph_aligned_copy else result
+        landing = self._arrival_target if self._continuous_copy else self.traveller.copy().move_to(result)
         self.landing = landing
         self.waypoints = [self.traveller.copy().move_to(point) for point in via]
         self.waypoint_positions = [point.copy() for point in via]
         # Route around a dense proof instead of carrying the copy through its
         # intervening rows. Each leg preserves the complete formula geometry.
         stops = [*self.waypoints, landing]
+        travel_duration=1. if self._continuous_copy else .70
         travel = [Transform(self.traveller, stop,
                             path_arc=0 if self.waypoints else path_arc,
-                            run_time=0.70 / len(stops)) for stop in stops]
-        arrival = [Succession(*travel, run_time=0.70)]
+                            run_time=travel_duration / len(stops)) for stop in stops]
+        arrival = [Succession(*travel, run_time=travel_duration)]
         if application is not None:
-            arrival.append(Succession(Wait(0.55), FadeOut(application, run_time=0.15)))
-        self._arrival_target = copy_formula(result) if self._glyph_aligned_copy else result
-        transfer = Succession(
+            # Clear the old subexpression as the readable copy approaches,
+            # rather than superimposing both formulas through most of arrival.
+            fade_start=.30*travel_duration
+            arrival.append(Succession(Wait(fade_start),FadeOut(application,run_time=.25*travel_duration)))
+        transfer = AnimationGroup(*arrival,lag_ratio=0,run_time=1.) if self._continuous_copy else Succession(
             AnimationGroup(*arrival, lag_ratio=0, run_time=0.70),
             Transform(self.traveller, self._arrival_target, run_time=0.30),
         )
@@ -275,9 +232,16 @@ class ApplyDefinition(AnimationGroup):
         self.traveller.become(self._copy_formula(self.definition)).set_z_index(30)
         if self._glyph_aligned_copy:
             self._arrival_target.become(self._copy_formula(self.result))
-        self.landing.become(self.traveller.copy().move_to(self.result))
-        for waypoint, position in zip(self.waypoints, self.waypoint_positions):
-            waypoint.become(self.traveller.copy().move_to(position))
+        if not self._continuous_copy:
+            self.landing.become(self.traveller.copy().move_to(self.result))
+        for index,(waypoint, position) in enumerate(zip(self.waypoints, self.waypoint_positions)):
+            waypoint.become(self.traveller.copy())
+            if self._continuous_copy:
+                source=self.traveller.copy();target=self._arrival_target.copy()
+                source.align_data(target)
+                waypoint.align_data(target)
+                waypoint.interpolate(source,target,(index+1)/(len(self.waypoints)+1))
+            waypoint.move_to(position)
         super().begin()
 
     def _setup_scene(self, scene):
