@@ -34,16 +34,24 @@ class MathStack(VGroup):
 class ObjectRow(Group):
     """A horizontal layout container; children retain their own identities."""
     _algovis_layout_container=True
-    def __init__(self,*children,align_part=None):
+    def __init__(self,*children,align_part=None,align_edge='top'):
         self.align_part=align_part
+        if align_edge not in ('top','bottom'):raise ValueError('Object-row alignment is top or bottom')
+        self.align_edge=align_edge
         super().__init__(*children)
 
     def apply_scene_typography(self,typography,*,group):
         for child in self:assign_scene_typography(child,typography,group=group)
         self.arrange(RIGHT,aligned_edge=UP,buff=.45)
         if self.align_part and len(self):
-            top=getattr(self[0],self.align_part).get_top()[1]
-            for child in self:child.shift((0,top-getattr(child,self.align_part).get_top()[1],0))
+            anchor='get_top' if self.align_edge=='top' else 'get_bottom'
+            y=getattr(getattr(self[0],self.align_part),anchor)()[1]
+            for child in self:child.shift((0,y-getattr(getattr(child,self.align_part),anchor)()[1],0))
+
+    def with_state(self,*,index,**state):
+        children=[child.copy() for child in self]
+        children[index]=children[index].with_state(**state)
+        return ObjectRow(*children,align_part=self.align_part,align_edge=self.align_edge)
 
 
 class BracedGroup(Group):

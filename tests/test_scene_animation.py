@@ -11,6 +11,101 @@ from tests.test_composition import apply
 
 
 class SceneAnimationTests(unittest.TestCase):
+    def test_component_reference_keeps_its_planned_base_case_before_playback(self):
+        base=CaseEquation(Equation({'call':'f(n,w)','eq':'='}),[Equation({'answer':'v_n'})])
+        proof=ColumnSlide();proof.add('definitions',MathStack(base))
+        future=proof.fork().refine('definitions',rows=[
+            CaseEquation(Equation({'call':'f(n+1,w)','eq':'='}),[Equation({'answer':'0'})])])
+        answer=ColumnSlide();answer.add('base',future.part('definitions','0'))
+        self.assertEqual(answer.target('base').lhs.slot_tex['call'],'f(n+1,w)')
+        self.assertEqual(answer.target('base').rows[0].slot_tex['answer'],'0')
+        self.assertEqual(base.lhs.slot_tex['call'],'f(n,w)')
+
+    def test_semantics_address_the_actual_term_inside_nested_definition_containers(self):
+        view=ColumnSlide()
+        view.add('definition',MathStack(Equation({'f':'f(','child':'i+1','close':',w)'})))
+        known=view.fork().set_meaning('definition',part='0.child',status='known')
+        self.assertEqual(known.target('definition')[0].part('child').semantics.status,'known')
+        self.assertNotEqual(known.target('definition')[0].part('child').get_color(),
+                            view.target('definition')[0].part('child').get_color())
+
+    def test_tree_continuation_stays_unboxed_through_its_reveal(self):
+        tree=RecursiveTree(lambda n:(n,[(r'\vdots',)] if n=='n' else []),('n',),
+                           profile='compact',reveal_depth=0)
+        animation=tree.get_depth_reveal_anim(1)
+        animation.begin()
+        for alpha in (.25,.5,1):
+            animation.interpolate(alpha)
+            dots=tree.tree_structure['children'][0]['mobject']
+            self.assertEqual(float(np.max(dots.box.get_fill_opacity())),0)
+            self.assertEqual(float(np.max(dots.box.get_stroke_opacity())),0)
+        animation.finish()
+        self.assertGreater(dots.label.get_fill_opacity(),.9)
+
+    def test_algorithm_proof_requires_the_recursive_definition_not_its_claim(self):
+        from algovis import ProofSlide,TextObject
+        proof=ProofSlide()
+        with self.assertRaisesRegex(TypeError,'not a prose correctness claim'):
+            proof.define_algorithm(TextObject('f is the optimum'),Equation({'base':'f(0)=0'}))
+        recurrence=Equation({'call':'f(n)','eq':'=','child':'f(n-1)+n'})
+        base=Equation({'base':'f(0)=0'})
+        proof.define_algorithm(recurrence,base)
+        self.assertIs(proof.object('definitions').mobject[0],recurrence)
+        self.assertIs(proof.object('definitions').mobject[1],base)
+        with self.assertRaisesRegex(TypeError,'intended meaning belongs in the claim'):
+            proof.fork().refine('definitions',rows=[TextObject('f is the optimum'),base])
+
+    def test_named_math_span_reuses_its_terms_without_owning_new_glyphs(self):
+        row=Equation({'now':'v_i+','future_open':'f(','future_index':'i+1',
+                      'future_rest':',w)','condition':r'\quad w+w_i\le C'})
+        selected=row.part('future*')
+        self.assertEqual(selected.tex_string,'f(i+1,w)')
+        self.assertIs(selected[1],row.part('future_index'))
+        self.assertNotIn(row.part('condition'),selected.submobjects)
+        changed=row.next_layout(future_index='i+2')
+        self.assertEqual(changed.part('future*').tex_string,'f(i+2,w)')
+
+    def test_bag_attempt_is_separate_from_its_valid_load_and_returns(self):
+        import tempfile
+        from pathlib import Path
+        from PIL import Image
+        from algovis import IllustratedBag,SlideObject
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'prop.png';Image.new('RGBA',(40,60),'white').save(path)
+            bag=IllustratedBag(path).with_state(capacity=6,used=5,show_meter=True)
+            item=SlideObject(ImageMobject(np.full((8,8,4),255,dtype=np.uint8)))
+            attempt=bag.with_state(attempt=item)
+            rejected=attempt.with_state(reject_attempt=True)
+            returned=rejected.with_state(return_attempt=True)
+            self.assertEqual([x.meter.used for x in (bag,attempt,rejected,returned)],[5]*4)
+            self.assertIsNotNone(rejected.rejection)
+            self.assertIsNone(returned.attempt)
+            self.assertIsNone(returned.rejection)
+            scene=Scene();view=ColumnSlide();view.add('bag',bag);view.add('item',item);view.install(scene)
+            pending=view.fork().refine('bag',attempt=item)
+            apply(ViewTransition(view,pending),scene)
+            rejected=pending.fork().refine('bag',reject_attempt=True)
+            apply(ViewTransition(pending,rejected),scene)
+            returned=rejected.fork().refine('bag',return_attempt=True)
+            apply(ViewTransition(rejected,returned),scene)
+            self.assertIsNone(bag.attempt)
+            self.assertEqual(len(bag.contents),0)
+            self.assertEqual(bag.meter.used,5)
+
+    def test_card_natural_geometry_does_not_inherit_a_previous_scene_scale(self):
+        from algovis import IllustratedItem
+        from algovis.layout import LessonTypography
+        card=IllustratedItem(np.full((12,16,4),255,dtype=np.uint8),'item',1,
+                             metric_reserve={'weight':3,'value':10})
+        card.scale(.65)
+        card.apply_scene_typography(LessonTypography(),group='cards')
+        self.assertAlmostEqual(card.frame.width,2.3)
+        self.assertAlmostEqual(card.frame.height,2.25)
+        updated=card.with_state(weight=3,value=10)
+        updated.apply_scene_typography(LessonTypography(),group='cards')
+        self.assertAlmostEqual(updated.frame.width,card.frame.width)
+        self.assertAlmostEqual(updated.frame.height,card.frame.height)
+
     def test_component_reveals_survive_the_entire_lesson_timeline(self):
         from algovis import Checklist,PseudocodePanel,RecapScene
         for component,states in [(Checklist(['First','Second']),[{'visible':1},{'visible':2},{'recursion_brace':True}]),

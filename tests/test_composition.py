@@ -81,7 +81,13 @@ class LayoutPlanningTests(unittest.TestCase):
         view = ProofSlide()
         view.add('inductive_step', MathRow({'call': 'f(k+1)', 'eq': '=', 'child': 'f(k)', 'rest': '+(k+1)'}))
         expanded = view.fork().substitute('inductive_step', child=r'\frac{k(k+1)}2')
-        self.assertAlmostEqual(view.target('inductive_step').baseline, expanded.target('inductive_step').baseline)
+        from algovis import SceneSequence
+        sequence=SceneSequence('Reserve the complete derivation')
+        sequence.add(view,reason='Start the larger instance')
+        sequence.add(expanded,reason='Substitute the hypothesis')
+        sequence.compile()
+        first,last=[beat.scene for beat in sequence.beats]
+        self.assertAlmostEqual(first.target('inductive_step').baseline,last.target('inductive_step').baseline)
 
     def test_failed_add_move_and_substitution_leave_the_plan_unchanged(self):
         view = ColumnSlide()

@@ -64,7 +64,7 @@ class SlideObject:
         if '_planned_model' in self.__dict__:
             part=self.planned_mobject
             for key in name.split('.'):part=part.part(key)
-            return PlannedPart(self,name,part.tex_string,
+            return PlannedPart(self,name,getattr(part,'tex_string',None),planned=part,
                 meaning=getattr(part,'semantics',None),theme=getattr(part,'_semantic_theme',None))
         if not hasattr(type(self.mobject),'part'):
             raise TypeError("Named terms require a component with named parts")
@@ -93,20 +93,27 @@ class SlideObject:
 
 class PlannedPart(SlideObject):
     """A term's planned content now, and its actual source artwork at playback."""
-    def __init__(self,owner,path,tex,*,meaning=None,theme=None):
+    def __init__(self,owner,path,tex,*,planned=None,meaning=None,theme=None):
         self.owner,self.path,self._tex=owner,path,tex
+        self._planned_target=planned.copy() if planned is not None else None
         self.copied_from=None
         if meaning is not None:self.semantics=meaning
         if theme is not None:self._semantic_theme=theme
 
     @property
-    def tex(self):return self._tex
+    def tex(self):
+        if self._tex is None:raise TypeError('This component reference is not a mathematical term')
+        return self._tex
 
     @property
     def mobject(self):
         result=self.owner.mobject
         for key in self.path.split('.'):result=result.part(key)
         return result
+
+    @property
+    def planned_mobject(self):
+        return self._planned_target if self._planned_target is not None else self.mobject
 
 
 @dataclass
@@ -257,7 +264,7 @@ class SlideView:
         """Borrow a named term from this scene's planned object state."""
         target=self.target(name)
         for key in path.split('.'):target=target.part(key)
-        return PlannedPart(self.object(name),path,target.tex_string,
+        return PlannedPart(self.object(name),path,getattr(target,'tex_string',None),planned=target,
                            meaning=getattr(target,'semantics',None),
                            theme=getattr(target,'_semantic_theme',None))
 
@@ -583,7 +590,8 @@ class SlideView:
     def set_meaning(self,name,*,part=None,**properties):
         with self._editing():
             target=self.items[name].target
-            if part is not None:target=target.part(part)
+            if part is not None:
+                for key in part.split('.'):target=target.part(key)
             set_semantics(target,theme=self.theme,**properties)
         self._remember_model(name)
         return self
@@ -731,7 +739,9 @@ def _definition_route(view,source,destination,items,*,left_bound=None):
                 if footer.slot in ('footer','conclusion') and footer.target.get_top()[1]<end[1]:
                     lower=max(lower,footer.target.get_top()[1]+.08)
             if below-half_height<lower:
-                raise ValueError('Definition substitution needs a clear landing band above the footer')
+                raise ValueError(f'Definition substitution needs a clear landing band above the footer: '
+                                 f'copy bottom {below-half_height:.3f}, available bottom {lower:.3f}, '
+                                 f'row top/bottom {item.target.get_top()[1]:.3f}/{item.target.get_bottom()[1]:.3f}')
             route=[np.array([x,start[1],0]),np.array([x,below,0]),np.array([end[0],below,0])]
         break
     return tuple(route)
@@ -838,6 +848,37 @@ class ProofSlide(SlideView):
     """Named proof rows with the existing shared rail and first-line alignment."""
     row_gap=.17
 
+    def define_algorithm(self,recurrence,base):
+        """Retain the actual recursive rule, separately from its claimed meaning.
+
+        A correctness claim cannot stand in for the algorithm being proved.
+        Reuse the already constructed native mathematical objects here.
+        """
+        from .core.teaching import MathStack
+        from .frames import CaseEquation
+        def native(value):
+            result=value.mobject if isinstance(value,SlideObject) else value
+            if not isinstance(result,(MathRow,CaseEquation,MathStack)):
+                raise TypeError('An algorithm definition needs its native recurrence and base equation, not a prose correctness claim')
+            if isinstance(result,MathStack):
+                for child in result:native(child)
+            return result
+        result=self.add('definitions',MathStack(native(recurrence),native(base)))
+        self._algorithm_definition=True
+        return result
+
+    def validate(self):
+        if getattr(self,'_algorithm_definition',False):
+            from .core.teaching import MathStack
+            from .frames import CaseEquation
+            def check(mob):
+                if isinstance(mob,MathStack):
+                    for child in mob:check(child)
+                elif not isinstance(mob,(MathRow,CaseEquation)):
+                    raise TypeError('Retain the native algorithm definition; its intended meaning belongs in the claim')
+            check(self.target('definitions'))
+        return super().validate()
+
     def definition_route(self,source,destination):
         return _definition_route(self,source,destination,
             [item for item in self.items.values() if item.slot in self.frame.rows or item.slot=='footer'],
@@ -891,16 +932,13 @@ class ProofSlide(SlideView):
 
     def row_envelopes(self):
         slots=(*self.frame.LABELS,'work')
-        minimums={'DEFINITIONS':.9,'work':.75}
-        metrics={slot:{'height':minimums.get(slot,.52),'ascent':0.,'descent':0.} for slot in slots}
+        minimums={'DEFINITIONS':.45,'work':.35}
+        metrics={slot:{'height':minimums.get(slot,.32),'ascent':0.,'descent':0.} for slot in slots}
         for item in self.items.values():
             if item.slot in metrics:
-                if isinstance(item.target,MathRow):
-                    # Reserve a fraction-sized envelope from the beginning.
-                    # A later numerator must not lift an unchanged f(k) or push
-                    # it into the row above while preserving its baseline.
-                    item.ascent=max(item.ascent,.5*self.typography.equation/33.6)
-                    item.descent=max(item.descent,.25*self.typography.equation/33.6)
+                # SceneSequence takes the maximum actual ascent/descent across
+                # future states. Imaginary fractions in every row waste space
+                # and shrink the entire proof, including plain prose.
                 row=metrics[item.slot]
                 row['height']=max(row['height'],self._height(item))
                 if isinstance(item.target,MathRow):
@@ -913,7 +951,7 @@ class ProofSlide(SlideView):
             item=self.items[name]
             if isinstance(item.target,MathRow) and item.slot=='work':
                 glyph_height=max(use.source.mobject.height,item.target.part(use.part).height)
-                metrics[item.slot]['height']=max(metrics[item.slot]['height'],1.75,3*glyph_height+.4)
+                metrics[item.slot]['height']=max(metrics[item.slot]['height'],2*glyph_height+.24)
         return metrics
 
     def _plan_rows(self,metrics=None,*,scale=None):
@@ -936,7 +974,12 @@ class ProofSlide(SlideView):
             if row is not None and isinstance(row.target,MathRow):
                 ascent=metrics[slot]['ascent']*shared_scale
                 descent=metrics[slot]['descent']*shared_scale
-                self.frame.rows[slot]-=row.baseline_offset+(ascent-descent)/2
+                if slot=='work' and height>ascent+descent+.1:
+                    # Put the equation at the top of its measured envelope.
+                    # The remaining space is one usable landing band below,
+                    # rather than two unusable half-gaps around the equation.
+                    self.frame.rows[slot]=top-ascent-row.baseline_offset
+                else:self.frame.rows[slot]-=row.baseline_offset+(ascent-descent)/2
             self._proof_regions[slot]=SlideRegion((left+width/2,y,0),width,height)
             top-=height+self.row_gap
 

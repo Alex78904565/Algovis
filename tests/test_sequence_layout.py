@@ -7,6 +7,19 @@ from algovis.animation import SceneBeat
 
 
 class SequenceLayoutTests(unittest.TestCase):
+    def test_illustration_is_centered_beside_a_taller_problem_data_block(self):
+        from algovis import IllustratedProblemScene
+        first=IllustratedProblemScene('A concrete problem')
+        first.add('illustration',Rectangle(width=2,height=2),slot='left')
+        first.add('item','First item',slot='right')
+        last=first.fork()
+        for i in range(5):last.add('fact'+str(i),TextObject('Another item attribute'),slot='right')
+        sequence=SceneSequence('Illustration and growing problem data')
+        sequence.add(first,reason='Introduce the instance');sequence.add(last,reason='Supply its data')
+        sequence.compile()
+        for beat in sequence.beats:
+            self.assertAlmostEqual(beat.scene.target('illustration').get_y(),beat.scene.layout.body.center[1])
+
     def test_list_and_block_share_the_centered_common_edge_contract(self):
         from algovis import BlockScene
         from manim import Group

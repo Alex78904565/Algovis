@@ -205,11 +205,13 @@ class MapScene(SlotScene):
 
 class DerivationScene(SlotScene):
     ROWS=(('meaning',1),('equation',2),('explanation',1))
+    block_slots=('meaning','equation','explanation')
 
 
 class RecurrenceScene(SlotScene):
     """Keep the function meaning, recurrence and base case visible together."""
     ROWS=(('meaning',1),('equation',2),('base',1.6),('explanation',.8))
+    block_slots=('meaning','equation','base','explanation')
 
 
 class ComparisonScene(SlotScene):
@@ -234,6 +236,16 @@ class ComparisonScene(SlotScene):
                    for p in samples):
                 return (np.array([gutter,start[1],0]),np.array([gutter,end[1],0]))
         return ()
+
+
+class IllustratedProblemScene(ComparisonScene):
+    """Center a concrete illustration beside a separately built data block.
+
+    An illustration is not the first row of a two-column proof. Its complete
+    visible group stays centered vertically while the item data grows.
+    """
+    centered_slots=('left',)
+    block_slots=('right',)
 
 
 class PairedScene(ComparisonScene):
@@ -379,6 +391,7 @@ class StoryScene(SlotScene):
     ROWS=(('story',2),('equation',1))
     diagram_slots=('story',)
     centered_slots=('story',)
+    block_slots=('equation',)
 
 
 class TreeExplanationScene(SlotScene):

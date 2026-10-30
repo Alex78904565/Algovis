@@ -119,6 +119,9 @@ class RecursiveTree(VGroup):
                 padding=self.node_padding,shape=self.node_shape,color=self.node_color,
                 theme=self.theme,style=self.node_style)
             node_shape=node_mobject.box
+            if label_str in (r'\vdots',r'\cdots',r'\ldots'):
+                node_shape.set_stroke(opacity=0).set_fill(opacity=0)
+                node_mobject._algovis_continuation=True
         else:
             node_shape = self.node_factory(label_str, label)
             node_mobject = VGroup(node_shape, label)
@@ -1045,17 +1048,20 @@ class RecursiveTree(VGroup):
         def reveal(_tree, alpha):
             for node, original, depth in nodes:
                 amount = level_alpha(alpha, depth)
-                node.become(
-                    original.copy()
-                    .scale(0.84 + 0.16 * amount, about_point=original.get_center())
-                    .set_opacity(amount)
-                )
+                node.become(self._reveal_picture(original,amount))
             for edge, original, depth in edges:
                 amount = level_alpha(alpha, depth)
                 edge.pointwise_become_partial(original, 0, amount)
                 edge.set_opacity(amount)
 
         return UpdateFromAlphaFunc(self, reveal)
+
+    @staticmethod
+    def _reveal_picture(original,amount):
+        target=original.copy().scale(0.84+0.16*amount,about_point=original.get_center()).set_opacity(amount)
+        if getattr(original,'_algovis_continuation',False):
+            target.box.set_stroke(opacity=0).set_fill(opacity=0)
+        return target
 
     def get_node_reveal_anim(self, node_data):
         """Reveal one prepared node together with its incoming edge.
@@ -1085,11 +1091,7 @@ class RecursiveTree(VGroup):
 
         def reveal(_tree, alpha):
             amount = smooth(alpha)
-            node.become(
-                original.copy()
-                .scale(0.84 + 0.16 * amount, about_point=original.get_center())
-                .set_opacity(amount)
-            )
+            node.become(self._reveal_picture(original,amount))
             if incoming_edge is not None:
                 incoming_edge.pointwise_become_partial(
                     incoming_original, 0, amount,

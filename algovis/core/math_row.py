@@ -1,7 +1,7 @@
 """Named mathematical terms laid out together by TeX, including substitutions."""
 from __future__ import annotations
 import numpy as np
-from manim import FadeIn, FadeOut, MathTex, Transform, VectorizedPoint
+from manim import FadeIn, FadeOut, MathTex, Transform, VectorizedPoint, VGroup
 from manim.mobject.text.tex_mobject import SCALE_FACTOR_PER_FONT_POINT
 
 
@@ -63,6 +63,12 @@ class MathRow(MathTex):
         return float(self._axis_origin.get_center()[1])
 
     def part(self, name):
+        if name.endswith('*'):
+            matches=[part for key,part in self.parts.items() if key.startswith(name[:-1])]
+            if not matches:raise KeyError(name)
+            group=VGroup(*matches)
+            group.tex_string=''.join(value for key,value in self.slot_tex.items() if key.startswith(name[:-1]))
+            return group
         return self.parts[name]
 
     def get_part_by_tex(self, tex, **kwargs):

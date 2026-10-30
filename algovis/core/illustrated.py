@@ -2,7 +2,7 @@
 from uuid import uuid4
 from PIL import Image
 from manim import (AnimationGroup,DOWN,FadeIn,FadeOut,Group,ImageMobject,LEFT,
-    RIGHT,RoundedRectangle,Transform,UP,VGroup,Brace,Rectangle)
+    RIGHT,RoundedRectangle,Transform,UP,VGroup,Brace,Rectangle,Cross,Succession)
 from ..layout import LessonStyle,assign_scene_typography
 from ..semantics import set_semantics
 from ..theme import DEFAULT_THEME
@@ -62,14 +62,14 @@ class IllustrationImage(ImageMobject):
 
 
 class IllustratedProp(Group):
-    def __init__(self,path,label,*,theme=DEFAULT_THEME):
+    def __init__(self,path,label,*,relative_size=1.,theme=DEFAULT_THEME):
         self.theme=theme
         pixels=Image.open(path).convert('RGBA')
         bounds=pixels.getchannel('A').getbbox()
         if bounds:pixels=pixels.crop(bounds)
         import numpy as np
         self.image=IllustrationImage(np.array(pixels))
-        self.image.scale_to_fit_height(2.5)
+        self.image.scale_to_fit_height(2.5*relative_size)
         self.label=LessonStyle(theme=theme).text(label,type_role='label',role='muted')
         self.label.next_to(self.image,DOWN,buff=.15)
         super().__init__(self.image,self.label)
@@ -115,6 +115,12 @@ class IllustratedItem(Group):
             start+=width+.32
 
     def apply_scene_typography(self,typography,*,group):
+        # Geometry belongs to the card, not to its previous containing layout.
+        # Reset the natural card before the sequence applies its common fit.
+        center=self.frame.get_center()
+        self.frame.stretch_to_fit_width(2.3).stretch_to_fit_height(2.25).move_to(center)
+        self.image.scale_to_fit_height(1.1)
+        if self.image.width>1.6:self.image.scale_to_fit_width(1.6)
         for part in (self.display_name,self.weight,self.value):
             assign_scene_typography(part,typography,group=group,role='label')
         widths=[]
@@ -251,24 +257,35 @@ class CapacityMeter(VGroup):
 class IllustratedBag(IllustratedProp):
     """The illustrated bag retains its meter through the worked selection."""
     def __init__(self,path,label='BAG',*,theme=DEFAULT_THEME):
-        super().__init__(path,label,theme=theme)
+        super().__init__(path,label,relative_size=.58,theme=theme)
         self.meter=CapacityMeter(theme=theme)
         self.contents=Group()
         self._copy_sources={}
         self.copy_path_arc=-.5
+        self.attempt=None
+        self.attempt_source=None
+        self.rejection=None
         self.add(self.meter,self.contents)
 
     @property
     def parts(self):
         return {'image':self.image,'label':self.label,'meter':self.meter,
-                **{f'stored:{index}':image for index,image in enumerate(self.contents)}}
+                **{f'stored:{index}':image for index,image in enumerate(self.contents)},
+                **({'attempt':self.attempt} if self.attempt is not None else {}),
+                **({'rejection':self.rejection} if self.rejection is not None else {})}
 
     def part(self,name):return self.parts[name]
 
     def _arrange_contents(self):
         for index,image in enumerate(self.contents):
             image.scale_to_fit_height(self.image.height*.2)
-            image.move_to(self.image.get_center()+RIGHT*((index%3-1)*self.image.width*.18)+UP*self.image.height*.12)
+            image.move_to(self.image.get_bottom()+RIGHT*((index%3-1)*self.image.width*.18)
+                          +UP*self.image.height*(.25+.19*(index//3)))
+        if self.attempt is not None:
+            self.attempt.scale_to_fit_height(self.image.height*.3)
+            self.attempt.move_to(self.image.get_center()+UP*self.image.height*.12)
+            if self.rejection is not None:
+                self.rejection.become(Cross(self.attempt,stroke_color=self.theme.danger,stroke_width=4))
 
     def apply_scene_typography(self,typography,*,group):
         super().apply_scene_typography(typography,group=group)
@@ -276,24 +293,49 @@ class IllustratedBag(IllustratedProp):
         self.meter.next_to(self.image,RIGHT,buff=.3)
         self._arrange_contents()
 
-    def with_state(self,*,capacity=None,used=None,show_meter=None,store=None):
+    def with_state(self,*,capacity=None,used=None,show_meter=None,store=None,
+                   attempt=None,reject_attempt=False,return_attempt=False,empty=False):
         target=self.copy();target.meter=target.meter.with_state(capacity=capacity,used=used,visible=show_meter)
         target.submobjects[2]=target.meter
         target.meter.next_to(target.image,RIGHT,buff=.3)
+        if empty:target.contents=Group()
         if store is not None:
             from ..composition import SlideObject
             source=store if isinstance(store,SlideObject) else SlideObject(store)
             target._copy_sources[f'stored:{len(target.contents)}']=source
             target.contents.add(source.planned_mobject.copy())
+        if attempt is not None:
+            from ..composition import SlideObject
+            source=attempt if isinstance(attempt,SlideObject) else SlideObject(attempt)
+            target.attempt_source=source
+            target.attempt=source.planned_mobject.copy()
+            target._copy_sources['attempt']=source
+        if reject_attempt:
+            if target.attempt is None:raise ValueError('Reject an attempted item before returning it')
+            target.rejection=Cross(target.attempt,stroke_color=self.theme.danger,stroke_width=4)
+        if return_attempt:
+            if target.attempt is None:raise ValueError('No attempted item to return')
+            target.attempt=None;target.rejection=None
         target._arrange_contents()
+        target.submobjects=[target.image,target.label,target.meter,target.contents,
+                            *([target.attempt] if target.attempt is not None else []),
+                            *([target.rejection] if target.rejection is not None else [])]
         return target
 
     def motions_to(self,target,*,skip=()):
         motions=[Transform(self.image,target.image),Transform(self.label,target.label),*self.meter.motions_to(target.meter)]
-        motions.extend(Transform(image,target.contents[index]) for index,image in enumerate(self.contents)
-                       if f'stored:{index}' not in skip)
+        motions.extend(Transform(image,target.contents[index]) if index<len(target.contents) else FadeOut(image)
+                       for index,image in enumerate(self.contents) if f'stored:{index}' not in skip)
         motions.extend(FadeIn(image) for index,image in enumerate(target.contents)
                        if index>=len(self.contents) and f'stored:{index}' not in skip)
+        if self.attempt is not None:
+            if target.attempt is not None:motions.append(Transform(self.attempt,target.attempt))
+            else:
+                motions.append(Succession(Transform(self.attempt,self.attempt_source.mobject.copy()),FadeOut(self.attempt)))
+        elif target.attempt is not None and 'attempt' not in skip:motions.append(FadeIn(target.attempt))
+        if self.rejection is not None:
+            motions.append(Transform(self.rejection,target.rejection) if target.rejection is not None else FadeOut(self.rejection))
+        elif target.rejection is not None:motions.append(FadeIn(target.rejection))
         return motions
 
     def adopt_layout(self,target):
@@ -304,5 +346,11 @@ class IllustratedBag(IllustratedProp):
             live=self.contents[index] if index<len(self.contents) else image
             _adopt(live,image);contents.append(live)
         self.contents.submobjects=contents
+        self.attempt=target.attempt
+        self.attempt_source=target.attempt_source
+        self.rejection=target.rejection
+        self.submobjects=[self.image,self.label,self.meter,self.contents,
+                         *([self.attempt] if self.attempt is not None else []),
+                         *([self.rejection] if self.rejection is not None else [])]
         self._copy_sources={}
         return self

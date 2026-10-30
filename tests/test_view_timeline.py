@@ -231,6 +231,21 @@ class ViewTimelineTests(unittest.TestCase):
         for name, part in row.parts.items():
             self.assertAlmostEqual(measured_font_size(part), expected[name])
 
+    def test_component_term_transforms_receive_font_calibration_inside_the_compiler(self):
+        from algovis.layout import LessonStyle, measured_font_size
+        from manim import Transform
+        row = MathRow({'label':r'\text{weight}=', 'result':'=8>6'})
+        LessonStyle().watch('capacity-example',row)
+        self.scene.mount_view(row)
+        destination = row.next_layout(result=r'=5\le6')
+        LessonStyle().watch('capacity-example',destination)
+        motion = Transform(row.part('result'),destination.part('result'))
+        program = self.start(motion)
+        program.interpolate(.5)
+        self.assertAlmostEqual(measured_font_size(row.part('result')),33.6)
+        self.finish(program)
+        self.assertAlmostEqual(measured_font_size(row.part('result')),33.6)
+
     def test_equation_peers_keep_their_point_sizes_during_a_glyph_morph(self):
         from algovis.layout import LessonStyle, measured_font_size
         row = MathRow({'index': 'i', 'value': 'v_i'})

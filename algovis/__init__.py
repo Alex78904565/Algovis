@@ -46,7 +46,7 @@ from .core.illustrated import IllustratedProp,IllustratedBag,CapacityMeter,Illus
 from .core.routes import CityMap,RoadTripSimulation,RouteTrace
 from .core.recap import Checklist
 from .scene_layouts import (CenteredScene, ListScene, BlockScene, SlotScene, DiagramScene, TreeScene, DefinitionScene,
-                            MapScene,DerivationScene,RecurrenceScene, ComparisonScene,PairedScene,SelectionScene,ConversionScene,AnalysisScene,RecapScene, StoryScene,TreeExplanationScene,TreeArrayScene)
+                            MapScene,DerivationScene,RecurrenceScene, ComparisonScene,IllustratedProblemScene,PairedScene,SelectionScene,ConversionScene,AnalysisScene,RecapScene, StoryScene,TreeExplanationScene,TreeArrayScene)
 from .semantics import SemanticProperties, SemanticChange, set_semantics
 from .storyboard import (
     ACTION_VERBS, ATTENTION_STYLES, ENTRY_STYLES, EXIT_STYLES,

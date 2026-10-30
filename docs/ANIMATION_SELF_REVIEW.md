@@ -146,6 +146,19 @@ do not establish consistent formatting between the two expressions.
 
 ## Work through the findings yourself
 
+- **Algorithm proof:** compare the retained native recursive/base equations
+  with the English correctness claim. They have different roles. Check the
+  exact predicate, base-instance name, induction assumption and quantified
+  conclusion, including the change from a one-item base to a no-items base.
+  The first/second recursive calls must follow the order of the recording.
+- **Worked selection:** calculate the stored load after every action. A failed
+  attempt must return its picture and restore the valid arithmetic before an
+  optimality claim. Check that only the new item's numbers travel and that the
+  card frames do not resize as attributes appear.
+- **Readability:** inspect whether reserved space serves visible ink or motion.
+  A proof fitting without overlap can still have excessive gaps and tiny text.
+  A tree spanning several steps must not be forced into one recipe row.
+
 - **Missing trigger:** remove the effect or supply its specific, justified words.
 - **Before/after word:** correct the cue or the scheduling. Include time spent in
   nested groups, transitions, and previous plays.

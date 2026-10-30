@@ -301,6 +301,17 @@ class _ViewPhase(_GatedPhase):
 
         for operation in self.operations:
             kind = _kind(operation)
+            if kind == 'move' and type(operation) is Transform:
+                # Component helpers also return ordinary term Transforms. They
+                # need the same destination font calibration as an authored
+                # Move, including snapshots taken by a simultaneous phase.
+                # Keep specialized Transform subclasses' adoption hooks intact.
+                operation = Move(operation.mobject, operation.target_mobject,
+                    run_time=operation.run_time, rate_func=operation.rate_func,
+                    path_arc=operation.path_arc, path_arc_axis=operation.path_arc_axis,
+                    path_func=operation.path_func,
+                    replace_mobject_with_target_in_scene=operation.replace_mobject_with_target_in_scene,
+                    suspend_mobject_updating=operation.suspend_mobject_updating)
             if kind == 'retire':
                 omit(operation.mobject)
                 available = [item.object.mobject for item in outgoing.items.values()
@@ -334,7 +345,7 @@ class _ViewPhase(_GatedPhase):
                 # Mobject has no color interpolator, so become() is not a valid
                 # layout planner. Use Manim's own point-bearing-family transform
                 # on detached copies, just as the eventual motion does.
-                planning_motion = Transform(planned, operation.target_mobject.copy())
+                planning_motion = Move(planned, operation.target_mobject.copy())
                 planning_motion.begin()
                 planning_motion.finish()
                 for name, item in incoming.items.items():

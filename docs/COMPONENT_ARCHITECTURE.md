@@ -46,6 +46,37 @@ objects. They do not need a deep inheritance tree merely to obtain a theme.
 A comparison panel, a state cell and a bag's capacity meter are not interchangeable
 just because each happens to contain a rectangle.
 
+For an algorithm correctness proof, call
+`proof.define_algorithm(recurrence, base)` with the actual native mathematical
+objects already constructed. This retains their identities and rejects a
+prose correctness claim in the definition slot, including later refinements.
+The English intended meaning belongs in the claim. Plain mathematical proofs
+can still add their definitions directly.
+
+`MathRow.part('future*')` selects existing named terms sharing a prefix as one
+read-only attention span. The terms retain their individual identities for
+substitution, semantic paint and native TeX layout. This lets a whole recursive
+call receive attention while its increasing index remains separately editable.
+
+`IllustratedBag.with_state(attempt=source)` carries a temporary item toward
+the bag without corrupting its valid stored load. `reject_attempt=True` marks
+it, and `return_attempt=True` sends it back. These operations are distinct from
+storing a chosen item and updating the capacity meter. Content placement and
+prop proportions belong to the illustrated components.
+
+Use `IllustratedProblemScene` when a concrete illustration accompanies a taller
+problem-data block. It centers the illustration vertically rather than treating
+it as the first row of a two-column derivation. `ObjectRow(align_part='image',
+align_edge='bottom')` puts differently sized props on the same visual ground.
+
+A planned part can also be a complete semantic component, such as a base-case
+`CaseEquation` inside a proof's definition stack. Its planned artwork is captured
+at reference creation, separately from the live child resolved during playback.
+Extracting it into the answer scene therefore retains both its identity and the
+newly authored zero base, even before that proof timeline has played. Only a
+mathematical term reference exposes `tex`; a component reference is not coerced
+into a TeX string.
+
 ## Plan compositions, then transition
 
 A Manim `SlideScene` owns the section's clock. Each visual beat can be a small

@@ -7,6 +7,50 @@ not another slide.
 
 ## Composition and copy contract
 
+The later induction/knapsack review rejected content that the preceding audit
+had accepted. A correctness proof must retain the **actual recursive equation
+and its base equation**. An English description of the answer is the claim to
+prove, not the function definition. `ProofSlide.define_algorithm` keeps those
+roles separate and rejects replacing the definition with prose. Show P(1) or
+P(0) beside the used base equation, write the actual P(k) assumption, and end
+with the predicate and its quantified domain. The original last-item base
+starts the proof at one; the no-items base extends it to zero.
+
+Match the order of cases to spoken references such as "first call" and
+"second call". Highlight their actual arguments in the retained recurrence.
+Changing the induction parameter or simplifying the base is a series of local
+edits to the existing proof, not a replacement summary board.
+
+Proof reservations must be measured from future ink. Reserving imaginary
+fractions in every row shrinks the whole proof unnecessarily. Give a travelling
+substitution one usable landing band, rather than distributing blank space
+above and below its destination. Verify the larger resulting text and the
+complete copy route together.
+
+An individual term Transform returned by a component helper must receive the
+same font calibration as a declared Move. A simultaneous bag/shape operation
+can capture the term before its owning equation is consolidated. Preserve its
+destination point-size reference during the glyph morph and on arrival; do
+not dismiss the resulting peer-typography flag as an acceptable exception.
+
+An illustrated capacity example needs a valid state when it is called optimal.
+Show the rejected item entering, its rejection mark and its return. Restore the
+valid total before claiming optimality. Store chosen pictures near the bottom
+of the bag. A character's bag should have plausible proportions. A second
+numerical instance still needs pictured items, not only w/v symbols.
+
+At a worked backtracking stop, show the reached base state once. Remove the
+consumed child-value rows after their substitutions have served their purpose;
+do not accidentally make several retained rows say the same stopping value.
+Inspect that transition as well as its settled result. Preserve the preceding
+branch calculations, recovered choices and matching-branch explanation.
+
+Preserve a discrete-input note long enough to read, including across the move
+to its worked example. A generic recursion tree uses unboxed continuation dots
+and a general "base case" label. The tree may span several recipe steps; it
+must not force a large gap between the first and second list entries. The
+viewer specifically preferred the compact spacing of the recipe replay.
+
 Reopened review after the 2026-10-30 handoff: several visibly wrong layouts were
 accepted by the agent despite the requirements below. A high frame count is not
 evidence that the requirements were enforced. For each repair, record the
