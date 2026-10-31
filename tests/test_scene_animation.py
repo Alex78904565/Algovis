@@ -20,7 +20,7 @@ class SceneAnimationTests(unittest.TestCase):
         film=LessonAnimation();film.add(applied,reason='Apply the definition')
         with tempconfig({'dry_run':True,'disable_caching':True}):
             scene=ViewScene(skip_animations=True);scene.setup();scene.set_view(first)
-            with patch('algovis.composition.ApplyDefinition',wraps=ApplyDefinition) as transfer:
+            with patch('algovis.composition.ApplyDefinition.bind',wraps=ApplyDefinition.bind) as transfer:
                 film.play(scene)
                 scene.play(Pulse(source.mobject,trigger='definition',reason='Refer to the visible definition'),run_time=.1)
                 applied.add('base','The base case')
@@ -512,7 +512,7 @@ class SceneAnimationTests(unittest.TestCase):
         self.assertEqual(len(via),3)
         self.assertLess(via[-1][1]+row.part('child').height/2,row.part('next').get_bottom()[1])
         from algovis import ApplyDefinition
-        with patch('algovis.composition.ApplyDefinition',wraps=ApplyDefinition) as transfer:
+        with patch('algovis.composition.ApplyDefinition.bind',wraps=ApplyDefinition.bind) as transfer:
             apply(ViewTransition(proof,target),scene)
             self.assertEqual(transfer.call_count,1)
             self.assertTrue(np.allclose(proof.object('work').mobject.part('next').get_center(),row.part('next').get_center()))
@@ -550,7 +550,7 @@ class SceneAnimationTests(unittest.TestCase):
         scene=Scene();proof.install(scene)
         next_proof=proof.fork().revise('inductive_step',{'call':'f(k+1)','eq':'=',
             'child':source.part('child'),'plus':source.part('plus'),'n':source.part('n')})
-        with patch('algovis.composition.ApplyDefinition',wraps=ApplyDefinition) as transfer:
+        with patch('algovis.composition.ApplyDefinition.bind',wraps=ApplyDefinition.bind) as transfer:
             apply(ViewTransition(proof,next_proof),scene)
             self.assertEqual(transfer.call_count,1)
             self.assertEqual(len(transfer.call_args.args[0]),3)
@@ -696,7 +696,7 @@ class SceneAnimationTests(unittest.TestCase):
         applied.add('base',Text('The base case'))
         third=applied.snapshot()
         scene=Scene();first.install(scene)
-        with patch('algovis.composition.ApplyDefinition',wraps=ApplyDefinition) as transfer:
+        with patch('algovis.composition.ApplyDefinition.bind',wraps=ApplyDefinition.bind) as transfer:
             apply(ViewTransition(first,second),scene)
             self.assertEqual(transfer.call_count,1)
             apply(ViewTransition(second,third),scene)
@@ -747,7 +747,7 @@ class SceneAnimationTests(unittest.TestCase):
             second=first.fork().refine('bag',used=1,store=SlideObject(item.image))
             third=second.fork().refine('bag',used=2)
             scene=Scene();first.install(scene)
-            with patch('algovis.composition.ApplyDefinition',wraps=ApplyDefinition) as transfer:
+            with patch('algovis.composition.ApplyDefinition.bind',wraps=ApplyDefinition.bind) as transfer:
                 apply(ViewTransition(first,second),scene)
                 self.assertEqual(transfer.call_count,1)
                 self.assertEqual(len(bag.mobject.contents),1)
@@ -964,7 +964,7 @@ class SceneAnimationTests(unittest.TestCase):
         scene=Scene();prior=[None]
         def transition(view,**options):
             apply(ViewTransition(prior[0],view),scene);prior[0]=view
-        with patch('algovis.composition.ApplyDefinition',wraps=ApplyDefinition) as transfer:
+        with patch('algovis.composition.ApplyDefinition.bind',wraps=ApplyDefinition.bind) as transfer:
             group.play(SimpleNamespace(transition_to=transition))
         self.assertEqual(transfer.call_count,1)
     def test_planned_term_copies_preserve_semantic_color_without_early_resolution(self):

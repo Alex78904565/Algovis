@@ -329,7 +329,7 @@ class _ViewPhase(_GatedPhase):
                 source, target = (_references(operation))
                 include(target)
                 source_names.append(scene.view_name(source))
-                operation = ApplyDefinition(source, None, target, preserve_destination_layout=True,
+                operation = ApplyDefinition.bind(source, None, target, preserve_destination_layout=True,
                                             run_time=operation.run_time,
                                             path_arc=getattr(operation, 'path_arc', 0))
             elif kind == 'replace_shape':

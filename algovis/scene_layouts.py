@@ -59,7 +59,7 @@ class SlotScene(SlideView):
     COLUMNS=()
     diagram_slots=()
     centered_slots=()
-    block_slots=()
+    block_slots=None
     shared_block_height=True
     gutter=.35
 
@@ -69,9 +69,15 @@ class SlotScene(SlideView):
         if context:
             if self.COLUMNS:raise ValueError('A context row requires a row-based scene')
             self.ROWS=(*self.ROWS,('context',.65))
-            self.block_slots=(*self.block_slots,'context')
+            if self.block_slots is not None:
+                self.block_slots=(*self.block_slots,'context')
         if center_blocks:
             self.block_slots=tuple(key for key,_ in self.COLUMNS)
+        elif self.block_slots is None:
+            # Text uses a centered common-edge block by default. Diagram
+            # specializations retain their explicitly centered geometry.
+            self.block_slots=tuple(key for key,_ in (self.COLUMNS or self.ROWS)
+                if key not in (*self.diagram_slots,*self.centered_slots))
         super().__init__(*args,**kwargs)
 
     def _slots(self):
@@ -188,7 +194,8 @@ class SlotScene(SlideView):
                 for _,item in items:item.target.set_x(region.center[0])
         footer=[(name,item) for name,item in self.items.items() if item.slot=='footer']
         if len(footer)>1:
-            column=ColumnLayout(self.layout.footer,gap=.1)
+            column=ColumnLayout(self.layout.footer,gap=.1,
+                content_width=max(item.target.width for _,item in footer))
             for name,item in footer:_column_row(column,name,item)
             Group(*(item.target for _,item in footer)).set_y(self.layout.footer.center[1])
         for item in self.items.values():
@@ -218,15 +225,118 @@ class MapScene(SlotScene):
     centered_slots=('map',)
 
 
-class DerivationScene(SlotScene):
+class ArgumentScene(SlotScene):
+    """Named stages of one growing, centered, left-aligned argument.
+
+    Semantic locations remain exposed, but their empty proportional bands do
+    not scatter a short explanation across the frame. The sequence reserves
+    the complete argument's envelope before the first line appears.
+    """
+    argument_copy_corridor=True
+    def motion_gap(self):
+        """Reserve a readable landing band for a routed definition copy."""
+        heights=[]
+        for use in self.definition_uses.values():
+            mob=use.source.mobject
+            fit=getattr(mob,'_algovis_view_fit_scale',1.)
+            heights.append(mob.height/fit+.32)
+        for item in self.items.values():
+            for source in getattr(item.target,'_copy_sources',{}).values():
+                mob=source.mobject
+                # A retained source can also need the band: the copy may
+                # approach below an existing prefix, just above the next
+                # explanation row. Retiring sources need the same clearance.
+                fit=getattr(mob,'_algovis_view_fit_scale',1.)
+                heights.append(mob.height/fit+.32)
+        return max([.34,*heights])
+
+    def _argument_gap(self):
+        return max(self.motion_gap(),getattr(self,'_sequence_motion_gap',.34))
+
+    def motion_reservation(self):
+        """Reserve side corridors when a definition must cross another row."""
+        slots=[key for key,_ in self.ROWS]+['footer']
+        widths=[]
+        for name,use in self.definition_uses.items():
+            destination=self.items[name]
+            source_ink={id(p) for p in use.source.mobject.get_family()}
+            owner=next((item for item in self.items.values()
+                if source_ink<={id(p) for p in item.object.mobject.get_family()}),None)
+            if owner is None or owner.slot not in slots or destination.slot not in slots:continue
+            a,b=sorted((slots.index(owner.slot),slots.index(destination.slot)))
+            if not any(item.slot in slots[a+1:b] for item in self.items.values()):continue
+            target=destination.target
+            for key in use.part.split('.'):target=target.part(key)
+            source=use.source.mobject
+            fit=getattr(source,'_algovis_view_fit_scale',1.)
+            widths.append(max(source.width/fit,target.width)+.16)
+        return max(widths,default=0.)
+
+    def _argument_region(self):
+        body=self.layout.body
+        margin=max(self.motion_reservation(),getattr(self,'_sequence_motion_margin',0.))
+        if 2*margin>=body.width:
+            raise ValueError('A definition transfer needs more room; use an adjacent application layout')
+        return SlideRegion(body.center,body.width-2*margin,body.height)
+
+    def _slots(self):
+        # These names are stages in one argument, not disjoint rectangles.
+        return {slot:self._argument_region() for slot,_ in self.ROWS}
+
+    def _argument_items(self):
+        return [(name,item) for slot,_ in self.ROWS for name,item in self.items.items() if item.slot==slot]
+
+    def block_widths(self):
+        return {'ArgumentScene/body':max((i.target.width for _,i in self._argument_items()),default=0.)}
+
+    def block_heights(self):
+        rows=self._argument_items()
+        return {'ArgumentScene/body':sum(self._height(i) for _,i in rows)+self._argument_gap()*max(0,len(rows)-1)}
+
+    def _fit_areas(self):
+        rows=[item for _,item in self._argument_items()]
+        region=self._argument_region()
+        areas=[FitArea('body',rows,region.width,region.height,stacked=True,gap=self._argument_gap())]
+        for area in super()._fit_areas():
+            if area.group=='header':areas.append(area)
+            elif area.group=='footer':
+                # A retained reference definition is a peer of the argument,
+                # even when it lives in the footer for a later application.
+                # Its region constrains the shared fit; it must not acquire an
+                # independent, larger equation size as the argument grows.
+                area.group='body'
+                areas.append(area)
+        return areas
+
+    def _arrange(self):
+        super()._arrange()
+        widths={**self.block_widths(),**getattr(self,'_sequence_block_widths',{})}
+        heights={**self.block_heights(),**getattr(self,'_sequence_block_heights',{})}
+        column=ColumnLayout(self._argument_region(),gap=self._argument_gap(),content_width=widths['ArgumentScene/body'] or None,
+            content_height=heights['ArgumentScene/body'] or None)
+        from .composition import _column_row
+        for name,item in self._argument_items():_column_row(column,name,item)
+
+
+class DerivationScene(ArgumentScene):
     ROWS=(('meaning',1),('equation',2),('explanation',1))
     block_slots=('meaning','equation','explanation')
 
 
-class RecurrenceScene(SlotScene):
+class RecurrenceScene(ArgumentScene):
     """Keep the function meaning, recurrence and base case visible together."""
     ROWS=(('meaning',1),('equation',2),('base',1.6),('explanation',.8))
     block_slots=('meaning','equation','base','explanation')
+
+
+class ApplicationScene(ArgumentScene):
+    """Read an answer from a completed rule and its English meaning.
+
+    The reference rule precedes the conditions. The general meaning and its
+    instantiated copy are neighbors, so a full prose definition does not have
+    to travel through the retained algorithm's ink.
+    """
+    ROWS=(('reference',2),('conditions',1),('definition',1),('application',1))
 
 
 class ComparisonScene(SlotScene):
@@ -408,13 +518,52 @@ class ConversionScene(ComparisonScene):
 
 
 class AnalysisScene(SlotScene):
-    """Retain the mathematical definition above two runtime derivations."""
-    ROWS=(('definition',1.6),('comparison',4))
+    """A centered definition, paired derivations and aligned result row."""
+    ROWS=(('definition',1.7),('comparison',3.5),('results',.7))
+    block_slots=('definition','left','right','left_result','right_result')
+
+    def __init__(self,*args,summary=False,**kwargs):
+        if summary:
+            self.ROWS=(*self.ROWS,('summary',.65))
+            self.block_slots=(*self.block_slots,'summary')
+        super().__init__(*args,**kwargs)
+
+    def block_heights(self):
+        heights=super().block_heights()
+        prefix=type(self).__name__
+        for pair in (('left','right'),('left_result','right_result')):
+            maximum=max(heights[f'{prefix}/{slot}'] for slot in pair)
+            for slot in pair:heights[f'{prefix}/{slot}']=maximum
+        return heights
+
+    def _region(self,slot):
+        return getattr(self,'_analysis_regions',{}).get(slot) or super()._region(slot)
+
+    def _text_width(self,slot):
+        return self._slots()[slot].width if slot in self._slots() else super()._text_width(slot)
+
+    def _arrange(self):
+        super()._arrange()
+        widths={**self.block_widths(),**getattr(self,'_sequence_block_widths',{})}
+        sides={side:max(widths.get(f'{type(self).__name__}/{slot}',0.) for slot in (side,side+'_result'))
+               for side in ('left','right')}
+        left=self.layout.body.center[0]-(sum(sides.values())+self.gutter)/2
+        regions=self._slots();self._analysis_regions={}
+        for side in ('left','right'):
+            width=sides[side]
+            for slot in (side,side+'_result'):
+                region=regions[slot]
+                self._analysis_regions[slot]=SlideRegion((left+width/2,region.center[1],0),
+                    max(width,.01),region.height)
+                for item in self.items.values():
+                    if item.slot==slot:item.target.shift((left-item.target.get_left()[0],0,0))
+            left+=width+self.gutter
 
     def _slots(self):
         regions=super()._slots()
         left,right=regions.pop('comparison').split_columns(1,1,gutter=self.gutter)
-        return {**regions,'left':left,'right':right}
+        a,b=regions.pop('results').split_columns(1,1,gutter=self.gutter)
+        return {**regions,'left':left,'right':right,'left_result':a,'right_result':b}
 
 
 class RecapScene(SlotScene):

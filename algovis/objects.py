@@ -49,3 +49,36 @@ class Equation(MathRow):
         selected=VGroup(*glyphs[start:start+len(text)])
         strike=Line(selected.get_corner(DL),selected.get_corner(UR),color=self._semantic_theme.danger,stroke_width=2)
         return Succession(Create(strike),FadeOut(strike))
+
+
+class FunctionDefinition(Equation):
+    """A named function and its English meaning, in one semantic equation.
+
+    The function keeps the same paint whether this is a full-width definition
+    or one side of a comparison. Wrapping belongs to this object, not the scene.
+    """
+    _algovis_content_fields=('_definition_text','_definition_call')
+
+    def __init__(self,call,meaning,*,theme=DEFAULT_THEME):
+        self._definition_text,self._definition_call=str(meaning),str(call)
+        self._definition_theme=theme
+        super().__init__({'call':str(call),'eq':'=','meaning':self._meaning_tex(72)},
+                         roles={'call':'current'},theme=theme)
+
+    def _meaning_tex(self,width):
+        import textwrap
+        lines=textwrap.wrap(self._definition_text,width=width,break_long_words=False)
+        if not lines:return ''
+        escaped=[line.replace('&',r'\&').replace('_',r'\_').replace('%',r'\%') for line in lines]
+        return r'\begin{aligned}[t]'+r'\\'.join(r'&\text{'+line+'}' for line in escaped)+r'\end{aligned}'
+
+    def layout_in(self,width,height,typography):
+        center=self.get_center()
+        for limit in range(72,20,-2):
+            target=self.next_layout(meaning=self._meaning_tex(limit))
+            if target.width<=width or limit==22:
+                self.adopt_layout(target);self.move_to(center);break
+
+    def with_state(self,*,call=None,meaning=None):
+        return FunctionDefinition(call or self._definition_call,
+            self._definition_text if meaning is None else meaning,theme=self._definition_theme).move_to(self)

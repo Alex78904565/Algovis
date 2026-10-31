@@ -109,6 +109,19 @@ class ApplyDefinition(AnimationGroup):
     when selected terms have gaps because intermediate terms were omitted.
     """
 
+    @classmethod
+    def bind(cls,definition,application,result,**options):
+        """Carry a definition into an instantiated expression during travel.
+
+        The view compiler uses this policy for both flat equations and nested
+        components. There is no intermediate arrival with unbound arguments.
+        The lower-level constructor retains its optional local-substitution API.
+        """
+        if options.pop('copy_only',True) is False:
+            raise ValueError('A bound definition must adopt its destination during travel')
+        options.setdefault('preserve_destination_layout',True)
+        return cls(definition,application,result,copy_only=True,**options)
+
     def __init__(self, definition, application, result, *, path_arc=-PI / 8, via=(),
                  definition_label=None, result_label=None,
                  preserve_destination_layout=False, copy_only=None, **kwargs):

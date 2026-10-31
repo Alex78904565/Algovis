@@ -57,6 +57,10 @@ class Checklist(VGroup):
             target.dp_brace=bool(dp_brace)
             target.storage_brace.set_opacity(1 if dp_brace else 0)
             target.storage_label.set_opacity(1 if dp_brace else 0)
+            if dp_brace:
+                from ..semantics import set_semantics
+                for row in target.rows[target.brace_rows:]:
+                    set_semantics(row,status='stored',theme=self.theme)
         return target
 
     def adopt_layout(self,target):

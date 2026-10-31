@@ -39,14 +39,14 @@ from .continuity import SectionHandoff
 from .core.math_row import MathRow
 from .core.proof import Proof, ProofRow
 from .animation import LessonAnimation,SceneSequence
-from .objects import TextObject, Equation
+from .objects import TextObject, Equation, FunctionDefinition
 from .core.sequences import StateSequence, FloatingCharacter
 from .core.teaching import MathStack,ObjectRow,StateStep,BracedGroup,FixedGrowthPlot,LogRuntimeComparison,ServerRacks,Worksheet,TreeAnnotation,InductionChain
-from .core.illustrated import IllustratedProp,IllustratedBag,CapacityMeter,IllustratedItem,ItemCollection
+from .core.illustrated import IllustratedProp,IllustratedBag,CapacityMeter,FuelTank,IllustratedItem,ItemCollection
 from .core.routes import CityMap,RoadTripSimulation,RouteTrace
 from .core.recap import Checklist
 from .scene_layouts import (CenteredScene, ListScene, BlockScene, SlotScene, DiagramScene, TreeScene, DefinitionScene,
-                            MapScene,DerivationScene,RecurrenceScene, ComparisonScene,IllustratedProblemScene,WorkedExampleScene,PairedScene,SelectionScene,ConversionScene,AnalysisScene,RecapScene, StoryScene,TreeExplanationScene,TreeArrayScene)
+                            MapScene,DerivationScene,RecurrenceScene,ApplicationScene,ComparisonScene,IllustratedProblemScene,WorkedExampleScene,PairedScene,SelectionScene,ConversionScene,AnalysisScene,RecapScene,StoryScene,TreeExplanationScene,TreeArrayScene)
 from .semantics import SemanticProperties, SemanticChange, set_semantics
 from .storyboard import (
     ACTION_VERBS, ATTENTION_STYLES, ENTRY_STYLES, EXIT_STYLES,

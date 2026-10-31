@@ -19,6 +19,9 @@ class WordAttention:
     @property
     def artwork(self):
         from .composition import SlideObject
+        if isinstance(self.target,(tuple,list)):
+            from manim import Group
+            return Group(*(part.mobject if isinstance(part,SlideObject) else part for part in self.target))
         return self.target.mobject if isinstance(self.target,SlideObject) else self.target
 
     def __deepcopy__(self, memo):

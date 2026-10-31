@@ -364,8 +364,10 @@ class SlideView:
         reason = font_reason or getattr(target,'_algovis_font_scale_reason','')
         if factor != 1 and not str(reason).strip():
             raise ValueError('A relative font override needs font_reason explaining its hierarchy')
-        role = ('heading' if slot == 'header' else 'proof_label' if slot.startswith('label:')
-                else 'note' if slot == 'footer' else None)
+        # A location is not a typography role. In particular, moving a
+        # definition to the footer must not turn its equation into a note.
+        # Supporting prose declares type_role='note' on the object itself.
+        role = ('heading' if slot == 'header' else 'proof_label' if slot.startswith('label:') else None)
         assign_scene_typography(target,self.typography,group=self._type_group,role=role)
         relative_font_scale(target,factor)
         target.scale(factor/inherited)
@@ -531,7 +533,14 @@ class SlideView:
             for group,factor in getattr(self,'_sequence_fit_scales',{}).items():
                 if group not in scales:continue
                 if scales[group]<factor-1e-6:
-                    raise ValueError('Content exceeds its planned animation-group envelope; replan the complete group')
+                    measurements=[{'component':type(item.target).__name__,'slot':item.slot,
+                        'width':float(item.target.width),'height':float(item.target.height),
+                        'reservedHeight':float(self._height(item))}
+                        for area in areas if area.group==group for item in area.items]
+                    raise ValueError('Content exceeds its planned animation-group envelope; '
+                        f'replan the complete group ({type(self).__name__}, {group}: '
+                        f'required fit {scales[group]:.8f}, planned fit {factor:.8f}; '
+                        f'items={measurements})')
                 scales[group]=factor
             fitted=set()
             for area in areas:
@@ -584,6 +593,18 @@ class SlideView:
                     and not list(_semantic_edits(item.target,target))):
                 raise ValueError(f'{type(target).__name__}.with_state changed drawing without changing its '
                     'declared content model; include the state in _algovis_content_fields')
+            # State arguments can contain children borrowed from a fitted
+            # earlier view alongside freshly created children. Normalize that
+            # detached composition before measuring it, just as add() does.
+            # Otherwise planning measures mixed fonts and live inheritance
+            # later (correctly) restores larger peer text outside the envelope.
+            role=('heading' if item.slot=='header' else
+                  'proof_label' if item.slot.startswith('label:') else None)
+            assign_scene_typography(target,self.typography,group=self._type_group,role=role)
+            inherited=getattr(target,'_algovis_relative_font_scale',1.)
+            relative_font_scale(target,item.font_scale)
+            target.scale(item.font_scale/inherited)
+            _set_placement_fit(target,1.)
             self.items[name]=replace(item,target=target)
         self._remember_model(name)
         return self
@@ -735,6 +756,10 @@ class _VacantDefinitionRoute(tuple):
 
 def _definition_route(view,source,destination,items,*,left_bound=None,vacant_destination=False):
     """A common measured corridor for column and proof definition copies."""
+    # Definitions removed from the incoming layout still occupy their old
+    # rows until their copies arrive. Routing only against the destination
+    # layout misses that live ink and permits travel through source labels.
+    items=[*items,*getattr(view,'_transition_source_rows',())]
     start,end=source.get_center(),destination.get_center()
     half_width=max(source.width,destination.width)/2+.12
     half_height=max(source.height,destination.height)/2+.08
@@ -777,12 +802,16 @@ def _definition_route(view,source,destination,items,*,left_bound=None,vacant_des
            for part in source_siblings for p in samples):
         obstacles.extend(owners)
     if abs(end[1]-start[1])<.1 and not obstacles:return ()
+    crossing_rows=[]
     for item in items:
         live_family={id(p) for p in item.object.mobject.get_family()}
         target_family={id(p) for p in item.target.get_family()}
         if source_ink and source_ink<=live_family:continue
         if destination_ink and destination_ink<=(target_family|live_family):continue
         target=item.target
+        if (target.get_bottom()[1]<max(start[1],end[1])+half_height
+                and target.get_top()[1]>min(start[1],end[1])-half_height):
+            crossing_rows.append(target)
         if any(target.get_left()[0]-half_width<p[0]<target.get_right()[0]+half_width
                and target.get_bottom()[1]-half_height<p[1]<target.get_top()[1]+half_height
                for p in samples):obstacles.append(target)
@@ -801,6 +830,11 @@ def _definition_route(view,source,destination,items,*,left_bound=None,vacant_des
                 obstacles.append(item.target)
             break
     if not obstacles:return ()
+    # A detour can meet a shorter row that the original diagonal missed.
+    # Its corridor must clear every row along the vertical travel, not only
+    # the row that first forced the detour.
+    if getattr(view,'argument_copy_corridor',False):
+        obstacles.extend(crossing_rows)
     left=min(p.get_left()[0] for p in obstacles)-half_width
     right=max(p.get_right()[0] for p in obstacles)+half_width
     low=(left_bound if left_bound is not None else view.layout.body.center[0]-view.layout.body.width/2)+half_width
@@ -906,9 +940,32 @@ def _definition_copies(view,sources,destination,*,entering=False):
         source=run[0][1].mobject if len(run)==1 else VGroup(*(entry[1].mobject for entry in run))
         target=destination.part(run[0][0]) if len(run)==1 else VGroup(*(destination.part(entry[0]) for entry in run))
         via=route(view,source,target,vacant_destination=entering) if route else ()
-        motion=ApplyDefinition(source,None,target,copy_only=True,via=via)
-        motion._algovis_requires_vacant_destination=getattr(via,'vacant_destination',False)
+        motion=ApplyDefinition.bind(source,None,target,copy_only=True,via=via)
+        needs_clearance=getattr(via,'vacant_destination',False)
+        if entering:
+            # A route can be clear of existing rows yet pass through the new
+            # formula's prefix or subscript. That ink does not exist yet:
+            # keep it absent until the arriving definition has landed. Test
+            # the actual routed path, including the changing text envelope.
+            siblings=[part for key,part in destination.parts.items() if key not in sources]
+            points=[source.get_center(),*via,target.get_center()]
+            width=max(source.width,target.width)/2
+            height=max(source.height,target.height)/2
+            needs_clearance=needs_clearance or any(
+                part.get_left()[0]-width+.015<p[0]<part.get_right()[0]+width-.015
+                and part.get_bottom()[1]-height+.015<p[1]<part.get_top()[1]+height-.015
+                for a,b in zip(points,points[1:]) for alpha in np.linspace(0,1,61)
+                for p in [a+(b-a)*alpha] for part in siblings)
+        motion._algovis_requires_vacant_destination=needs_clearance
         motions.append(motion)
+    if len(motions)>1:
+        # Separate definitions can use the same side corridor. Apply them in
+        # equation order rather than superimposing their travelling glyphs.
+        # Contiguous terms from one definition remain a single readable run.
+        ordered=Succession(*motions)
+        ordered._algovis_requires_vacant_destination=any(
+            getattr(motion,'_algovis_requires_vacant_destination',False) for motion in motions)
+        return [ordered]
     return motions
 
 
@@ -1364,10 +1421,13 @@ class ViewTransition:
         source_family = {id(obj) for source in sources for obj in source.mobject.get_family()}
         copy_owners = {key for key in self.exiting
                        if source_family & {id(obj) for obj in self.old[key][1].object.mobject.get_family()}}
+        self.incoming._transition_source_rows=tuple(
+            replace(self.old[key][1],target=self.old[key][1].object.mobject)
+            for key in copy_owners)
         exits = [FadeOut(self.old[key][1].object.mobject) for key in self.exiting if key not in copy_owners]
 
         def build_changes():
-            motions = [];delayed_entries=[];term_entries=[];term_exits=[]
+            motions = [];delayed_entries=[];term_entries=[];term_exits=[];held_reflows=[]
             routed=set()
             for keys in self._reflow_groups:
                 starts=[self.new[key][1].object.mobject for key in keys]
@@ -1443,12 +1503,22 @@ class ViewTransition:
                 else:
                     route=getattr(type(self.incoming),'definition_route',None)
                     via=item.via or (route(self.incoming,source.mobject,live) if route else ())
-                    motions.append(ApplyDefinition(source.mobject, None, live,
+                    motions.append(ApplyDefinition.bind(source.mobject, None, live,
                         via=via, path_arc=item.path_arc, preserve_destination_layout=True,copy_only=True))
             for key in self.retained:
                 name, item = self.new[key]
                 live = item.object.mobject
                 if key in routed:
+                    continue
+                if (copy_owners and not self.borrowed[key] and name not in self.definition_uses
+                        and _content_model(live)==_content_model(item.target)
+                        and any(_reflow_intersects([live,self.old[owner][1].object.mobject],
+                            [item.target,self.old[owner][1].object.mobject]) for owner in copy_owners)):
+                    # Sources stay on screen until their copies arrive. Their
+                    # former rows are therefore not vacant yet: moving a
+                    # retained caption into those rows now would write over
+                    # the very definition being applied.
+                    held_reflows.append((live,item.target,item.path_arc))
                     continue
                 if isinstance(live, MathRow):
                     use = self.definition_uses.get(name)
@@ -1476,7 +1546,7 @@ class ViewTransition:
                                     arc=candidate
                         clear_prose=live.prose_term(use.part)
                         def transfer(use=use,live=live,item=item,via=via,arc=arc,clear_prose=clear_prose):
-                            return ApplyDefinition(use.source.mobject, None if clear_prose else live.part(use.part),
+                            return ApplyDefinition.bind(use.source.mobject, None if clear_prose else live.part(use.part),
                                 item.target.part(use.part), via=via, path_arc=arc,
                                 preserve_destination_layout=True)
                     skip = tuple(borrowed)+((use.part,) if use else ())
@@ -1500,7 +1570,7 @@ class ViewTransition:
                     use=self.definition_uses.get(name)
                     borrowed=self.borrowed[key]
                     for part,source in borrowed.items():
-                        motions.append(ApplyDefinition(source.mobject,None,item.target.part(part),copy_only=True,
+                        motions.append(ApplyDefinition.bind(source.mobject,None,item.target.part(part),copy_only=True,
                             path_arc=getattr(item.target,'copy_path_arc',0),preserve_destination_layout=True))
                     if use:
                         def at_path(root,path):
@@ -1509,7 +1579,7 @@ class ViewTransition:
                         destination=at_path(item.target,use.part)
                         route=getattr(type(self.incoming),'definition_route',None)
                         via=use.via or (route(self.incoming,use.source.mobject,destination) if route else ())
-                        motions.append(ApplyDefinition(use.source.mobject,at_path(live,use.part),
+                        motions.append(ApplyDefinition.bind(use.source.mobject,at_path(live,use.part),
                             destination,via=via,path_arc=use.path_arc,preserve_destination_layout=True))
                         motions.extend(live.motions_to(item.target,skip=(*borrowed,use.part)))
                     elif not _same_picture(live,item.target):
@@ -1557,8 +1627,18 @@ class ViewTransition:
                                     _deferred(lambda:arriving,run_time=.75))
             if copy_owners:
                 # The definition stays visible until its copy has arrived.
-                return Succession(changing, _deferred(lambda: AnimationGroup(
-                    *(FadeOut(self.old[key][1].object.mobject) for key in copy_owners)), run_time=.2))
+                phases=[changing,_deferred(lambda: AnimationGroup(
+                    *(FadeOut(self.old[key][1].object.mobject) for key in copy_owners)), run_time=.2)]
+                if held_reflows:
+                    def release_rows():
+                        animations=[]
+                        for live,target,arc in held_reflows:
+                            if hasattr(type(live),'motions_to'):
+                                animations.extend(live.motions_to(target))
+                            else:animations.append(Transform(live,target,path_arc=arc))
+                        return _ArrivedLayoutGroup(*animations,on_arrival=finish_layout)
+                    phases.append(_deferred(release_rows,run_time=.3))
+                return Succession(*phases)
             return changing
 
         def build_with_fit():
@@ -1589,6 +1669,7 @@ class ViewTransition:
         return self._scheduled
 
     def commit(self, scene, *, adopt=True, consolidate=True):
+        self.incoming.__dict__.pop('_transition_source_rows',None)
         _remember_definition_uses(scene,self.definition_uses.values())
         # AnimationGroup and Succession build synthetic owners. A nested copy
         # can dissolve those groups, leaving an empty wrapper at the scene root.

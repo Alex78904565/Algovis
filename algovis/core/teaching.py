@@ -162,16 +162,25 @@ class FixedGrowthPlot(VGroup):
 
 class LogRuntimeComparison(VGroup):
     """Fixed log10 axes and labelled operation-count curves."""
-    def __init__(self,series,*,x_max=20,y_max=20,theme=DEFAULT_THEME):
+    def __init__(self,series,*,x_max=20,y_max=20,x_ticks=None,y_ticks=None,theme=DEFAULT_THEME):
         self.theme=theme
         self.x_max,self.y_max=x_max,y_max
-        self.axes=Axes(x_range=[2,x_max,2],y_range=[0,y_max,1],x_length=9.2,y_length=3.6,
+        self.x_ticks=tuple(x_ticks if x_ticks is not None else range(2,x_max+1,4))
+        self.y_ticks=tuple(y_ticks if y_ticks is not None else range(4,y_max+1,4))
+        def tick_step(values,extent):
+            gaps=np.diff(sorted(set(values)))
+            return float(np.median(gaps)) if len(gaps) else max(1.,extent/5)
+        # Label ranges can span hundreds of log units. A fixed unit tick
+        # creates a solid white band; tick density belongs to the chart's
+        # declared scale, just like the accompanying numeric labels.
+        self.axes=Axes(x_range=[2,x_max,tick_step(self.x_ticks,x_max-2)],
+            y_range=[0,y_max,tick_step(self.y_ticks,y_max)],x_length=9.2,y_length=3.6,
             tips=False,axis_config={'color':theme.muted,'stroke_width':1.5})
         style=LessonStyle(theme=theme)
         self.x_labels=VGroup(*(style.math(str(x),type_role='label',role='muted').next_to(
-            self.axes.c2p(x,0),DOWN,buff=.12) for x in range(2,x_max+1,4)))
+            self.axes.c2p(x,0),DOWN,buff=.12) for x in self.x_ticks))
         self.y_labels=VGroup(*(style.math(str(y),type_role='label',role='muted').next_to(
-            self.axes.c2p(2,y),LEFT,buff=.12) for y in range(4,y_max+1,4)))
+            self.axes.c2p(2,y),LEFT,buff=.12) for y in self.y_ticks))
         self.y_title=style.math(r'\log_{10}(\text{operations})',type_role='label').next_to(self.axes,UP,buff=.22)
         self.x_title=style.math('n',type_role='label').next_to(self.axes,RIGHT,buff=.18).align_to(self.axes,DOWN)
         self.curves=VGroup();self.legend=VGroup()
@@ -200,9 +209,9 @@ class LogRuntimeComparison(VGroup):
         def labels():
             for curve,points in zip(self.curves,curve_points):
                 curve.set_points(np.array([self.axes.c2p(*old_axes.p2c(point)) for point in points]))
-            for x,label in zip(range(2,self.x_max+1,4),self.x_labels):
+            for x,label in zip(self.x_ticks,self.x_labels):
                 label.next_to(self.axes.c2p(x,0),DOWN,buff=.12)
-            for y,label in zip(range(4,self.y_max+1,4),self.y_labels):
+            for y,label in zip(self.y_ticks,self.y_labels):
                 label.next_to(self.axes.c2p(2,y),LEFT,buff=.12)
             self.y_title.next_to(self.axes,UP,buff=.22)
             self.x_title.next_to(self.axes,RIGHT,buff=.18).align_to(self.axes,DOWN)

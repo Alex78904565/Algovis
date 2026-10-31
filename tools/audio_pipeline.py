@@ -144,6 +144,37 @@ def mute_clip_head(
     return cleaned
 
 
+def retime_after_inserted_pause(document, at, seconds):
+    """Translate an existing narration timeline after a pause-only PCM edit.
+
+    No source-chunk or tempo reconstruction is appropriate when all existing
+    speech samples remain intact. Words may not straddle the insertion; longer
+    transcript containers may, and their ends expand by the inserted duration.
+    """
+    import copy
+    if not math.isfinite(at) or not math.isfinite(seconds) or at<0 or seconds<=0:
+        raise ValueError('A pause needs a nonnegative time and positive duration')
+    result=copy.deepcopy(document)
+    def visit(item):
+        if isinstance(item,list):
+            for child in item:visit(child)
+        elif isinstance(item,dict):
+            if 'start' in item and 'end' in item:
+                start,end=float(item['start']),float(item['end'])
+                if 'word' in item and start<at<end:
+                    raise ValueError('A timestamped spoken word straddles the proposed pause')
+                item['start']=round(start+(seconds if start>=at else 0),6)
+                item['end']=round(end+(seconds if end>at else 0),6)
+            if 'time' in item and 'phrase' in item:
+                item['time']=round(float(item['time'])+(seconds if float(item['time'])>=at else 0),6)
+            for key in ('words','segments','cues'):
+                if key in item:visit(item[key])
+    visit(result)
+    if isinstance(result,dict) and isinstance(result.get('duration'),(int,float)):
+        result['duration']=round(result['duration']+seconds,6)
+    return result
+
+
 def insert_verified_master_pauses(samples, rate, pauses):
     """Insert pauses at reviewed quiet seams, never at detected speech.
 

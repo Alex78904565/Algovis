@@ -62,7 +62,9 @@ class IllustrationImage(ImageMobject):
 
 
 class IllustratedProp(Group):
+    _algovis_content_fields=('relative_size',)
     def __init__(self,path,label,*,relative_size=1.,theme=DEFAULT_THEME):
+        self.relative_size=relative_size
         self.theme=theme
         pixels=Image.open(path).convert('RGBA')
         bounds=pixels.getchannel('A').getbbox()
@@ -204,12 +206,12 @@ class ItemCollection(Group):
 class CapacityMeter(VGroup):
     """A shared labelled capacity gauge with explicit current and maximum load."""
     _algovis_content_fields=('used','visible')
-    def __init__(self,capacity='C',used=0,*,visible=False,theme=DEFAULT_THEME):
+    def __init__(self,capacity='C',used=0,*,symbol='C',visible=False,theme=DEFAULT_THEME):
         self.theme,self.capacity,self.used,self.visible=theme,capacity,float(used),visible
         self.outline=RoundedRectangle(width=.28,height=1.9,corner_radius=.04,color=theme.muted,fill_opacity=0)
         self.fill=Rectangle(width=.16,height=.01,stroke_width=0,fill_color=theme.success,fill_opacity=0)
         numeric=isinstance(capacity,(int,float))
-        self.capacity_label=Equation({'symbol':'C','eq':'=' if numeric else '',
+        self.capacity_label=Equation({'symbol':symbol,'eq':'=' if numeric else '',
             'capacity':str(capacity) if numeric else ''},theme=theme,role='current')
         self.readout=Equation({'used':f'{used:g}','slash':'/','capacity':str(capacity)},theme=theme)
         super().__init__(self.outline,self.fill,self.capacity_label,self.readout)
@@ -255,6 +257,38 @@ class CapacityMeter(VGroup):
         return self
 
 
+class FuelTank(CapacityMeter):
+    """A recognizable fuel container using the same capacity/readout mechanics."""
+    def __init__(self,capacity,used=0,*,visible=False,theme=DEFAULT_THEME):
+        super().__init__(capacity,used,symbol='T',visible=visible,theme=theme)
+        from ..objects import TextObject
+        self.outline.stretch_to_fit_width(1.35).stretch_to_fit_height(.85)
+        self.fill.stretch_to_fit_width(1.17)
+        self.handle=RoundedRectangle(width=.55,height=.18,corner_radius=.05,
+            color=theme.muted,fill_opacity=0,stroke_width=2)
+        self.tank_label=TextObject('FUEL TANK',type_role='label',theme=theme)
+        self.add(self.handle,self.tank_label);self._arrange()
+
+    def _arrange(self):
+        super()._arrange()
+        if not hasattr(self,'handle'):return
+        self.handle.next_to(self.outline,UP,buff=0)
+        self.tank_label.next_to(self.handle,UP,buff=.10)
+        self.capacity_label.next_to(self.outline,RIGHT,buff=.18).align_to(self.outline,UP)
+        self.readout.next_to(self.outline,RIGHT,buff=.18).align_to(self.outline,DOWN)
+        self.handle.set_stroke(opacity=int(self.visible))
+        self.tank_label.set_opacity(int(self.visible))
+
+    def apply_scene_typography(self,typography,*,group):
+        super().apply_scene_typography(typography,group=group)
+        assign_scene_typography(self.tank_label,typography,group=group,role='label')
+        self._arrange()
+
+    def motions_to(self,target):
+        return [*super().motions_to(target),Transform(self.handle,target.handle),
+                Transform(self.tank_label,target.tank_label)]
+
+
 class IllustratedBag(IllustratedProp):
     """The illustrated bag retains its meter through the worked selection."""
     def __init__(self,path,label='BAG',*,relative_size=1.,theme=DEFAULT_THEME):
@@ -294,9 +328,13 @@ class IllustratedBag(IllustratedProp):
         self.meter.next_to(self.image,RIGHT,buff=.3)
         self._arrange_contents()
 
-    def with_state(self,*,capacity=None,used=None,show_meter=None,store=None,
+    def with_state(self,*,capacity=None,used=None,show_meter=None,store=None,relative_size=None,
                    attempt=None,reject_attempt=False,return_attempt=False,empty=False):
         target=self.copy();target.meter=target.meter.with_state(capacity=capacity,used=used,visible=show_meter)
+        if relative_size is not None:
+            target.relative_size=float(relative_size)
+            target.image.scale_to_fit_height(2.5*target.relative_size)
+            target.label.next_to(target.image,DOWN,buff=.15)
         target.submobjects[2]=target.meter
         target.meter.next_to(target.image,RIGHT,buff=.3)
         if empty:target.contents=Group()

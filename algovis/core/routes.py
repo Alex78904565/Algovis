@@ -1,11 +1,12 @@
 """City maps and concrete route simulations, independent of lesson narration."""
 import math
 import numpy as np
-from manim import (AnimationGroup,BackgroundRectangle,Circle,Create,DOWN,FadeIn,
+from manim import (AnimationGroup,BackgroundRectangle,Circle,Create,DOWN,FadeIn,interpolate_color,
     LEFT,Line,MoveAlongPath,RIGHT,RoundedRectangle,Transform,UP,VGroup,VectorizedPoint)
 from ..layout import LessonStyle,assign_scene_typography
 from ..objects import Equation
 from ..theme import DEFAULT_THEME
+from .illustrated import FuelTank
 
 
 class RouteTrace(VGroup):
@@ -16,10 +17,10 @@ class RouteTrace(VGroup):
         self.cities_path=tuple(cities);self.progress=0
         self.evaluation=evaluation
         self.route=Equation({'start':str(cities[0]),**{f'edge{index}':rf'\to {city}'
-            for index,city in enumerate(cities[1:])}},theme=theme)
+            for index,city in enumerate(cities[1:])}},role='current',evaluation=evaluation,theme=theme)
         costs=[distances[tuple(sorted((a-1,b-1)))] for a,b in zip(cities,cities[1:])]
         self.cost=Equation({**{f'cost{index}':('+' if index else '')+str(cost)
-            for index,cost in enumerate(costs)},'total':'='+str(sum(costs))},theme=theme)
+            for index,cost in enumerate(costs)},'total':'='+str(sum(costs))},evaluation=evaluation,theme=theme)
         self.theme=theme
         super().__init__(self.route,self.cost)
         self.arrange(RIGHT,buff=.4)
@@ -37,13 +38,12 @@ class RouteTrace(VGroup):
         start,end=self.cities_path[index:index+2]
         self.progress+=1
         route=self.route.part(f'edge{index}');cost=self.cost.part(f'cost{index}')
-        route.set_opacity(1);cost.set_opacity(1)
         return AnimationGroup(self.map_ref.mobject.route_step(start-1,end-1,evaluation=self.evaluation),
-            FadeIn(route),FadeIn(cost),lag_ratio=0)
+            Transform(route,route.copy().set_opacity(1)),Transform(cost,cost.copy().set_opacity(1)),lag_ratio=0)
 
     def finish_total(self):
-        total=self.cost.part('total');total.set_opacity(1)
-        return FadeIn(total)
+        total=self.cost.part('total')
+        return Transform(total,total.copy().set_opacity(1))
 
 
 class CityMap(VGroup):
@@ -51,6 +51,7 @@ class CityMap(VGroup):
     def __init__(self,labels,*,distances=None,layout='line',prices=None,show_roads=True,theme=DEFAULT_THEME):
         if layout not in ('line','network'):raise ValueError('City layout must be line or network')
         self.theme,self.layout_kind=theme,layout
+        self.route_overlays={};self.route_colors={}
         style=LessonStyle(theme=theme)
         count=len(labels)
         points=[np.array([(index-(count-1)/2)*1.8,0,0]) for index in range(count)]
@@ -99,29 +100,32 @@ class CityMap(VGroup):
         for label,city in zip(self.price_labels,self.cities):label.next_to(city,UP,buff=.26)
 
     def reveal_roads(self):
-        self.roads.set_opacity(1)
-        return AnimationGroup(*(Create(road) for road in self.roads),lag_ratio=.04)
+        return AnimationGroup(*(Transform(road,road.copy().set_stroke(opacity=1))
+                                for road in self.roads),lag_ratio=0)
 
     def reveal_distances(self):
-        self.distance_labels.set_opacity(1)
-        return FadeIn(self.distance_labels)
+        return Transform(self.distance_labels,self.distance_labels.copy().set_opacity(1))
 
     def reveal_price(self,index):
         label=self.price_labels[index]
-        label.set_opacity(1)
-        return FadeIn(label)
+        return Transform(label,label.copy().set_opacity(1))
 
     def start_route(self):
-        self.traveler.move_to(self.cities[0])
-        self.traveler.set_stroke(opacity=1).set_fill(opacity=0)
-        return FadeIn(self.traveler)
+        return Transform(self.traveler,self.traveler.copy().move_to(self.cities[0]).set_stroke(opacity=1).set_fill(opacity=0))
 
     def route_step(self,start,end,*,evaluation=None):
         color=self.theme.role_color(evaluation or 'current')
-        original=self.road_by_pair[tuple(sorted((start,end)))]
-        highlight=original.copy().set_color(color).set_stroke(width=4)
-        self.add(highlight)
-        return AnimationGroup(Create(highlight),MoveAlongPath(self.traveler,
+        key=tuple(sorted((start,end)))
+        if key not in self.route_overlays:
+            self.route_overlays[key]=self.road_by_pair[key].copy().set_stroke(opacity=0,width=4)
+            self.add(self.route_overlays[key])
+        prior=self.route_colors.get(key)
+        if prior is not None and prior!=color:
+            from manim import ManimColor
+            color=interpolate_color(ManimColor(prior),ManimColor(color),.5)
+        self.route_colors[key]=color
+        highlight=self.route_overlays[key]
+        return AnimationGroup(Transform(highlight,highlight.copy().set_color(color).set_stroke(opacity=1,width=4)),MoveAlongPath(self.traveler,
             Line(self.traveler.get_center(),self.cities[end].get_center())))
 
     def reset_route(self):
@@ -140,8 +144,7 @@ class RoadTripSimulation(VGroup):
         self.cost=Equation({'cost':r'\text{cost}=0'},theme=theme)
         self.dashboard=VGroup(self.state,self.purchase,self.cost)
         self.dashboard.arrange(RIGHT,buff=.6).next_to(self.map,DOWN,buff=.8)
-        self.pips=VGroup(*(RoundedRectangle(width=.35,height=.28,corner_radius=.04,
-            color=theme.muted,fill_opacity=.15) for _ in range(capacity))).arrange(RIGHT,buff=.1)
+        self.pips=FuelTank(capacity,visible=False,theme=theme)
         self.pips.next_to(self.dashboard,DOWN,buff=.3)
         # The dashboard exists geometrically but is revealed only when the
         # example starts. It must not change the map's layout when it appears.
@@ -149,19 +152,21 @@ class RoadTripSimulation(VGroup):
         self.dashboard.set_opacity(0);self.pips.set_opacity(0)
 
     def apply_scene_typography(self,typography,*,group):
-        self.map.apply_scene_typography(typography,group=group)
-        for value in self.dashboard:assign_scene_typography(value,typography,group=group)
+        # The trace is fitted as a diagram. Its dashboard peers share that
+        # component fit, not the size of external derivation equations.
+        component_group=f'{group}/RoadTripSimulation'
+        self.map.apply_scene_typography(typography,group=component_group)
+        for value in self.dashboard:assign_scene_typography(value,typography,group=component_group)
+        self.pips.apply_scene_typography(typography,group=component_group)
         self.dashboard.arrange(RIGHT,buff=.6).next_to(self.map,DOWN,buff=.8)
         self.pips.next_to(self.dashboard,DOWN,buff=.3)
 
     def start(self):
-        self.dashboard.set_opacity(1)
-        for pip in self.pips:pip.set_stroke(opacity=1).set_fill(opacity=.15)
-        return AnimationGroup(self.map.start_route(),FadeIn(self.dashboard),FadeIn(self.pips))
+        return AnimationGroup(self.map.start_route(),Transform(self.dashboard,self.dashboard.copy().set_opacity(1)),
+            Transform(self.pips,self.pips.with_state(visible=True)))
 
     def _fuel_animation(self):
-        return AnimationGroup(*(pip.animate.set_fill(self.theme.success if index<self.fuel else self.theme.surface,
-            opacity=.9 if index<self.fuel else .15) for index,pip in enumerate(self.pips)))
+        return Transform(self.pips,self.pips.with_state(used=self.fuel,visible=True))
 
     def buy(self,amount,*,reveal_cost=True):
         if amount<0 or self.fuel+amount>self.capacity:raise ValueError('Purchase exceeds the fuel capacity')

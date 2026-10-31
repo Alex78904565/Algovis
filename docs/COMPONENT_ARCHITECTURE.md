@@ -811,3 +811,75 @@ Use `view.refine('recurrence', call='f(i,w)')` to edit the function call in a
 and remain painted throughout. Rebuilding the entire lhs for a parameter edit
 can accidentally rename an unchanged optimizer and schedule a needless exit
 and entrance. `lhs=` remains available when the entire lhs changes meaning.
+
+### Explanatory layout policies
+
+Inheritance is a route to a shared policy, not evidence that the policy is
+correct. Audit the effective region, wrapping, common fit and block alignment
+of each specialization. Ordinary `SlotScene` text is a centered block with
+common left edges. `ArgumentScene` exposes semantic stages of one argument,
+rather than scattering a short derivation across independent vertical bands.
+`AnalysisScene` aligns the two column headings and their result rows, and centers
+the combined columns away from the outer screen margins. Diagram specializations
+retain their own geometric policy. A continuing proof, including local changes
+of predicate or base case, belongs in one sequence-wide sizing scope.
+
+Use `FunctionDefinition(call, meaning)` for a function's English meaning. The
+named call keeps its semantic paint, the equals sign stays beside it, and wrapped
+English starts on that same first baseline. Do not reconstruct the convention
+as an independently positioned function and a prose paragraph.
+
+`CaseEquation.term_roles` declares persistent roles for named terms across row
+refinements; status and good/bad evaluation still take precedence. A single
+unbraced result uses an ordinary equation gap instead of an unused brace gutter.
+Attention can target a tuple of related objects when one box describes the whole
+quantity (for example, the weight and value of the chosen bag).
+
+Semantic refinement follows the same natural-typography preparation as insertion.
+Its arguments may mix fitted children from an earlier view and newly created
+content. Normalize that detached composition before measuring the sequence;
+never let playback become the first point at which its peer sizes agree. The
+sequence-envelope guard remains strict and reports the failing group and item
+measurements. A guard failure blocks the candidate rather than shrinking one
+sentence manually.
+
+All view-compiler definition transfers use `ApplyDefinition.bind`, whether the
+destination is a plain named equation term or a nested case row. It transforms
+the copied expression to the destination's arguments and formatting during
+travel. A second local substitution after landing can briefly assert the wrong
+equality and is not the compiler policy. The lower-level constructor still
+supports an explicitly authored separate substitution outside this policy.
+
+`ApplicationScene` specializes `ArgumentScene` for reading an answer from a
+completed algorithm. Its ordered slots are `reference`, `conditions`,
+`definition`, and `application`. The whole English definition and its concrete
+copy are adjacent, so the transfer has a clear route without covering the
+retained recurrence and base case. Use the construction-oriented `RecurrenceScene`
+when explaining those rules; use the application layout when matching them to
+the original question. Neither specialization uses per-element offsets.
+
+`ArgumentScene.motion_reservation()` measures definition transfers that cross
+another semantic row. `SceneSequence` reserves their side corridors for the
+whole explanation before it starts. Wrapping and common fitting use that reduced
+content width; the existing full safe frame remains available for the travelling
+copy. This prevents a full-width state explanation from becoming an impassable
+wall between a footer definition and its application. Source-adjacent copies
+do not reserve an unnecessary gutter. A motion route must still pass its ink
+clearance checks; reservation is not permission to ignore an intersecting route.
+Reference equations keep their declared typography when moved into a footer.
+The footer is a location, not an implicit note role. ArgumentScene fits its
+reference definitions with the argument's text peers across the complete
+sequence. Use a TextObject with type_role='note' for genuinely secondary prose.
+
+ViewTransition owns source-row occupancy during copying. A source that will
+retire stays visible until its copy arrives; retained artwork whose route
+crosses that source waits until retirement. Independent definition runs use
+their shared corridor in equation order. Lesson code must not introduce offsets
+or manual fades to work around this lifecycle.
+
+Route planning includes retiring source rows while their copies travel.
+A detour clears every intervening row, including short captions that did not
+intersect the original diagonal. ArgumentScene reserves the required landing
+band across its whole sequence. When the route crosses a new equation's prefix
+or suffix, ViewTransition keeps that new ink absent until the copy arrives.
+These are compiler/layout contracts; an authored offset cannot certify them.

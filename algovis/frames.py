@@ -186,25 +186,42 @@ class CaseEquation(VGroup):
     """Shared lhs/brace/left-aligned alternatives, using the supplied objects."""
     _algovis_content_fields=('aligned_parts',)
 
-    def __init__(self, lhs, rows, *, compact=False, show_brace=None,aligned_parts=(),theme=DEFAULT_THEME, style=None, **kwargs):
+    def __init__(self, lhs, rows, *, compact=False, show_brace=None,aligned_parts=(),term_roles=None,theme=DEFAULT_THEME, style=None, **kwargs):
         self.theme,self.compact=theme,compact
         self.aligned_parts=tuple(aligned_parts)
         self.show_brace=show_brace
+        self.term_roles=dict(term_roles or {})
         self.style = style or DEFAULT_FRAME_STYLE
         self.lhs = lhs
         self.rows = rows if isinstance(rows, VGroup) else VGroup(*rows)
+        self._paint_terms()
         self.rows.arrange(DOWN, aligned_edge=LEFT,
                           buff=self.style.compact_case_gap if compact else self.style.case_gap)
         self._align_parts()
         self.brace = Brace(self.rows, LEFT, color=theme.foreground)
         self.brace.set_opacity(1 if self.show_brace is True or (self.show_brace is None and len(self.rows)>1) else 0)
-        lhs.next_to(self.brace, LEFT, buff=self.style.case_lhs_gap)
+        self._place_lhs()
         super().__init__(lhs, self.brace, self.rows, **kwargs)
         self._algovis_layout_component = "CaseEquation"
 
     @property
     def baseline(self):
         return self.lhs.baseline
+
+    def _paint_terms(self):
+        from fnmatch import fnmatchcase
+        from .semantics import set_semantics
+        for row in self.rows:
+            for name,part in getattr(row,'parts',{}).items():
+                for pattern,role in self.term_roles.items():
+                    if fnmatchcase(name,pattern):set_semantics(part,role=role,theme=self.theme)
+
+    def _place_lhs(self):
+        braced=self.show_brace is True or (self.show_brace is None and len(self.rows)>1)
+        self.lhs.next_to(self.brace if braced else self.rows,LEFT,
+                         buff=self.style.case_lhs_gap if braced else self.style.term_gap)
+        if not braced and len(self.rows)==1 and hasattr(self.rows[0],'baseline'):
+            self.lhs.shift(UP*(self.rows[0].baseline-self.lhs.baseline))
 
     def _align_parts(self):
         """Align named trailing annotations as actual case columns.
@@ -229,11 +246,12 @@ class CaseEquation(VGroup):
         center=self.get_center()
         assign_scene_typography(self.lhs,typography,group=group)
         for row in self.rows:assign_scene_typography(row,typography,group=group)
+        self._paint_terms()
         self.rows.arrange(DOWN,aligned_edge=LEFT,buff=self.style.compact_case_gap if self.compact else self.style.case_gap)
         self._align_parts()
         self.brace.become(Brace(self.rows,LEFT,color=self.brace.get_color()))
         self.brace.set_opacity(1 if self.show_brace is True or (self.show_brace is None and len(self.rows)>1) else 0)
-        self.lhs.next_to(self.brace,LEFT,buff=self.style.case_lhs_gap)
+        self._place_lhs()
         self.move_to(center)
 
     def part(self,name):
@@ -254,7 +272,7 @@ class CaseEquation(VGroup):
             lhs=self.lhs.next_layout(call=call)
         return CaseEquation(lhs.copy() if lhs is not None else self.lhs.copy(),
             [row.copy() for row in (rows if rows is not None else self.rows)],
-            style=self.style,theme=self.theme,compact=self.compact,show_brace=self.show_brace,
+            style=self.style,theme=self.theme,compact=self.compact,show_brace=self.show_brace,term_roles=self.term_roles,
             aligned_parts=self.aligned_parts if aligned_parts is None else aligned_parts).move_to(self)
 
     def motions_to(self,target,*,skip=(),introductions=None,retirements=None):
@@ -303,6 +321,7 @@ class CaseEquation(VGroup):
         self.rows.submobjects=adopted
         self.submobjects=[self.lhs,self.brace,self.rows]
         self.aligned_parts=target.aligned_parts
+        self.term_roles=target.term_roles.copy()
         return self
 
 

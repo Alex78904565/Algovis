@@ -1,5 +1,16 @@
 # Recurring animation feedback: reference for the agent
 
+### Shared classes must enforce their promised defaults
+
+Inheritance alone is not evidence of a completed layout migration. Verify the
+actual policy: source and destination font roles, complete sequence fitting,
+old/new row positions during reflow, copy departure/corridor/landing clearance,
+and creation/retirement of neighboring ink. The route that avoids a wide row can
+still hit a shorter caption that its original diagonal missed. A newly created
+maximum/subscript must not fade in through its arriving definition copy.
+Inspect these internal phases and keep a regression that reproduces the actual
+failure. Do not describe a hierarchy or a passing endpoint check as enforcement.
+
 ## Reopened regressions after the image-description audit
 
 Read each slide as a student, from top to bottom. The visible order must form
@@ -1267,3 +1278,74 @@ unrelated text, motion, or audio.
   Adding a parameter must not briefly remove max or the equals sign. Use the
   cases component's call refinement rather than reconstructing its entire lhs;
   inspect intermediate painted terms, not just the final formula.
+
+## Reopened review: layout policies and instructional grouping
+
+- A class hierarchy does not certify its defaults. Inspect which base class
+  actually positions each repeated construction, and verify the rendered result.
+  Migrating the playback clock alone does not enforce a shared layout policy.
+- Keep a named function and its English definition in one reusable object. A
+  wrapped definition starts beside the function, not above or below its equals
+  sign. Peer definitions use the same paint and type roles.
+- A two-column runtime argument needs matching headings, aligned result rows,
+  and a readable overall conclusion. Label state ranges, local work and answer
+  postprocessing explicitly; neither a bare formula nor a passing bounds check
+  explains where the runtime comes from.
+- Preserve a proof's justification when adding its mathematical consequence.
+  When changing the induction measure, modify the compatible rows in place and
+  leave enough time to read them. Reserve the complete continuing proof before
+  playback. Do not hide a compiler fit failure with a local text-size override.
+- One semantic choice can include several properties. When the narration says
+  "best choice," attention must include its weights as well as its values;
+  use one grouped box when that is the author's requested grouping.
+- A map location and a computational state have different meanings. City nodes
+  can remain circular; repeated function states use the shared rectangular cell.
+  Explain this distinction when asked rather than changing a working map style.
+- Show bounds first as the quantities just explained. Introduce the choice
+  variable on its actual spoken name, then carry those bounds into the min/max
+  expression. A correctly timed effect on an earlier unrelated word still fails.
+- Right-hand reminders need a top-to-bottom construction: population order,
+  bracket conversion, meaning-matched answer, runtime, recovery. Keep the recorded
+  left-hand checklist and its heading distinct from these reminders.
+
+These are requirements from reopened viewer notes, not viewer approval of any
+new render. Positive render observations belong to their specific evidence
+record; they must not be promoted to a whole-lesson endorsement.
+
+The encoded value-indexed-knapsack review exposed a further distinction: a
+correct route and endpoint can still land the formal f(i,v) before converting it
+to f(i+1,v). Inspect the arguments at arrival. Flat equations and nested cases
+must use the same bound-transfer policy; a fix in only one compiler branch does
+not establish coverage of the other branch.
+
+Retaining a sentence means retaining its object, not constructing a new Text
+with the same words inside a replacement group. When adding a consequence,
+construct the new layout container from the existing sentence and the new
+mathematics. The compiler preserves that child's identity while moving it.
+Do not change a container's child count through a refinement that supplies no
+new child identities; the compiler deliberately rejects that ambiguous operation.
+Inspect motion and the erased/recreated-text ledger, not just matching endpoints.
+
+A slot does not determine an object's typography. A reference equation placed
+in a footer remains an equation; supporting prose declares its own note role.
+Initial insertion, retained-object adoption and refinement must agree. The
+argument's reference definitions share its sequence-wide fitting scale, so a
+growing recurrence cannot leave a larger peer equation below it. This defect
+was found in the encoded TSP derivation, not by its endpoint bounds check.
+
+Compare equivalent forward and backward recurrences term by term. Both their
+immediate and remaining contributions are structural blue; their combining
+operation is yellow. An explicit but incorrect role is still a lesson defect,
+even when the semantic lookup and inheritance operate correctly.
+
+Source rows remain occupied throughout a definition copy. Retained text must
+wait until those sources retire before moving into their former space. Separate
+definitions sharing a travel corridor enter their application in equation order;
+contiguous terms of one expression travel together. Inspect these internal
+phases at native frames: correct endpoints can hide half a second of overlapping
+source labels, travellers and a retained caption.
+
+A wider plotted domain also requires an appropriate tick interval. Labeling
+only a few log-axis values while leaving a tick at every integer can render the
+axis as a solid band. The chart component derives tick density from its declared
+tick values; inspect the actual axes as well as the curves and legend.
