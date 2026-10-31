@@ -601,13 +601,16 @@ class SlideView:
         self.definition_uses[name]=DefinitionUse(_object(source),path)
         return self
 
-    def revise(self,name,parts,*,meanings=None):
-        """Add/remove named terms while preserving every unchanged term owner."""
+    def revise(self,name,parts,*,meanings=None,from_definitions=None):
+        """Revise terms, optionally carrying definitions into bound destination TeX."""
         with self._editing():
             item=self.items[name]
             if not isinstance(item.target,MathRow):raise TypeError('Revising named terms requires an equation')
             sources={key:value for key,value in parts.items() if isinstance(value,SlideObject)}
-            values={key:(value.tex if key in sources else value) for key,value in parts.items()}
+            for key,source in (from_definitions or {}).items():
+                if key not in parts:raise ValueError('A definition destination must be a named revised term: '+key)
+                sources[key]=_object(source)
+            values={key:(value.tex if isinstance(value,SlideObject) else value) for key,value in parts.items()}
             target=item.target.next_layout(values)
             target._copy_sources=sources
             for key,source in sources.items():
@@ -1218,6 +1221,32 @@ def _axis_reflow(starts, ends):
     raise ValueError('Sibling cards cross during reflow; provide a separate layout stage')
 
 
+def _uniform_font_resize(live, target):
+    """Separate a shared fit change from components' internal content phases.
+
+    A row may retire prose before moving, while its neighboring cases move
+    immediately; a two-axis card reflow also has a different clock. Resize
+    retained peer artwork together first so those independent phases cannot
+    temporarily give the same text role different sizes.
+    """
+    def sizes(root):
+        values={}
+        for part in root.get_family():
+            role=getattr(part,'_algovis_type_role',None)
+            size=measured_font_size(part)
+            if role and size and not getattr(part,'_algovis_font_container',False):
+                values.setdefault(role,[]).append(size/getattr(part,'_algovis_relative_font_scale',1.))
+        return {role:float(np.median(items)) for role,items in values.items()}
+    before,after=sizes(live),sizes(target)
+    ratios=[after[role]/size for role,size in before.items() if role in after]
+    if not ratios or max(ratios)-min(ratios)>1e-4:
+        return None
+    factor=float(np.median(ratios))
+    if abs(factor-1)<1e-4:
+        return None
+    return live.copy().scale(factor)
+
+
 class ViewTransition:
     """One identity-based difference between two final compositions."""
 
@@ -1338,7 +1367,7 @@ class ViewTransition:
         exits = [FadeOut(self.old[key][1].object.mobject) for key in self.exiting if key not in copy_owners]
 
         def build_changes():
-            motions = [];delayed_entries=[]
+            motions = [];delayed_entries=[];term_entries=[];term_exits=[]
             routed=set()
             for keys in self._reflow_groups:
                 starts=[self.new[key][1].object.mobject for key in keys]
@@ -1451,7 +1480,8 @@ class ViewTransition:
                                 item.target.part(use.part), via=via, path_arc=arc,
                                 preserve_destination_layout=True)
                     skip = tuple(borrowed)+((use.part,) if use else ())
-                    local = [animation for animation in live.motions_to(item.target, skip=skip)
+                    local = [animation for animation in live.motions_to(item.target, skip=skip,
+                                introductions=term_entries,retirements=term_exits)
                                 if not hasattr(animation, "target_mobject")
                                 or not _same_picture(animation.mobject, animation.target_mobject)]
                     if use:
@@ -1483,7 +1513,10 @@ class ViewTransition:
                             destination,via=via,path_arc=use.path_arc,preserve_destination_layout=True))
                         motions.extend(live.motions_to(item.target,skip=(*borrowed,use.part)))
                     elif not _same_picture(live,item.target):
-                        motions.extend(live.motions_to(item.target,skip=tuple(borrowed)) if borrowed else live.motions_to(item.target))
+                        phase_options=({'introductions':term_entries,'retirements':term_exits}
+                                       if isinstance(live,CaseEquation) else {})
+                        motions.extend(live.motions_to(item.target,skip=tuple(borrowed),**phase_options)
+                                       if borrowed else live.motions_to(item.target,**phase_options))
                 elif not _same_picture(live, item.target):
                     if isinstance(live,Text) and isinstance(item.target,Text) and live.text != item.target.text:
                         def reveal_caption(live=live,target=item.target):
@@ -1503,19 +1536,43 @@ class ViewTransition:
                     for live,target in zip(item.object.mobject.get_family(),item.target.get_family()):
                         _copy_layout_metadata(target,live)
             changing = _ArrivedLayoutGroup(*motions,on_arrival=finish_layout) if motions else Wait(.001)
-            if delayed_entries:
+            held_term_exits=[animation for animation in term_exits
+                             if source_family & {id(part) for part in animation.mobject.get_family()}]
+            term_exits=[animation for animation in term_exits if animation not in held_term_exits]
+            if held_term_exits:
+                changing=Succession(changing,_deferred(
+                    lambda:AnimationGroup(*held_term_exits),run_time=.2))
+            if delayed_entries or term_entries:
                 # This is one cue-anchored mechanical transition: move the
                 # retained argument first, then write into the cleared space.
                 # Construct the fades only at that phase so future labels
                 # cannot be prepainted by an AnimationGroup owner.
                 changing=Succession(changing,_deferred(lambda:AnimationGroup(
                     *(entering(live) if entering else FadeIn(live)
-                      for live,entering in delayed_entries)),run_time=.2))
+                      for live,entering in delayed_entries),
+                    *(FadeIn(part) for part in term_entries)),run_time=.2))
+            if term_exits:
+                arriving=changing
+                changing=Succession(AnimationGroup(*term_exits,run_time=.25),
+                                    _deferred(lambda:arriving,run_time=.75))
             if copy_owners:
                 # The definition stays visible until its copy has arrived.
                 return Succession(changing, _deferred(lambda: AnimationGroup(
                     *(FadeOut(self.old[key][1].object.mobject) for key in copy_owners)), run_time=.2))
             return changing
+
+        def build_with_fit():
+            resizes=[]
+            # Axis reflow has two geometric stages; ordinary equation motions
+            # now share global retire/move/introduce phases instead.
+            for key in (self.retained if self._reflow_groups else ()):
+                item=self.new[key][1]
+                target=_uniform_font_resize(item.object.mobject,item.target)
+                if target is not None:resizes.append(Transform(item.object.mobject,target))
+            if resizes:
+                return Succession(AnimationGroup(*resizes,run_time=.2),
+                                  _deferred(build_changes,run_time=.8))
+            return build_changes()
 
         if exits:
             if not self.entering and not self.retained and not copy_owners:
@@ -1523,12 +1580,12 @@ class ViewTransition:
             else:
                 self._scheduled = (Succession(
                     _deferred(lambda: AnimationGroup(*exits), run_time=.25),
-                    _deferred(build_changes, run_time=.75)),)
+                    _deferred(build_with_fit, run_time=.75)),)
         elif (not self.definition_uses
                 and not any(self.describe()[kind] for kind in ("move", "substitute", "copy", "enter", "exit"))):
             self._scheduled = ()
         else:
-            self._scheduled = (_deferred(build_changes),)
+            self._scheduled = (_deferred(build_with_fit),)
         return self._scheduled
 
     def commit(self, scene, *, adopt=True, consolidate=True):

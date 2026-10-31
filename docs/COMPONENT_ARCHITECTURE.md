@@ -791,3 +791,23 @@ the same cards and their internal identities; a still-colliding plan fails.
 New peer text waits for retained peers to finish resizing, including across
 separate sequence-fit scopes with the same logical typography-group identity.
 Checking only the final size or a change of group name misses that transition.
+Native equations contribute their retirements, retained motions and new terms
+to shared view-wide phases. A case equation must not retire prose locally while
+its neighboring row or proof rail has already started moving. New terms enter
+after retained geometry arrives. Definition sources stay visible through their
+copies. Two-axis card reflow has a separate shared font-resize phase before its
+two geometric stages. Revised named equations preserve their typography
+contracts, including new terms; losing metadata must not hide a peer from
+inspection. Inspect both sizes and actual painted glyph clearance from rails.
+
+`view.revise(..., from_definitions={'child': source.part('child')})` separates
+a travelling source from the destination's explicitly instantiated TeX. A
+definition with formal n can therefore arrive as the correct k+1 instance,
+with notation transforming during travel. Do not land f(n-1)+n beside f(k+1)=
+and repair the resulting invalid equality only in a later animation.
+
+Use `view.refine('recurrence', call='f(i,w)')` to edit the function call in a
+`CaseEquation`. Its equals sign and optimizer retain their named identities
+and remain painted throughout. Rebuilding the entire lhs for a parameter edit
+can accidentally rename an unchanged optimizer and schedule a needless exit
+and entrance. `lhs=` remains available when the entire lhs changes meaning.

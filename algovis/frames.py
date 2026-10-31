@@ -242,13 +242,22 @@ class CaseEquation(VGroup):
         if name.startswith('row:'):return self.rows[int(name.split(':')[1])]
         raise KeyError(name)
 
-    def with_state(self,*,lhs=None,rows=None,aligned_parts=None):
+    def with_state(self,*,lhs=None,rows=None,aligned_parts=None,call=None):
+        """Refine alternatives or the function call without replacing its peers.
+
+        ``call=`` keeps the equals sign, optimizer and their term identities.
+        Reconstruct ``lhs`` only when the entire left-hand side changes meaning.
+        """
+        if call is not None:
+            if lhs is not None:
+                raise ValueError("Specify call or lhs, not both")
+            lhs=self.lhs.next_layout(call=call)
         return CaseEquation(lhs.copy() if lhs is not None else self.lhs.copy(),
             [row.copy() for row in (rows if rows is not None else self.rows)],
             style=self.style,theme=self.theme,compact=self.compact,show_brace=self.show_brace,
             aligned_parts=self.aligned_parts if aligned_parts is None else aligned_parts).move_to(self)
 
-    def motions_to(self,target,*,skip=()):
+    def motions_to(self,target,*,skip=(),introductions=None,retirements=None):
         from manim import FadeIn,FadeOut,Transform,AnimationGroup,Succession
         from .core.math_row import MathRow
         from .utils.effects import DeferredAnimation
@@ -261,6 +270,10 @@ class CaseEquation(VGroup):
         motions.append(Transform(self.brace,target.brace))
         retired.extend(FadeOut(row) for row in self.rows[len(target.rows):])
         introduced.extend(target.rows[len(self.rows):])
+        if retirements is not None:
+            retirements.extend(retired);retired=[]
+        if introductions is not None:
+            introductions.extend(introduced);introduced=[]
         # New labels belong to their moving equation, including nested rows.
         # Never leave them fading at the destination while the owner travels.
         moving=any(np.linalg.norm(a.get_center()-b.get_center())>.1

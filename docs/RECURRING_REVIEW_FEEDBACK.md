@@ -1254,3 +1254,16 @@ unrelated text, motion, or audio.
 - New proof rows must wait for retained definitions to finish changing type
   size between explanation groups. A shared group name does not imply a shared
   fit during motion. Keep the peer-size gate active during this phase.
+- Retained peers must coordinate their fit change before local phases, too.
+  Delaying only new text is insufficient when one retained row retires prose
+  first and another moves immediately, or cards have a two-axis route. Inspect
+  the actual intermediate font measurements; do not dismiss a failed gate
+  because its endpoint is correct. Read every section's gate result explicitly.
+- Applying a definition includes binding its formal arguments. Copy its terms
+  into the actual instance, transforming notation during travel. A settled
+  f(k+1)=f(n-1)+n line is misleading even if the next animation substitutes n.
+  The student reading check applies to each completed intermediate equality.
+- Preserve unchanged mathematical terms by identity when refining an equation.
+  Adding a parameter must not briefly remove max or the equals sign. Use the
+  cases component's call refinement rather than reconstructing its entire lhs;
+  inspect intermediate painted terms, not just the final formula.

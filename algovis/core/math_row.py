@@ -124,6 +124,14 @@ class MathRow(MathTex):
                 part.set_color(self.parts[name].get_color())
                 copy_semantics(self.parts[name],part)
         copy_semantics(self,target)
+        group=getattr(self,'_algovis_typography_group',None)
+        if group is not None:
+            from ..layout import LessonStyle
+            LessonStyle._watch_type(target,group,self._algovis_type_role)
+            for part in target.get_family():
+                if hasattr(self,'_algovis_scene_typography'):
+                    part._algovis_scene_typography=self._algovis_scene_typography
+                part._algovis_relative_font_scale=getattr(self,'_algovis_relative_font_scale',1.)
         if hasattr(self, '_sum_contract'): target._sum_contract = self._sum_contract
         return target.aligned_to(self)
 
