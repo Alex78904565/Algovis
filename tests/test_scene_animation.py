@@ -31,9 +31,15 @@ class SceneAnimationTests(unittest.TestCase):
 
     def test_definition_copy_can_use_the_clear_outer_motion_margin(self):
         from algovis import ListScene
+        from manim import Rectangle,config
         first=ListScene()
-        first.add('meaning','Minimum weight for a target. Choose the largest feasible target value.')
+        first.add('meaning','Minimum weight for a target.')
         handle=first.add('all_items',Equation({'call':'f[1,v]','meaning':r'=\text{minimum weight to reach at least }v'}))
+        # Reserve a measured block width, rather than relying on the platform's
+        # prose font to leave enough room for this specifically outer route.
+        # The traveller's whole ink has .05 units beyond the safe-frame edge.
+        width=config.frame_width-2*(handle.mobject.part('call').width+.18+.12+.05)
+        first.add('extent',Rectangle(width=width,height=.01).set_opacity(0))
         first.add('bound',Equation({'total':r'V=\sum_{i=1}^n v_i','range':r'\qquad0\le v\le V'}))
         first.add('seek','find the largest target v')
         second=first.fork();second.add('feasible',Equation({'call':handle.part('call')}))
@@ -42,8 +48,8 @@ class SceneAnimationTests(unittest.TestCase):
         via=second.definition_route(source,destination,vacant_destination=True)
         self.assertTrue(via)
         self.assertLess(via[0][0],source.get_left()[0])
-        from manim import config
         self.assertGreater(via[0][0]-source.width/2,-config.frame_width/2+.18)
+        self.assertLess(via[0][0],second.layout.body.center[0]-second.layout.body.width/2+source.width/2+.12)
         third=second.fork()
         wrapper=third.add('answer',Equation({'max':r'\max\{v\mid 0\le v\le V,',
                                             'call':handle.part('call'),'end':r'\le C\}'}))

@@ -4,12 +4,20 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
           cache: pip
@@ -19,5 +27,9 @@ jobs:
           sudo apt-get install -y ffmpeg libcairo2-dev libpango1.0-dev pkg-config texlive-latex-extra texlive-fonts-recommended dvisvgm
       - name: Install Algovis
         run: python -m pip install -e .
+      - name: Check and report installed dependencies
+        run: |
+          python -m pip check
+          python -m pip list
       - name: Run tests
         run: python -m unittest discover -v

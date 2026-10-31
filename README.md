@@ -288,6 +288,13 @@ Run the repository tests with:
 python -m unittest discover -s tests -v
 ```
 
+CI runs the complete suite from the public checkout on Ubuntu 24.04. Geometry
+fixtures must measure their required space instead of assuming that the default
+prose font has identical metrics on Windows and Linux. The current Manim range
+requires Pillow below 13: its Cairo image compositor still uses the dtype-changing
+`Image.fromarray(..., mode=...)` behavior removed in Pillow 13. Keep that
+compatibility bound until a supported Manim release fixes the compositor.
+
 ## Project status
 
 Algovis is currently an alpha release extracted from a full dynamic-programming

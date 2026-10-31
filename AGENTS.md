@@ -79,3 +79,10 @@ honestly, especially when perceptual audio inspection is unavailable.
 Preserve raw recordings. Keep private lesson audio, music, renders, annotations,
 and production sources out of public commits according to the existing ignore
 rules. Publish reusable library, reviewer, examples, tests, and documentation.
+
+After a public push, check the GitHub Actions result for that exact commit and
+repair failures before treating the change as verified. Local Windows tests do
+not certify the Linux workflow. Reproduce failures from tracked files only;
+keep geometry fixtures independent of incidental platform font metrics, and
+declare upstream dependency compatibility in project metadata. Do not skip
+failing tests or disable CI notifications to conceal a broken run.

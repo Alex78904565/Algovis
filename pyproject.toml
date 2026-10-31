@@ -10,6 +10,9 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "manim>=0.19,<0.22",
+    # These Manim releases use a dtype-changing Image.fromarray mode removed
+    # in Pillow 13 when compositing raster artwork with the Cairo camera.
+    "Pillow>=9.1,<13",
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
