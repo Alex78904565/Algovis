@@ -30,10 +30,23 @@ ViewScene                     preferred scene with view timelines/word attention
 
 SlideView                     detached composition at one point in the lesson
 ├── ColumnSlide               a shared left-aligned column
-├── SplitSlide                two columns inside the body region
+│   ├── SplitSlide            two columns inside the body region
+│   ├── CenteredScene         centered content
+│   └── BlockScene            common-edge content block
+│       └── ListScene
 ├── EquationSlide             named rows from EquationFrame
-└── ProofSlide                named rows/labels from ProofFrame
-    CanvasSlide               positioned components with their own layout rules
+├── ProofSlide                named rows/labels from ProofFrame
+├── SlotScene                 shared named-region defaults and fitting
+│   ├── ArgumentScene         one growing common-edge argument
+│   │   ├── DerivationScene   meaning, equation, explanation
+│   │   ├── RecurrenceScene   also retains the base case
+│   │   └── ApplicationScene  rule, conditions, meaning, answer
+│   ├── ComparisonScene      corresponding content in two columns
+│   │   ├── WorkedExampleScene independently centered evidence/working
+│   │   └── PairedScene      explicit matching rows
+│   ├── AnalysisScene        definition, paired derivations, result row
+│   └── DiagramScene         component diagram plus explanation
+└── CanvasSlide               explicitly positioned component canvas
 
 SlideObject                   stable live artwork; copy() records a new identity
 ViewTransition                difference between compositions, played by SlideScene
