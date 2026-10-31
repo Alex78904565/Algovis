@@ -19,8 +19,8 @@ from manim import AnimationGroup, FadeIn, FadeOut, Group, Mobject, SingleStringM
 from .core.math import ApplyDefinition
 from .core.math_row import MathRow
 from .core.proof import first_line_of
-from .frames import EquationFrame, ProofFrame
-from .layout import ColumnLayout, LessonTypography, assign_scene_typography
+from .frames import CaseEquation, EquationFrame, ProofFrame
+from .layout import ColumnLayout, LessonTypography, assign_scene_typography, measured_font_size
 from .fitting import FitArea, FitPolicy, plain_text, relative_font_scale
 from .semantics import copy_semantics, set_semantics
 from .theme import DEFAULT_THEME
@@ -190,6 +190,18 @@ def _content_model(mob):
     return (type(mob),values,tuple(_content_model(child) for child in mob.submobjects))
 
 
+def _set_placement_fit(mob,factor):
+    """Layout children carry the scale imposed by their owning placement.
+
+    They can later become independent scene objects. A local marker of one
+    would then misdescribe their fitted geometry and a later content edit
+    could restore the smaller, preplanned version after the first handoff.
+    """
+    mob._algovis_view_fit_scale=factor
+    if type(mob) in (Group,VGroup) or getattr(mob,'_algovis_layout_container',False):
+        for child in mob:_set_placement_fit(child,factor)
+
+
 def _semantic_edits(before,after,path=()):
     if getattr(before,'semantics',None)!=getattr(after,'semantics',None):
         if hasattr(after,'semantics'):yield path,after
@@ -313,7 +325,7 @@ class SlideView:
                         # Undo that owning placement's fit before reflowing.
                         factor=old[1]
                         if factor!=1:live.scale(1/factor)
-                        live._algovis_view_fit_scale=1.
+                        _set_placement_fit(live,1.)
                         for path,meaning in _semantic_edits(old[0],target):
                             node=live
                             for index in path:node=node.submobjects[index]
@@ -346,7 +358,7 @@ class SlideView:
         prior_fit = getattr(target,'_algovis_view_fit_scale',1.)
         if prior_fit != 1:
             target.scale(1/prior_fit)
-        target._algovis_view_fit_scale = 1.
+        _set_placement_fit(target,1.)
         inherited=getattr(target,'_algovis_relative_font_scale',1.)
         factor=inherited if font_scale is None else float(font_scale)
         reason = font_reason or getattr(target,'_algovis_font_scale_reason','')
@@ -359,7 +371,7 @@ class SlideView:
         target.scale(factor/inherited)
         target._algovis_font_scale_reason=str(reason)
         metrics = {}
-        if isinstance(target, MathRow):
+        if isinstance(target, (MathRow,CaseEquation)):
             metrics = dict(ascent=float(target.get_top()[1]-target.baseline),
                            descent=float(target.baseline-target.get_bottom()[1]),
                            baseline_offset=float(target.baseline-target.get_y()))
@@ -383,6 +395,7 @@ class SlideView:
                 if item.fit_scale != 1:
                     self._scale_item(item,1/item.fit_scale)
                     item.fit_scale = 1.
+                _set_placement_fit(item.target,1.)
             yield
             self._fit_and_arrange()
             self._remember_defaults()
@@ -468,7 +481,7 @@ class SlideView:
 
     @staticmethod
     def _height(item):
-        if isinstance(item.target,MathRow):
+        if isinstance(item.target,(MathRow,CaseEquation)):
             item.ascent=max(item.ascent,float(item.target.get_top()[1]-item.target.baseline))
             item.descent=max(item.descent,float(item.target.baseline-item.target.get_bottom()[1]))
             return item.ascent+item.descent
@@ -529,7 +542,7 @@ class SlideView:
                     fitted.add(id(item))
                     self._scale_item(item,factor)
                     item.fit_scale=factor
-                    item.target._algovis_view_fit_scale=factor
+                    _set_placement_fit(item.target,factor)
                 self._fit_report.append({'group':area.group,'scale':factor})
         self._arrange()
 
@@ -970,6 +983,18 @@ class ProofSlide(SlideView):
     """Named proof rows with the existing shared rail and first-line alignment."""
     row_gap=.17
 
+    def restate_claim(self,parts):
+        """Change the induction predicate and retire its dependent proof.
+
+        Keep the algorithm and frame. A base, hypothesis or conclusion proved
+        for the old predicate cannot silently certify the replacement claim.
+        Authors then add the new justification in the same exposed rows.
+        """
+        result=self.fork()
+        for name in ('base_case','induction_hypothesis','inductive_step','work','conclusion'):
+            if name in result.items:result.remove(name)
+        return result.revise('claim',parts)
+
     def define_algorithm(self,recurrence,base):
         """Retain the actual recursive rule, separately from its claimed meaning.
 
@@ -1128,7 +1153,8 @@ class ProofSlide(SlideView):
                 row = self.items.get(item.slot[6:])
                 key=item.slot[6:].upper().replace('_',' ')
                 target=(self.frame.label_target(row.slot,first_line_of(row.target)) if row is not None
-                        else self.frame.labels_by_name[key].copy().set_y(self.frame.rows[key]))
+                        else self.frame.labels_by_name[key].copy().set_y(
+                            getattr(self,'_sequence_proof_label_y',{}).get(item.slot,self.frame.rows[key])))
                 item.target.become(target)
         # A continuing equality omits the repeated left-hand side and aligns
         # its equals sign with the preceding proof line's equals sign.
@@ -1160,6 +1186,36 @@ class ProofSlide(SlideView):
                 areas.append(FitArea('body' if item.slot=='conclusion' else item.slot,
                                      [item],region.width,region.height))
         return areas
+
+
+def _reflow_intersects(starts, ends):
+    """Check sibling artwork throughout a candidate linear reflow, not just its ends."""
+    for alpha in np.linspace(0, 1, 61):
+        boxes=[]
+        for start,end in zip(starts,ends):
+            center=(1-alpha)*start.get_center()+alpha*end.get_center()
+            size=(1-alpha)*np.array([start.width,start.height])+alpha*np.array([end.width,end.height])
+            boxes.append((center,size/2))
+        for i,(a,ra) in enumerate(boxes):
+            for b,rb in boxes[i+1:]:
+                if np.all(np.abs(a[:2]-b[:2]) < ra+rb-.015):
+                    return True
+    return False
+
+
+def _axis_reflow(starts, ends):
+    """Return a safe intermediate layout when sibling cards would cross."""
+    if not _reflow_intersects(starts,ends):
+        return None
+    for axis in (0,1):
+        middle=[]
+        for start,end in zip(starts,ends):
+            target=start.copy()
+            point=target.get_center().copy();point[axis]=end.get_center()[axis]
+            target.move_to(point);middle.append(target)
+        if not _reflow_intersects(starts,middle) and not _reflow_intersects(middle,ends):
+            return middle
+    raise ValueError('Sibling cards cross during reflow; provide a separate layout stage')
 
 
 class ViewTransition:
@@ -1201,6 +1257,16 @@ class ViewTransition:
         self.retained = [key for key in self.new if key in self.old]
         self.entering = [key for key in self.new if key not in self.old]
         self.exiting = [key for key in self.old if key not in self.new]
+        # Layout containers keep child identities, but straight-line motion can
+        # cross siblings when a grid becomes a row. Components opt into a
+        # coordinated axis reflow; ordinary retained-object motion is unchanged.
+        self._reflow_groups=[]
+        for placement in incoming.items.values():
+            mob=placement.object.mobject
+            if getattr(mob,'_algovis_axis_reflow',False):
+                keys=[id(child) for child in mob.cards]
+                if len(keys)>1 and all(key in self.retained for key in keys):
+                    self._reflow_groups.append(keys)
         self.borrowed={}
         for key,(_name,item) in self.new.items():
             prior=self.old[key][1].target if key in self.old else None
@@ -1273,6 +1339,16 @@ class ViewTransition:
 
         def build_changes():
             motions = [];delayed_entries=[]
+            routed=set()
+            for keys in self._reflow_groups:
+                starts=[self.new[key][1].object.mobject for key in keys]
+                ends=[self.new[key][1].target for key in keys]
+                middle=_axis_reflow(starts,ends)
+                if middle is not None:
+                    motions.append(Succession(
+                        AnimationGroup(*(Transform(start,mid) for start,mid in zip(starts,middle))),
+                        AnimationGroup(*(Transform(start,end) for start,end in zip(starts,ends)))))
+                    routed.update(keys)
             # A row leaving a proof can resize while its definition source
             # remains in that proof for a copy. During travel they are no
             # longer settled peers. Keep the row's measured font contract,
@@ -1286,9 +1362,24 @@ class ViewTransition:
                         if hasattr(part,'_algovis_typography_group'):
                             part._algovis_typography_group=f'transition/{self.incoming._type_group}/{key}'
             def crosses_moving_art(target):
+                contracts={(getattr(part,'_algovis_typography_group',None),
+                            getattr(part,'_algovis_type_role',None))
+                           for part in target.get_family()
+                           if getattr(part,'_algovis_typography_group',None)}
                 for retained in self.retained:
                     live=self.new[retained][1].object.mobject
                     end=self.new[retained][1].target
+                    # A newly introduced proof row must not appear at its final
+                    # type size while retained definitions still resize. Equal
+                    # peer-group names can span separate sequence fit scopes.
+                    for part,new_part in zip(live.get_family(),end.get_family()):
+                        contract=(getattr(new_part,'_algovis_typography_group',None),
+                                  getattr(new_part,'_algovis_type_role',None))
+                        if contract not in contracts:
+                            continue
+                        before=measured_font_size(part);after=measured_font_size(new_part)
+                        if before and after and abs(before-after)>.2:
+                            return True
                     if np.linalg.norm(live.get_center()-end.get_center())<.1:continue
                     width=max(live.width,end.width)/2
                     height=max(live.height,end.height)/2
@@ -1328,6 +1419,8 @@ class ViewTransition:
             for key in self.retained:
                 name, item = self.new[key]
                 live = item.object.mobject
+                if key in routed:
+                    continue
                 if isinstance(live, MathRow):
                     use = self.definition_uses.get(name)
                     borrowed=self.borrowed[key]
@@ -1554,7 +1647,7 @@ def _frame_fit_areas(view, rows, left):
 
 
 def _column_row(column, name, item):
-    if not isinstance(item.target, MathRow):
+    if not isinstance(item.target, (MathRow,CaseEquation)):
         column.add(name, item.target)
         return
     target = item.target
@@ -1570,7 +1663,7 @@ def _column_row(column, name, item):
 
 def _frame_row(frame, item):
     frame.place(item.slot, item.target)
-    if isinstance(item.target, MathRow):
+    if isinstance(item.target, (MathRow,CaseEquation)):
         baseline = frame.anchor(item.slot)[1]+item.baseline_offset
         item.target.shift([0, baseline-item.target.baseline, 0])
 

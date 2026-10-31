@@ -170,6 +170,7 @@ class IllustratedItem(Group):
 class ItemCollection(Group):
     """A layout container reuses the same cards in a grid or a row."""
     _algovis_layout_container=True
+    _algovis_axis_reflow=True
     def __init__(self,*items,columns=4,count=None):
         self.columns=columns
         self.cards=list(items)
@@ -256,8 +257,8 @@ class CapacityMeter(VGroup):
 
 class IllustratedBag(IllustratedProp):
     """The illustrated bag retains its meter through the worked selection."""
-    def __init__(self,path,label='BAG',*,theme=DEFAULT_THEME):
-        super().__init__(path,label,relative_size=.58,theme=theme)
+    def __init__(self,path,label='BAG',*,relative_size=1.,theme=DEFAULT_THEME):
+        super().__init__(path,label,relative_size=relative_size,theme=theme)
         self.meter=CapacityMeter(theme=theme)
         self.contents=Group()
         self._copy_sources={}

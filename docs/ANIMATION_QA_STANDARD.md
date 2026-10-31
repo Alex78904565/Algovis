@@ -42,6 +42,14 @@ editorial checklist. An inherited cue is context, not a justification for a puls
 
 ## 2. Prefer one stable composition per idea
 
+- Read every completed slide from top to bottom as a student. Definitions and
+  prerequisites must precede their use; a claim, assumption, derivation and
+  conclusion must occupy their logical roles. Retained material must still be
+  relevant and compatible with the current claim. A clear-looking arrangement
+  that mixes old and new predicates, states an unjustified result, or introduces
+  notation before its meaning fails this check. Repeat it after intermediate
+  edits, not only after the last frame. Record the reasoning chain explicitly.
+
 - Treat independently rendered sections as one visual sequence. Inspect the
   last/first frames together and the surrounding motion. Retain shared artwork
   across the cut; make genuine topic changes deliberately within the narration

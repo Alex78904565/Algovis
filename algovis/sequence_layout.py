@@ -1,19 +1,20 @@
 """Plan fitting over a complete explanation, before its first visible step."""
 from dataclasses import replace
-from .composition import ProofSlide
+from .composition import ProofSlide,_set_placement_fit
 from .core.math_row import MathRow
+from .frames import CaseEquation
 
 
 def natural_view(view):
     result=view.snapshot()
     for field in ('_sequence_layout_name','_sequence_fit_scales','_sequence_proof_envelopes',
                   '_sequence_block_widths','_sequence_block_heights','_sequence_fill_widths',
-                  '_sequence_paired_heights','_sequence_text_widths'):
+                  '_sequence_paired_heights','_sequence_text_widths','_sequence_proof_label_y'):
         result.__dict__.pop(field,None)
     for item in result.items.values():
         if item.fit_scale!=1:result._scale_item(item,1/item.fit_scale)
         item.fit_scale=1.
-        item.target._algovis_view_fit_scale=1.
+        _set_placement_fit(item.target,1.)
     return result
 
 
@@ -63,7 +64,7 @@ def plan_sequence(name,views,*,previous=None):
     equation_rows={}
     for view in planned:
         for item in view.items.values():
-            if not isinstance(item.target,MathRow):continue
+            if not isinstance(item.target,(MathRow,CaseEquation)):continue
             key=id(item.object.mobject)
             row=equation_rows.setdefault(key,{'ascent':0.,'descent':0.})
             row['ascent']=max(row['ascent'],item.ascent,
@@ -112,6 +113,17 @@ def plan_sequence(name,views,*,previous=None):
     for view in planned:
         view._sequence_block_widths=widths.copy()
         view._sequence_block_heights=heights.copy()
+        with view._editing():pass
+    # A spoken stage heading can precede its content. Position it from the
+    # first real row, rather than from an empty region's center, so adding
+    # that content cannot make the already-visible heading jump.
+    label_y={}
+    for view in proofs:
+        for item_name,item in view.items.items():
+            if item_name.startswith('label:') and item_name[6:] in view.items:
+                label_y.setdefault(item.slot,float(item.target.get_y()))
+    for view in proofs:
+        view._sequence_proof_label_y=label_y.copy()
         with view._editing():pass
     report={'name':name,'scales':scales,'proofEnvelopes':envelopes,
             'blockWidths':widths,'blockHeights':heights,'fillWidths':fill_widths,'scenes':len(planned)}

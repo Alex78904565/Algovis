@@ -1,5 +1,44 @@
 # Recurring animation feedback: reference for the agent
 
+## Reopened regressions after the image-description audit
+
+Read each slide as a student, from top to bottom. The visible order must form
+a logical explanation. Record the actual reasoning chain and check what each
+line depends on, including intermediate states. A neatly aligned new predicate
+under an old proof is still incoherent. This applies across all lesson sections.
+
+Describing an image did not prevent the agent from accepting visible violations.
+The description must be tested against the specific earlier accepted behavior,
+including its referents, not merely the general category of layout or timing.
+Keep the failed comparison and inspect the replacement before marking a repair
+ready. Tests establish mechanisms; they do not approve the authored mathematics.
+
+- "Best choice" in the illustrated capacity example refers to both the weight
+  and value totals. Highlight both together. A value-only binding reintroduces
+  the previously rejected behavior even when it is perfectly word-aligned.
+- In the Fibonacci count equality, put the child contributions before their
+  evaluated total, followed by the named Fibonacci result. Retaining every term
+  in a different order does not preserve this explanatory chain.
+- Use matching units in both factors of a runtime product. A count of unique
+  states must be paired with work per unique state, including the concrete copy.
+- An alternative induction predicate belongs in the claim row. Its old base,
+  hypothesis, step and conclusion cannot certify the replacement predicate.
+  Retain the algorithm, then adapt the actual proof. Show the substituted child
+  calls and the conclusion being proved, not just a direction arrow or summary.
+- P(k) is a statement. The induction hypothesis guarantees that child calls
+  return optimal values; P(k) does not itself return those values. Give written
+  justification for the one-item base, as well as its predicate name.
+- Trailing take/skip labels form a shared case column. A quad after expressions
+  of different lengths does not align them. Native case columns own this geometry.
+- A child leaving a fitted layout container must carry its owning fit metadata.
+  Check its first handoff and the next explicit content edit. Otherwise live
+  inheritance can enlarge the first state while a preplanned edit restores the
+  old smaller geometry. This differs from repeated shrinkage on sibling edits.
+- Reserve a complete proof before playing it, but treat a second proof with a
+  different claim as its own layout scope. Future algebra for that second proof
+  should not create a large empty gap in the first proof. A spoken stage label
+  starts on its future first-line anchor, before its content appears.
+
 The preferred visual style is a carefully built whiteboard explanation. Start
 with a useful composition and develop it. Keep useful work visible and move it
 when space is needed. A new spoken clause usually calls for a local change,
@@ -1205,3 +1244,13 @@ unrelated text, motion, or audio.
   copy must not replay while a base case or caption is being introduced. The
   renderer must retain consumed transition identities in its outgoing snapshot;
   checking the transition object alone misses a renderer that discards them.
+- An intentionally blank named equation slot is still a slot. MathTex can omit
+  empty arguments, so positional zipping can silently assign a later glyph to
+  the wrong name. Preserve empty identities in the component, reveal their
+  eventual content normally, and test a blank between two painted terms.
+- A grid-to-row transition can collide despite non-overlapping endpoints.
+  Inspect the moving cards; the container/compiler must coordinate their paths.
+  Do not approve the sequence from its final row alone.
+- New proof rows must wait for retained definitions to finish changing type
+  size between explanation groups. A shared group name does not imply a shared
+  fit during motion. Keep the peer-size gate active during this phase.

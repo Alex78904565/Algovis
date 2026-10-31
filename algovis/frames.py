@@ -184,20 +184,45 @@ class EquationFrame:
 
 class CaseEquation(VGroup):
     """Shared lhs/brace/left-aligned alternatives, using the supplied objects."""
+    _algovis_content_fields=('aligned_parts',)
 
-    def __init__(self, lhs, rows, *, compact=False, show_brace=None,theme=DEFAULT_THEME, style=None, **kwargs):
+    def __init__(self, lhs, rows, *, compact=False, show_brace=None,aligned_parts=(),theme=DEFAULT_THEME, style=None, **kwargs):
         self.theme,self.compact=theme,compact
+        self.aligned_parts=tuple(aligned_parts)
         self.show_brace=show_brace
         self.style = style or DEFAULT_FRAME_STYLE
         self.lhs = lhs
         self.rows = rows if isinstance(rows, VGroup) else VGroup(*rows)
         self.rows.arrange(DOWN, aligned_edge=LEFT,
                           buff=self.style.compact_case_gap if compact else self.style.case_gap)
+        self._align_parts()
         self.brace = Brace(self.rows, LEFT, color=theme.foreground)
         self.brace.set_opacity(1 if self.show_brace is True or (self.show_brace is None and len(self.rows)>1) else 0)
         lhs.next_to(self.brace, LEFT, buff=self.style.case_lhs_gap)
         super().__init__(lhs, self.brace, self.rows, **kwargs)
         self._algovis_layout_component = "CaseEquation"
+
+    @property
+    def baseline(self):
+        return self.lhs.baseline
+
+    def _align_parts(self):
+        """Align named trailing annotations as actual case columns.
+
+        A TeX quad is spacing inside one expression, not a column shared by
+        alternatives of different lengths. The cases component owns this
+        geometry and reapplies it whenever typography rebuilds its rows.
+        """
+        from .core.math_row import MathRow
+        for name in self.aligned_parts:
+            rows=[row for row in self.rows if isinstance(row,MathRow) and name in row.parts]
+            if not rows:continue
+            x=max(row.part(name).get_left()[0] for row in rows)
+            for row in rows:
+                keys=list(row.parts);index=keys.index(name)
+                delta=x-row.part(name).get_left()[0]
+                for key in keys[index:]:row.part(key).shift(RIGHT*delta)
+                row._remember_layout()
 
     def apply_scene_typography(self,typography,*,group):
         from .layout import assign_scene_typography
@@ -205,6 +230,7 @@ class CaseEquation(VGroup):
         assign_scene_typography(self.lhs,typography,group=group)
         for row in self.rows:assign_scene_typography(row,typography,group=group)
         self.rows.arrange(DOWN,aligned_edge=LEFT,buff=self.style.compact_case_gap if self.compact else self.style.case_gap)
+        self._align_parts()
         self.brace.become(Brace(self.rows,LEFT,color=self.brace.get_color()))
         self.brace.set_opacity(1 if self.show_brace is True or (self.show_brace is None and len(self.rows)>1) else 0)
         self.lhs.next_to(self.brace,LEFT,buff=self.style.case_lhs_gap)
@@ -216,10 +242,11 @@ class CaseEquation(VGroup):
         if name.startswith('row:'):return self.rows[int(name.split(':')[1])]
         raise KeyError(name)
 
-    def with_state(self,*,lhs=None,rows=None):
+    def with_state(self,*,lhs=None,rows=None,aligned_parts=None):
         return CaseEquation(lhs.copy() if lhs is not None else self.lhs.copy(),
             [row.copy() for row in (rows if rows is not None else self.rows)],
-            style=self.style,theme=self.theme,compact=self.compact,show_brace=self.show_brace).move_to(self)
+            style=self.style,theme=self.theme,compact=self.compact,show_brace=self.show_brace,
+            aligned_parts=self.aligned_parts if aligned_parts is None else aligned_parts).move_to(self)
 
     def motions_to(self,target,*,skip=()):
         from manim import FadeIn,FadeOut,Transform,AnimationGroup,Succession
@@ -262,6 +289,7 @@ class CaseEquation(VGroup):
             _adopt(live,row);adopted.append(live)
         self.rows.submobjects=adopted
         self.submobjects=[self.lhs,self.brace,self.rows]
+        self.aligned_parts=target.aligned_parts
         return self
 
 

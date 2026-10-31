@@ -30,11 +30,27 @@ class MathRow(MathTex):
 
     def __init__(self, parts, *, font_size=33.6, **kwargs):
         self.slot_tex = dict(parts)
-        super().__init__(*self.slot_tex.values(), 'H', arg_separator='', font_size=font_size, **kwargs)
+        # MathTex drops empty input strings. Zipping its remaining children
+        # against every requested name would assign the next glyph to the
+        # blank slot and lose a later name. Blank terms are real named slots,
+        # represented by unpainted, zero-size insertion anchors.
+        nonempty=[(name,tex) for name,tex in self.slot_tex.items() if tex.strip()]
+        super().__init__(*(tex for _,tex in nonempty), 'H', arg_separator='', font_size=font_size, **kwargs)
         marker = self.submobjects[-1]
         origin = np.array([self.get_left()[0], marker.get_bottom()[1], 0.])
         self.remove(marker)
-        self.parts = dict(zip(self.slot_tex, self.submobjects))
+        painted=dict(zip((name for name,_ in nonempty),self.submobjects))
+        self.parts={}
+        previous=None
+        for name,tex in self.slot_tex.items():
+            if name in painted:
+                part=painted[name];previous=part
+            else:
+                part=VectorizedPoint([previous.get_right()[0] if previous is not None else origin[0],origin[1],0],
+                                     artificial_width=0,artificial_height=0)
+                part.tex_string=''
+            self.parts[name]=part
+        self.submobjects=list(self.parts.values())
         # TeX part containers may report white while their glyphs are blue.
         # Normalize uniform paint onto the named term so later substitutions
         # retain its semantic color instead of silently turning it white.
@@ -144,10 +160,14 @@ class MathRow(MathTex):
 
     def motions_to(self, target, *, skip=(), introductions=None, retirements=None):
         from ..utils.effects import DeferredAnimation, ReplaceContent
-        skip = set(skip); animations = []; retired = []; replacements=[]
+        skip = set(skip); animations = []; retired = []; replacements=[];filled=[]
         for name,part in self.parts.items():
             if name in skip: continue
             if name not in target.parts:
+                retired.append(FadeOut(part))
+            elif not self.slot_tex[name].strip() and target.slot_tex[name].strip():
+                filled.append(target.part(name))
+            elif self.slot_tex[name].strip() and not target.slot_tex[name].strip():
                 retired.append(FadeOut(part))
             elif (re.findall(r'\\text\{([^{}]*)\}',self.slot_tex[name])
                   !=re.findall(r'\\text\{([^{}]*)\}',target.slot_tex[name])
@@ -164,7 +184,7 @@ class MathRow(MathTex):
                     retired.append(FadeOut(part));replacements.append(target.part(name))
             else:
                 animations.append(Transform(part,target.part(name)))
-        introduced = replacements+[part for name,part in target.parts.items()
+        introduced = replacements+filled+[part for name,part in target.parts.items()
                                    if name not in self.parts and name not in skip]
         if retirements is not None:
             retirements.extend(retired)
@@ -210,6 +230,8 @@ class MathRow(MathTex):
         adopted = {}
         for name,new in target.parts.items():
             part = old.get(name, new)
+            if (name in self.slot_tex and bool(self.slot_tex[name].strip())!=bool(target.slot_tex[name].strip())):
+                part=new
             if part is not new:
                 part.become(new)
                 part.submobjects = [child.copy() for child in new.submobjects]

@@ -756,3 +756,38 @@ tests, and inspect the first caption/base addition after each transfer.
 Completed uses also belong to the renderer independently of its current visual
 container: intrinsic attention phases can capture a native canvas between two
 structured views. That capture must not reset the consumed-use registry.
+
+## Case columns, proof changes and extracted layout children
+
+`CaseEquation(aligned_parts=('choice_label',))` makes trailing branch labels a
+common column. It reapplies that constraint after typography and preserves it
+through refinement/adoption. Its lhs baseline participates in sequence-wide
+equation reservations; a taller condition does not move the function call.
+
+`ProofSlide.restate_claim(parts)` retains the algorithm and proof frame while
+retiring base/hypothesis/step/work/conclusion rows tied to the old predicate.
+The author supplies the new proof in its proper rows. This prevents stale
+justification from looking valid merely because it still fits the same frame;
+it does not prove the author's mathematics. A stage label introduced before its
+content uses the first planned content line's anchor from the start.
+
+Fit metadata follows every child of a layout container. Undoing an enclosing
+placement's fit clears that metadata recursively, and applying the shared fit
+sets it recursively. An extracted child therefore has the same natural geometry
+in a newly authored view and in live-model inheritance, including after a later
+content edit. Component internals remain owned by their component.
+
+Named equation slots remain addressable even when their TeX is empty. `MathRow`
+does not zip names against MathTex's filtered arguments: it restores empty slots
+as zero-size, unpainted insertion anchors. Introducing content into that slot
+uses a reveal; it must not steal a neighboring term's identity or morph an
+invisible point into a glyph. Check both refinement and live layout adoption.
+
+`ItemCollection` opts into coordinated axis reflow. If direct sibling paths
+intersect, the compiler checks a horizontal-then-vertical layout and its reverse,
+using their measured extents, before scheduling both phases together. It keeps
+the same cards and their internal identities; a still-colliding plan fails.
+
+New peer text waits for retained peers to finish resizing, including across
+separate sequence-fit scopes with the same logical typography-group identity.
+Checking only the final size or a change of group name misses that transition.

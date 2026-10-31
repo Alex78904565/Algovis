@@ -7,6 +7,31 @@ from algovis.animation import SceneBeat
 
 
 class SequenceLayoutTests(unittest.TestCase):
+    def test_proof_heading_starts_at_its_future_first_line(self):
+        view=ProofSlide();view.add('claim',Equation({'claim':'P(n)'}))
+        view.label('base_case')
+        content=view.fork();content.add('base_case',Equation({'call':'f(0)','eq':'=','value':'0'}))
+        sequence=SceneSequence('Name then prove the base')
+        sequence.add(view,reason='Name the stage');sequence.add(content,reason='Use its definition')
+        sequence.compile()
+        a,b=[beat.scene for beat in sequence.beats]
+        self.assertEqual(sequence.layout_report['name'],'Name then prove the base')
+        self.assertAlmostEqual(a.target('label:base_case').get_y(),b.target('label:base_case').get_y())
+
+    def test_extracted_child_keeps_natural_geometry_before_a_later_content_edit(self):
+        from manim import Scene
+        from algovis import ObjectRow,ComparisonScene,CenteredScene
+        left,right=Rectangle(width=4,height=1.5),Rectangle(width=4,height=1.5)
+        first=ComparisonScene()
+        first.add('pair',ObjectRow(left,right),slot='left')
+        self.assertLess(first.items['pair'].fit_scale,1.)
+        first.install(Scene())
+        fresh=CenteredScene();fresh.add('child',left)
+        self.assertAlmostEqual(fresh.target('child').width,4.)
+        planned_width=fresh.target('child').width
+        fresh.retain_live_models(first)
+        self.assertAlmostEqual(fresh.target('child').width,planned_width)
+
     def test_retained_paragraph_keeps_its_wrap_when_a_new_group_has_more_width(self):
         from algovis import ComparisonScene
         from algovis.sequence_layout import plan_sequence

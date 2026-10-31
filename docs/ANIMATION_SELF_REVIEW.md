@@ -38,6 +38,13 @@ the report does not mechanically certify that the images are good.
    merely to make the current render pass; identify the author instruction or
    narration revision that supersedes it, or leave the discrepancy open.
    Record `pass`, `fail`, `unverified`, or `not applicable`, with a reason.
+   Read the board from a novice student's perspective, top to bottom. Write
+   its actual chain: definition/prerequisites → claim → assumptions → reasoning
+   → conclusion, using the roles applicable to that slide. Identify any missing
+   justification, incompatible retained claim, premature notation or misplaced
+   statement. Naming every visible object does not establish that this chain
+   makes sense. A contradiction blocks visual acceptance even when geometry,
+   timing and object retention checks pass.
 4. **Repair, render, observe again.** A failure or missing required evidence
    prevents signoff for that criterion. Preserve the original failed observation
    and working parts, repair the shared cause where appropriate, then repeat the
