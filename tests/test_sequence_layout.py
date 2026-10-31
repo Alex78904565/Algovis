@@ -268,7 +268,8 @@ class SequenceLayoutTests(unittest.TestCase):
         a,b=[beat.scene for beat in group.beats]
         np.testing.assert_allclose(a.target('work').get_center(),b.target('work').get_center())
         art=Group(*(item.target for item in b.items.values()))
-        np.testing.assert_allclose(art.get_center(),b.layout.body.center)
+        # Floating-point transforms can leave a tiny z residual around zero.
+        np.testing.assert_allclose(art.get_center(),b.layout.body.center,atol=1e-12)
         self.assertAlmostEqual(b.target('work').get_left()[0],b.target('meaning').get_left()[0])
 
     def test_filling_illustration_follows_its_text_column_without_stretching_label_type(self):
