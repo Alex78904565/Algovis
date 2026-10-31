@@ -70,6 +70,8 @@ manim -pql examples/layout_transitions.py LayoutTransitions ProofTransitions
 manim -pql examples/word_attention.py WordAttentionExample
 manim -pql examples/automatic_layout.py AutomaticLayout
 manim -pql examples/scene_animation.py SceneAnimationExample
+manim -pql examples/nested_panels.py NestedPanelsExample
+manim -pql examples/panel_motion.py PanelMotionExample
 ```
 
 See [the component architecture](docs/COMPONENT_ARCHITECTURE.md) for the shared
@@ -88,6 +90,14 @@ whole explanation and shares its fitting scale and proof-row reservations.
 Later content stays hidden until its cue; adding a fraction or another row
 does not resize the earlier steps. See the
 [complete-layout example](examples/scene_animation.py).
+
+For nested layouts, use `PanelSlide` with `Panel` and `RowPanel`. Each panel
+arranges its children; a planned explanation reserves space for later steps.
+Objects keep their identities when moved between panels, while `copy()` carries
+a new object from its source. See [nested panels](examples/nested_panels.py) and
+the [ownership contract](docs/PANEL_ARCHITECTURE_AUDIT.md). In narrated lessons,
+create the owned plan with `self.lesson_animation()` so unplayed steps and stale
+spoken triggers are rejected before a new preview is published.
 
 `ViewScene` also supports overlapping/staggered component animations and
 automatic object attention on verified narration words. Declare, for example,

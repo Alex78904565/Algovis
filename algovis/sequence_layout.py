@@ -10,7 +10,7 @@ def natural_view(view):
     for field in ('_sequence_layout_name','_sequence_fit_scales','_sequence_proof_envelopes',
                   '_sequence_block_widths','_sequence_block_heights','_sequence_fill_widths',
                   '_sequence_paired_heights','_sequence_text_widths','_sequence_proof_label_y',
-                  '_sequence_motion_margin','_sequence_motion_gap'):
+                  '_sequence_motion_margin','_sequence_motion_gap','_sequence_panel_envelopes'):
         result.__dict__.pop(field,None)
     for item in result.items.values():
         if item.fit_scale!=1:result._scale_item(item,1/item.fit_scale)
@@ -27,6 +27,11 @@ def plan_sequence(name,views,*,previous=None):
     cannot fit readably fails here, before any member begins playback.
     """
     planned=[natural_view(view) for view in views]
+    panel_views=[view for view in planned if hasattr(type(view),'_bound_author_panels')]
+    if panel_views:
+        from .panels import plan_panel_envelopes
+        envelope=plan_panel_envelopes(panel_views)
+        for view in panel_views:view._sequence_panel_envelopes=envelope
     motion_margin=max((view.motion_reservation() for view in planned
                        if hasattr(type(view),'motion_reservation')),default=0.)
     motion_gap=max((view.motion_gap() for view in planned

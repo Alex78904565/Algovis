@@ -9,13 +9,13 @@ from .presentation import SlideRegion
 
 class CenteredScene(ColumnSlide):
     """A centered vertical stack, for a title or one compact argument."""
-    def _arrange(self):
-        super()._arrange()
-        body=[item.target for item in self.items.values() if item.slot=='body']
-        if body:
-            stack=Group(*body)
-            stack.move_to(self.layout.body.center)
-            for part in body:part.set_x(self.layout.body.center[0])
+    def _panel_recipe(self):
+        from .panels import CenteredColumnPanel
+        root=super()._panel_recipe()
+        root.children['body']=CenteredColumnPanel.bound(
+            [(name,item) for name,item in self.items.items() if item.slot=='body'],
+            gap=self.gap,padding=self.padding,vertical='top',center_block=False)
+        return root
 
 
 class BlockScene(ColumnSlide):
@@ -28,16 +28,19 @@ class BlockScene(ColumnSlide):
         rows=[item for item in self.items.values() if item.slot=='body']
         return {'BlockScene/body':sum(self._height(item) for item in rows)+self.gap*max(0,len(rows)-1)}
 
-    def _arrange(self):
+    def _panel_recipe(self):
+        from .panels import Panel, RegionPanel, CenterPanel
         widths=self.block_widths();widths.update(getattr(self,'_sequence_block_widths',{}))
         heights=self.block_heights();heights.update(getattr(self,'_sequence_block_heights',{}))
-        column=ColumnLayout(self.layout.body,gap=self.gap,
-            content_width=widths['BlockScene/body'] or None,
-            content_height=heights['BlockScene/body'] or None)
-        from .composition import _column_row
+        root=RegionPanel()
+        panel=Panel.bound([(name,item) for name,item in self.items.items() if item.slot=='body'],gap=self.gap)
+        panel.content_width=widths['BlockScene/body'] or None
+        panel.content_height=heights['BlockScene/body'] or None
+        root.in_region('body',self.layout.body,panel)
         for name,item in self.items.items():
-            if item.slot=='body':_column_row(column,name,item)
-            else:item.target.move_to(self.layout.region(item.slot).center)
+            if item.slot!='body':
+                root.in_region(name,self.layout.region(item.slot),CenterPanel.bound([(name,item)]))
+        return root
 
 
 class ListScene(BlockScene):
@@ -176,7 +179,9 @@ class SlotScene(SlideView):
             heights={key:max(heights.values()) for key in heights}
         return heights
 
-    def _arrange(self):
+    def _panel_recipe(self):
+        from .panels import Panel, CenterPanel, CenteredColumnPanel, RegionPanel
+        root=RegionPanel()
         widths=self.block_widths()
         widths.update(getattr(self,'_sequence_block_widths',{}))
         heights=self.block_heights()
@@ -185,22 +190,19 @@ class SlotScene(SlideView):
             items=[(name,item) for name,item in self.items.items() if item.slot==slot]
             width=widths.get(f'{type(self).__name__}/{slot}')
             height=heights.get(f'{type(self).__name__}/{slot}')
-            column=ColumnLayout(region,gap=.28,content_width=width or None,content_height=height or None)
-            from .composition import _column_row
-            for name,item in items:_column_row(column,name,item)
-            if slot in self.centered_slots and items:
-                group=Group(*(item.target for _,item in items))
-                group.move_to(region.center)
-                for _,item in items:item.target.set_x(region.center[0])
+            cls=CenteredColumnPanel if slot in self.centered_slots else Panel
+            panel=cls.bound(items,gap=.28,vertical='center' if height else 'top',center_block=bool(width))
+            panel.content_width=width or None
+            panel.content_height=height or None
+            root.in_region(slot,region,panel)
         footer=[(name,item) for name,item in self.items.items() if item.slot=='footer']
         if len(footer)>1:
-            column=ColumnLayout(self.layout.footer,gap=.1,
-                content_width=max(item.target.width for _,item in footer))
-            for name,item in footer:_column_row(column,name,item)
-            Group(*(item.target for _,item in footer)).set_y(self.layout.footer.center[1])
-        for item in self.items.values():
+            from .panels import FooterPanel
+            root.in_region('footer',self.layout.footer,FooterPanel.bound(footer,gap=.1,vertical='top'))
+        for name,item in self.items.items():
             if item.slot not in self._slots() and not (item.slot=='footer' and len(footer)>1):
-                item.target.move_to(self.layout.region(item.slot).center)
+                root.in_region(name,self.layout.region(item.slot),CenterPanel.bound([(name,item)]))
+        return root
 
 
 class DiagramScene(SlotScene):
@@ -308,14 +310,18 @@ class ArgumentScene(SlotScene):
                 areas.append(area)
         return areas
 
-    def _arrange(self):
-        super()._arrange()
+    def _panel_recipe(self):
+        from .panels import Panel
+        root=super()._panel_recipe()
+        for slot,_ in self.ROWS:
+            root.children.pop(slot,None);root.regions.pop(slot,None)
         widths={**self.block_widths(),**getattr(self,'_sequence_block_widths',{})}
         heights={**self.block_heights(),**getattr(self,'_sequence_block_heights',{})}
-        column=ColumnLayout(self._argument_region(),gap=self._argument_gap(),content_width=widths['ArgumentScene/body'] or None,
-            content_height=heights['ArgumentScene/body'] or None)
-        from .composition import _column_row
-        for name,item in self._argument_items():_column_row(column,name,item)
+        panel=Panel.bound(self._argument_items(),gap=self._argument_gap())
+        panel.content_width=widths['ArgumentScene/body'] or None
+        panel.content_height=heights['ArgumentScene/body'] or None
+        root.in_region('argument',self._argument_region(),panel)
+        return root
 
 
 class DerivationScene(ArgumentScene):
@@ -404,47 +410,26 @@ class PairedScene(ComparisonScene):
                 for index,pair in enumerate(self.pairs)}
 
     def _region(self,slot):
-        return getattr(self,'_paired_regions',{}).get(slot) or super()._region(slot)
+        return getattr(self,'_allocated_panel_regions',{}).get(slot) or super()._region(slot)
 
     def _text_width(self,slot):
         # Wrapping uses the full column capacity, not an earlier short row's
         # fitted width. Validation uses the actual centered column below.
         return super()._slots()[slot].width if slot in ('left','right') else super()._text_width(slot)
 
-    def _arrange(self):
-        super()._arrange()
+    def _panel_recipe(self):
+        from .panels import PairedPanel
+        root=super()._panel_recipe()
         heights=self.paired_heights()
         fit=next((area['scale'] for area in self._fit_report if area['group']=='body'),1.)
         heights.update({key:height*fit for key,height in getattr(self,'_sequence_paired_heights',{}).items()})
-        widths=self.block_widths()
-        widths.update(getattr(self,'_sequence_block_widths',{}))
-        total_height=sum(heights.values())+.28*max(0,len(heights)-1)
-        regions=self._slots()
-        # Center the two-column argument as one block; retain a shared top
-        # for corresponding rows and a common left edge within each column.
-        content_widths={slot:widths.get(f'{type(self).__name__}/{slot}',max(
-            (item.target.width for item in self.items.values() if item.slot==slot),default=0.))
-            for slot in regions}
-        total_width=sum(content_widths.values())+self.gutter
-        left=self.layout.body.center[0]-total_width/2
-        columns={};self._paired_regions={}
-        for slot,region in regions.items():
-            width=content_widths[slot]
-            area=SlideRegion((left+width/2,self.layout.body.center[1],0),max(width,.01),region.height)
-            self._paired_regions[slot]=area
-            columns[slot]=ColumnLayout(area,padding=0,gap=.28,content_height=total_height)
-            left+=width+self.gutter
-        from .core.proof import first_line_of
-        from manim import UP
-        for index,pair in enumerate(self.pairs):
-            for column in columns.values():column.reserve(str(index),heights[str(index)])
-            for name in pair:
-                if name not in self.items:continue
-                item=self.items[name];columns[item.slot].place(str(index),item.target)
-                # Align the first readable line rather than the bounding-box
-                # center of a multiline example or a fraction.
-                top=columns[item.slot]._slots[str(index)][0]
-                item.target.shift((0,top-first_line_of(item.target).get_top()[1],0))
+        widths={**self.block_widths(),**getattr(self,'_sequence_block_widths',{})}
+        content_widths={slot:widths.get(f'{type(self).__name__}/{slot}',0.) for slot in self._slots()}
+        pair=PairedPanel(pairs=self.pairs,heights=heights,widths=content_widths,gap=self.gutter)
+        for slot in self._slots():
+            pair.panel(slot,root.children.pop(slot));root.regions.pop(slot)
+        root.in_region('paired',self.layout.body,pair)
+        return root
 
     def block_widths(self):
         return {f'{type(self).__name__}/{slot}':max(
@@ -491,30 +476,14 @@ class ConversionScene(ComparisonScene):
         regions['connector']=SlideRegion(body.center,self.gutter,body.height)
         return regions
 
-    def _arrange(self):
-        super()._arrange()
-        sides={}
-        def row_anchor(target):
-            if getattr(target,'_algovis_layout_container',False) and len(target)>1:
-                target=target[1]
-            return float(target.baseline) if hasattr(type(target),'baseline') else target.get_y()
-        for slot in ('left','right'):
-            items=[item for item in self.items.values() if item.slot==slot]
-            for item in items:
-                center=self._region(slot).center[0]
-                item.target.set_x(center)
-                if getattr(item.target,'_algovis_layout_container',False):
-                    for row in item.target:row.set_x(center)
-            sides[slot]=items
-        for left,right in zip(sides['left'],sides['right']):
-            baseline=min(row_anchor(left.target),row_anchor(right.target))
-            for item in (left,right):item.target.shift((0,baseline-row_anchor(item.target),0))
-        reference=next((items[0].target for items in sides.values() if items),None)
-        if reference is not None:
-            for item in self.items.values():
-                if item.slot=='connector':
-                    item.target.set_x(self.layout.body.center[0])
-                    item.target.shift((0,row_anchor(reference)-row_anchor(item.target),0))
+    def _panel_recipe(self):
+        from .panels import ConversionPanel
+        root=super()._panel_recipe()
+        conversion=ConversionPanel(self._slots())
+        for slot in self._slots():
+            conversion.panel(slot,root.children.pop(slot));root.regions.pop(slot)
+        root.in_region('conversion',self.layout.body,conversion)
+        return root
 
 
 class AnalysisScene(SlotScene):
@@ -537,27 +506,23 @@ class AnalysisScene(SlotScene):
         return heights
 
     def _region(self,slot):
-        return getattr(self,'_analysis_regions',{}).get(slot) or super()._region(slot)
+        return getattr(self,'_allocated_panel_regions',{}).get(slot) or super()._region(slot)
 
     def _text_width(self,slot):
         return self._slots()[slot].width if slot in self._slots() else super()._text_width(slot)
 
-    def _arrange(self):
-        super()._arrange()
+    def _panel_recipe(self):
+        from .panels import AnalysisPanel
+        root=super()._panel_recipe()
         widths={**self.block_widths(),**getattr(self,'_sequence_block_widths',{})}
         sides={side:max(widths.get(f'{type(self).__name__}/{slot}',0.) for slot in (side,side+'_result'))
                for side in ('left','right')}
-        left=self.layout.body.center[0]-(sum(sides.values())+self.gutter)/2
-        regions=self._slots();self._analysis_regions={}
+        analysis=AnalysisPanel(sides,gap=self.gutter)
         for side in ('left','right'):
-            width=sides[side]
             for slot in (side,side+'_result'):
-                region=regions[slot]
-                self._analysis_regions[slot]=SlideRegion((left+width/2,region.center[1],0),
-                    max(width,.01),region.height)
-                for item in self.items.values():
-                    if item.slot==slot:item.target.shift((left-item.target.get_left()[0],0,0))
-            left+=width+self.gutter
+                analysis.in_region(slot,root.regions.pop(slot),root.children.pop(slot))
+        root.in_region('analysis',self.layout.body,analysis)
+        return root
 
     def _slots(self):
         regions=super()._slots()

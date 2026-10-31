@@ -511,6 +511,8 @@ class SlideSceneMixin:
     def begin_narration(self, cue_path, *, project_root=None, gain=None):
         """Attach a mastered voice track and return its named cue timeline."""
         self.narration = NarrationTrack.from_json(cue_path, project_root=project_root)
+        if getattr(self,'require_alignment_provenance',False) and not self.narration.alignment_provenance:
+            raise ValueError('This lesson requires recording/transcript alignment fingerprints before rendering')
         return self.narration.start(self, gain=gain)
 
     def wait_for_cue(self, name, offset=0.0):

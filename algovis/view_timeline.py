@@ -172,8 +172,11 @@ class CanvasSlide(SlideView):
     production ink-level audit checks actual text/painted bounds.
     """
 
-    def _arrange(self):
-        pass
+    def _panel_recipe(self):
+        from .panels import RegionPanel,FixedPanel
+        root=RegionPanel()
+        root.in_region('intrinsic',self.layout.body,FixedPanel.bound(self.items.items()))
+        return root
 
     def add(self, *args, **kwargs):
         raise TypeError('Use ColumnSlide, SplitSlide, EquationSlide or ProofSlide for automatic alignment; '
@@ -201,6 +204,7 @@ class CanvasSlide(SlideView):
 
     def include(self, name, mob, target=None):
         self.items[name] = Placement(SlideObject(mob), (target if target is not None else mob).copy(), 'body')
+        self._arrange()
         return self.items[name].object
 
 
@@ -416,7 +420,8 @@ class _MathLayoutPhase(_GatedPhase):
                     from .layout import LessonStyle
                     LessonStyle._watch_type(target, source._algovis_typography_group, 'equation')
                 self.adoptions.append((source, target))
-                return [Move(motion.mobject, motion.target_mobject)
+                return [Move(motion.mobject, motion.target_mobject,
+                             path_arc=getattr(animation,'path_arc',0) or getattr(motion,'path_arc',0))
                         if isinstance(motion, Transform) else motion
                         for motion in source.motions_to(target)]
             if any(isinstance(part, MathRow) for part in source.get_family()):
@@ -457,8 +462,43 @@ class ViewSceneMixin:
         self._view_name_counter = 0
         self._word_attention = []
         self._attention_waiting = False
+        self._animation_plans = []
+
+    def register_animation_plan(self,plan):
+        if not any(existing is plan for existing in self._animation_plans):
+            self._animation_plans.append(plan)
+        return plan
+
+    def lesson_animation(self):
+        """Create an owned plan whose declared triggers must all be consumed."""
+        from .animation import LessonAnimation
+        return LessonAnimation(self)
+
+    def trigger_coverage(self):
+        return {'schema':1,
+            'steps':[record for index,plan in enumerate(self._animation_plans)
+                     for record in plan.trigger_coverage(path=f'animation/{index}')],
+            'attention':[{'cue':binding.cue,'reason':binding.reason,'consumed':binding.fired}
+                         for binding in self._word_attention]}
+
+    def validate_trigger_consumption(self):
+        from .review.inspection import trigger_coverage_findings
+        track=getattr(self,'narration',None)
+        if track is not None and hasattr(track,'validate_provenance'):track.validate_provenance()
+        findings=trigger_coverage_findings({'triggerCoverage':self.trigger_coverage()})
+        if findings:
+            detail='; '.join(f"{item['cue'] or '(opening)'}: {item['reason']}" for item in findings[:8])
+            raise RuntimeError('Declared animation trigger was never consumed: '+detail)
+
+    def tear_down(self):
+        self.validate_trigger_consumption()
+        super().tear_down()
 
     def begin_narration(self, *args, **kwargs):
+        if getattr(self,'narration',None) is not None:
+            missing=[binding.cue for binding in self._word_attention if not binding.fired]
+            if missing:raise RuntimeError('Attention triggers were not consumed before changing narration: '+', '.join(missing))
+            self.validate_trigger_consumption()
         self._word_attention = []
         return super().begin_narration(*args, **kwargs)
 
@@ -717,6 +757,7 @@ class ViewSceneMixin:
             document = json.loads(path.read_text(encoding='utf-8'))
             document['viewInfrastructure'] = {'schema': 1, 'groups': 'layout_containers',
                                                'steps': self._view_steps}
+            document['triggerCoverage']=self.trigger_coverage()
             temporary = path.with_suffix(path.suffix+'.view.tmp')
             temporary.write_text(json.dumps(document, ensure_ascii=False), encoding='utf-8')
             temporary.replace(path)

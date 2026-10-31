@@ -104,6 +104,9 @@ class WordAttentionTests(unittest.TestCase):
         self.scene.bind_attention(self.target(), 'square', duration=.8, reason='Name it')
         with self.assertRaisesRegex(ValueError, 'animation slot'):
             self.scene.view_on_cue('square', run_time=.4, reason='Name it')
+        # The rejected slot must not consume the binding. Correct it and fire
+        # it; an otherwise unfinished fixture should fail the teardown guard.
+        self.scene.view_on_cue('square', run_time=.8, reason='Name it')
 
     def test_named_equation_terms_choose_a_box_as_the_default(self):
         row = SlideObject(MathRow({'f':'f(', 'index':'i', 'close':')'}))

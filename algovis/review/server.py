@@ -36,8 +36,8 @@ from .preflight import finding_evidence, finding_id, legacy_id, store_decision
 
 MAX_JSON_BYTES = 8 * 1024 * 1024
 MAX_COMMENT_LENGTH = 4_000
-# All catalog scenes share Manim's media/TeX cache. Keep manual requests and
-# automatic catalog rebuilds on the same serial execution lane.
+# Keep manual requests and catalog rebuilds on one publication lane. Each
+# explicit-source render also owns a TeX directory, including against external jobs.
 _MANIM_RENDER_LOCK = threading.Lock()
 
 
@@ -67,6 +67,17 @@ def _atomic_json(path: Path, value) -> None:
         encoding="utf-8",
     )
     os.replace(temporary, path)
+
+
+def _atomic_copy(source, destination):
+    destination=Path(destination)
+    destination.parent.mkdir(parents=True,exist_ok=True)
+    temporary=destination.with_name(destination.name+'.'+uuid.uuid4().hex+'.tmp')
+    try:
+        shutil.copyfile(source,temporary)
+        os.replace(temporary,destination)
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def _inside(root: Path, path: Path) -> Path:
@@ -117,6 +128,12 @@ class ReviewServer:
 
     def __post_init__(self) -> None:
         self.workspace = self.workspace.resolve()
+        # Upgrade the original production's launcher-only catalog to the same
+        # explicit source path as new projects. It must receive the isolated
+        # configuration and fresh-render guarantees too.
+        if (self.scene_source is None and (self.workspace/'render_sections.ps1').is_file()
+                and (self.workspace/'full_video_preview.py').is_file()):
+            self.scene_source=self.workspace/'full_video_preview.py'
         self.video_path = _inside(self.workspace, self.video_path)
         self.base_video_path = self.video_path
         self.cue_path = _inside(self.workspace, self.cue_path)
@@ -161,6 +178,12 @@ class ReviewServer:
             )
         else:
             self.manifest_path = _inside(self.workspace, self.manifest_path)
+        self.base_manifest_path=self.manifest_path
+        pinned=self.video_path.with_suffix('.objects.json')
+        if self.video_path in published:
+            if not pinned.exists() and self.manifest_path.is_file():_atomic_copy(self.manifest_path,pinned)
+            if pinned.exists():self.manifest_path=pinned
+        self._active_render_job=None
         self.assets_dir = self.review_dir / "assets"
         self.annotations_path = self.review_dir / "annotations.json"
         self.pending_path = self.review_dir / "PENDING.md"
@@ -1031,14 +1054,16 @@ class ReviewServer:
         threading.Thread(target=self._render_worker, daemon=True).start()
         return True
 
-    def _render_command(self) -> list[str]:
+    def _render_command(self, *, config_file=None,media_dir=None) -> list[str]:
         """Render an explicit scene source using the current Python runtime."""
         if self.scene_source is not None:
             if not self.scene_source.is_file():
                 raise ValueError(f"Scene source does not exist: {self.scene_source}")
             return [
                 sys.executable, "-m", "manim", f"-q{self.quality}",
-                "--media_dir", str(self.workspace / "media"),
+                "--media_dir", str(media_dir or self.workspace / "media"),
+                *(["--config_file",str(config_file)] if config_file is not None else []),
+                "--disable_caching",
                 "-v", "WARNING", "--progress_bar", "none",
                 str(self.scene_source), self.scene_name,
             ]
@@ -1080,20 +1105,25 @@ class ReviewServer:
     def _render_once(self) -> None:
         try:
             self._validate_source_typography()
-            command = self._render_command()
+            from ..rendering import RenderJob
+            job=RenderJob.create(self.workspace,self.section_id)
+            job.seed_handoffs(self.workspace/'.review'/'handoffs')
+            self._active_render_job=job
+            command = self._render_command(config_file=job.config_file,media_dir=job.media_dir)
             completed = subprocess.run(
                 command, cwd=self.workspace, capture_output=True, text=True,
                 timeout=30 * 60, check=False,
                 env={
                     **os.environ,
-                    "ALGOVIS_REVIEW_MANIFEST": str(self.manifest_path),
+                    "ALGOVIS_REVIEW_MANIFEST": str(job.manifest_path),
+                    "ALGOVIS_HANDOFF_DIR": str(job.handoff_dir),
                 },
             )
             log = (completed.stdout + "\n" + completed.stderr).strip()
             (self.review_dir / "last-render.log").write_text(log + "\n", encoding="utf-8")
             if completed.returncode:
                 raise RuntimeError(log or f"Render exited {completed.returncode}")
-            self._validate_render_timing()
+            self._validate_render_timing(manifest_path=job.manifest_path)
             self._validate_render_continuity()
             self._publish_render()
             self._refresh_preflight()
@@ -1117,6 +1147,7 @@ class ReviewServer:
                     completed_at=_utc_now(), log_tail=detail[-3_000:],
                 )
         finally:
+            self._active_render_job=None
             rerender = False
             with self._render_lock:
                 self._render_started = False
@@ -1143,13 +1174,23 @@ class ReviewServer:
         _atomic_json(self.review_dir / 'typography-source.json', report)
         require_scene_typography(source, self.scene_name)
 
-    def _validate_render_timing(self) -> None:
+    def _validate_render_timing(self, *, manifest_path=None) -> None:
         """Reject timing and declared peer-type errors, keeping the last good video."""
         from .audit import audit_section
-        from .inspection import typography_findings, alignment_findings, focus_span_findings
-        if self.manifest_path is None or not self.manifest_path.is_file():
+        from .inspection import typography_findings, alignment_findings, focus_span_findings, trigger_coverage_findings
+        cue_document=json.loads(self.cue_path.read_text(encoding='utf-8'))
+        if cue_document.get('alignmentProvenance') is not None:
+            from ..narration import NarrationTrack
+            NarrationTrack.from_json(self.cue_path,project_root=self.workspace)
+        fresh=manifest_path is not None
+        manifest_path=Path(manifest_path) if fresh else self.manifest_path
+        if manifest_path is None or not manifest_path.is_file():
+            if fresh:raise RuntimeError('The render did not create a fresh object manifest; the previous preview remains available')
             return
-        manifest = json.loads(self.manifest_path.read_text(encoding="utf-8"))
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        trigger_errors=trigger_coverage_findings(manifest)
+        if trigger_errors:
+            raise RuntimeError('Unconsumed animation triggers rejected before publication: '+str(trigger_errors[0]))
         focus_errors=focus_span_findings(manifest)
         if focus_errors:
             raise RuntimeError('Held focus rejected before publication: '+str(focus_errors[0]))
@@ -1171,7 +1212,7 @@ class ReviewServer:
         if alignment:
             groups = ", ".join(dict.fromkeys(item["group"] for item in alignment))
             raise RuntimeError("Declared row alignment rejected before publication: " + groups[:800])
-        paths = [self.manifest_path, self.cue_path, self.transcript_path]
+        paths = [manifest_path, self.cue_path, self.transcript_path]
         if any(path is None or not path.is_file() for path in paths):
             return
         report = audit_section(*[
@@ -1245,6 +1286,15 @@ class ReviewServer:
             })
 
     def _rendered_source(self) -> Path:
+        job=getattr(self,'_active_render_job',None)
+        if job is not None and self.scene_source is not None:
+            return job.movie(self.scene_name,expected_name=self.rendered_video_path.name if self.rendered_video_path else None)
+        source=self._canonical_render_path()
+        if not source.exists():
+            raise FileNotFoundError(f"Manim output was not created: {source}")
+        return source
+
+    def _canonical_render_path(self):
         source = self.rendered_video_path
         if source is None:
             quality_dir = {
@@ -1256,8 +1306,6 @@ class ReviewServer:
                 / (self.scene_source.stem if self.scene_source else "full_video_preview")
                 / quality_dir / f"{self.scene_name}.mp4"
             )
-        if not source.exists():
-            raise FileNotFoundError(f"Manim output was not created: {source}")
         return source
 
     def _validate_render_continuity(self) -> None:
@@ -1296,8 +1344,19 @@ class ReviewServer:
                 raise RuntimeError(completed.stderr.strip() or "FFmpeg failed")
         else:
             shutil.copy2(source, temporary)
-        os.replace(temporary, destination)
-        self.video_path = destination
+        job=getattr(self,'_active_render_job',None)
+        manifest=job.manifest_path if job is not None else self.manifest_path
+        pinned=destination.with_suffix('.objects.json')
+        if manifest is not None and manifest.is_file():_atomic_copy(manifest,pinned)
+        if job is not None:
+            _atomic_copy(source,self._canonical_render_path())
+            if manifest.is_file():_atomic_copy(manifest,self.base_manifest_path)
+            handoff=job.handoff_dir/(self.section_id+'.json')
+            if handoff.is_file():_atomic_copy(handoff,self.workspace/'.review'/'handoffs'/handoff.name)
+        os.replace(temporary,destination)
+        with self._lock:
+            self.video_path=destination
+            if pinned.is_file():self.manifest_path=pinned
         published = sorted(
             (path for path in self.published_dir.glob("*.mp4")
              if not path.name.endswith(".tmp.mp4")),

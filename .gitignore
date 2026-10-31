@@ -61,6 +61,7 @@ tools/*
 !tools/audio_qa.py
 !tools/internal_stitch_qa.py
 !tools/repair_dialogue.py
+!tools/seal_narration_alignment.py
 
 # This exporter contains the unreleased lesson's narration-specific adapter.
 /tools/export_storyboards.py

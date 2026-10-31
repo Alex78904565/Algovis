@@ -10,6 +10,7 @@ from dataclasses import dataclass
 import json
 from pathlib import Path
 import warnings
+import hashlib
 
 
 @dataclass(frozen=True)
@@ -17,6 +18,29 @@ class NarrationCue:
     name: str
     time: float
     phrase: str = ""
+    occurrence: int | None = None
+    context: str = ''
+
+
+@dataclass(frozen=True)
+class WordEvent:
+    """Resolved narration input, passed unchanged through the layout tree."""
+    cue: str
+    phrase: str
+    start: float
+    end: float
+    edge: str
+    transcript_fingerprint: str
+
+    @property
+    def time(self):return self.start if self.edge=='start' else self.end
+
+
+def file_fingerprint(path):
+    digest=hashlib.sha256()
+    with Path(path).open('rb') as stream:
+        for block in iter(lambda:stream.read(1024*1024),b''):digest.update(block)
+    return digest.hexdigest()
 
 
 class NarrationTrack:
@@ -27,6 +51,8 @@ class NarrationTrack:
         self.start_time = None
         self.late_arrivals = []
         self.words = list(words or [])
+        self.alignment_provenance = None
+        self._alignment_path = None
 
     @classmethod
     def from_json(cls, cue_path, project_root=None):
@@ -37,7 +63,8 @@ class NarrationTrack:
         if not audio.is_absolute():
             audio = root / audio
         cues = [
-            NarrationCue(item["name"], float(item["time"]), item.get("phrase", ""))
+            NarrationCue(item["name"], float(item["time"]), item.get("phrase", ""),
+                         item.get('occurrence'),item.get('context',''))
             for item in data["cues"]
         ]
         times = [cue.time for cue in cues]
@@ -50,16 +77,52 @@ class NarrationTrack:
             if not transcript.is_absolute():
                 transcript = root / transcript
             words = timed_words(json.loads(transcript.read_text(encoding="utf-8")))
-        return cls(audio, data["duration"], cues, words=words)
+        track=cls(audio, data["duration"], cues, words=words)
+        provenance=data.get('alignmentProvenance')
+        if provenance is not None:
+            if not words:raise ValueError('Alignment provenance requires timestamped transcriptWords')
+            actual={'audioSha256':file_fingerprint(audio),'transcriptSha256':file_fingerprint(transcript)}
+            if any(provenance.get(key)!=value for key,value in actual.items()):
+                raise ValueError('Recording or transcript changed after alignment; realign and rebind the cues before rendering')
+            track.alignment_provenance=actual
+            track._alignment_path=transcript
+        return track
+
+    def validate_provenance(self):
+        """Also catch a file changed while a long section was rendering."""
+        if self.alignment_provenance is not None:
+            actual={'audioSha256':file_fingerprint(self.audio_path),
+                    'transcriptSha256':file_fingerprint(self._alignment_path)}
+            if actual!=self.alignment_provenance:
+                raise ValueError('Recording or transcript changed during rendering; keep the previous preview and realign')
+
+    def word_event(self,name,*,edge='start'):
+        if edge not in ('start','end'):raise ValueError('Word timing edge must be start or end')
+        anchor=self.word_anchor(name)
+        fingerprint=hashlib.sha256(json.dumps(self.words,sort_keys=True).encode()).hexdigest()
+        return WordEvent(name,self.cues[name].phrase,float(anchor['start']),float(anchor['end']),edge,fingerprint)
 
     def word_anchor(self, name):
         """Resolve a strict cue against spoken words; its time only disambiguates."""
-        from .review.audit import phrase_anchor
+        from .review.audit import phrase_matches
         self.cue_time(name)  # Preserve the useful unknown-cue diagnostic.
         cue = self.cues[name]
         if not cue.phrase.strip() or not self.words:
             raise ValueError(f"Word cue {name!r} requires a phrase and timestamped transcriptWords")
-        anchor = phrase_anchor(cue.phrase, self.words, cue.time)
+        matches=phrase_matches(cue.phrase,self.words)
+        if cue.context:
+            contexts=phrase_matches(cue.context,self.words)
+            matches=[match for match in matches if any(context['start']<=match['start']
+                       and match['end']<=context['end'] for context in contexts)]
+        if cue.occurrence is not None:
+            if isinstance(cue.occurrence,bool) or not isinstance(cue.occurrence,int) or cue.occurrence<1:
+                raise ValueError('A word occurrence must be a positive one-based integer')
+            anchor=matches[cue.occurrence-1] if cue.occurrence<=len(matches) else None
+        else:
+            ordered=sorted(matches,key=lambda match:abs(match['start']-cue.time))
+            if len(ordered)>1 and abs(abs(ordered[0]['start']-cue.time)-abs(ordered[1]['start']-cue.time))<1e-8:
+                raise ValueError(f'Word cue {name!r} is ambiguous; specify context or occurrence')
+            anchor=ordered[0] if ordered else None
         if anchor is None or anchor["approximate"]:
             raise ValueError(f"Word cue {name!r} has no verified word alignment: {cue.phrase!r}")
         return anchor
@@ -133,6 +196,7 @@ class NarrationTrack:
         return remaining
 
     def finish(self, scene, tail=0.0):
+        self.validate_provenance()
         remaining = self.duration + float(tail) - self.elapsed(scene)
         if remaining > 0:
             scene.wait(remaining)

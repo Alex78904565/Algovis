@@ -14,6 +14,13 @@ from algovis.review.server import ReviewCatalog, ReviewHTTPServer, ReviewServer
 
 
 class ReviewServerTests(unittest.TestCase):
+    def render_manifest_fixture(self):
+        document=self.review.manifest_path.read_bytes()
+        def rendered(*args,**kwargs):
+            Path(kwargs['env']['ALGOVIS_REVIEW_MANIFEST']).write_bytes(document)
+            return subprocess.CompletedProcess([],0,'','')
+        return rendered
+
     def test_legacy_production_launcher_cannot_evade_the_typography_check(self):
         (self.workspace/'render_sections.ps1').write_text('# production launcher',encoding='utf-8')
         (self.workspace/'full_video_preview.py').write_text(
@@ -80,7 +87,7 @@ class ReviewServerTests(unittest.TestCase):
                 {'id':'b','label':'example','typographyGroup':'runtime','typeRole':'equation','fontSize':28}]}]}),encoding='utf-8')
         previous=self.review.video_path
         with patch.object(self.review,'_render_command',return_value=['fake']), \
-             patch('algovis.review.server.subprocess.run',return_value=subprocess.CompletedProcess([],0,'','')), \
+             patch('algovis.review.server.subprocess.run',side_effect=self.render_manifest_fixture()), \
              patch.object(self.review,'_publish_render') as publish:
             self.review._render_worker()
         publish.assert_not_called()
@@ -98,7 +105,7 @@ class ReviewServerTests(unittest.TestCase):
         }), encoding="utf-8")
         previous = self.review.video_path
         with patch.object(self.review, "_render_command", return_value=["fake"]), \
-             patch("algovis.review.server.subprocess.run", return_value=subprocess.CompletedProcess([],0,"","")), \
+             patch("algovis.review.server.subprocess.run", side_effect=self.render_manifest_fixture()), \
              patch.object(self.review, "_publish_render") as publish:
             self.review._render_worker()
         publish.assert_not_called()

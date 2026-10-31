@@ -34,12 +34,28 @@ class LessonAnimation:
     component processes such as drawing a tree layer or populating an array.
     Factories run on their cue, after prior scene layouts have been installed.
     """
-    def __init__(self):
+    def __init__(self,renderer=None):
         self.beats=[]
         self._played=0
         self._last_cue=None
         self._last_scene=None
         self._intrinsic_since_scene=False
+        self._renderer=renderer
+        self.resolved_triggers={}
+        if renderer is not None:
+            renderer.register_animation_plan(self)
+
+    def trigger_coverage(self,*,path='animation'):
+        """Account for planned leaf steps, including an unplayed nested group."""
+        records=[]
+        for index,beat in enumerate(self.beats):
+            location=f'{path}/{index}'
+            if isinstance(beat,SceneGroupBeat):
+                records.extend(beat.group.trigger_coverage(path=location))
+            else:
+                records.append({'path':location,'cue':beat.cue,'reason':beat.reason,
+                    'kind':type(beat).__name__,'edge':beat.edge,'consumed':index<self._played})
+        return records
 
     @staticmethod
     def _check(duration,reason):
@@ -67,6 +83,15 @@ class LessonAnimation:
         return group
 
     def play(self, renderer):
+        if self._renderer is not None and renderer is not self._renderer:
+            raise ValueError('A registered animation must play on its owning scene')
+        track=getattr(renderer,'narration',None)
+        if track is not None:
+            # Bind every remaining declaration before the first frame of this
+            # batch. A missing late cue must not waste a long partial render.
+            for record in self.trigger_coverage():
+                if not record['consumed'] and record['cue'] is not None:
+                    self.resolved_triggers[record['path']]=track.word_event(record['cue'],edge=record['edge'])
         for beat in self.beats[self._played:]:
             if isinstance(beat,SceneGroupBeat):
                 child=beat.group

@@ -8,6 +8,11 @@ into the full video.
 The narration is the timing contract. The storyboard is the visual contract.
 The Manim scene is an implementation of both.
 
+Moving objects may temporarily cross other content. Deliberate transfers should
+normally follow a gentle smooth arc. Judge readability and ownership during the
+move, and require a clear, aligned landing; transient overlap alone is not a
+failure. This author clarification supersedes blanket route-clearance rules.
+
 Use [the agent self-review workflow](ANIMATION_SELF_REVIEW.md) to produce and
 inspect the actual word-level timing and composition ledgers before viewer review.
 The [recurring feedback reference](RECURRING_REVIEW_FEEDBACK.md) is the compact

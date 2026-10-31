@@ -128,5 +128,29 @@ class Lesson:
 ''',scene='Lesson')
         self.assertEqual(report['findings'],[])
 
+    def test_direct_scene_drawing_and_unowned_plans_cannot_bypass_the_compiler(self):
+        with TemporaryDirectory(dir=Path.cwd()/'.qa') as folder:
+            root=Path(folder);(root/'algovis').mkdir()
+            path=root/'entry.py'
+            path.write_text('class Clip:\n def construct(self):\n  plan=LessonAnimation()\n  self.play(FadeIn(Text("x")))\n')
+            with self.assertRaisesRegex(ValueError,'authoring boundary violations'):
+                require_scene_typography(path,'Clip')
+
+    def test_canvas_alias_in_a_builder_is_rejected(self):
+        with TemporaryDirectory(dir=Path.cwd()/'.qa') as folder:
+            root=Path(folder);(root/'algovis').mkdir()
+            (root/'builder.py').write_text('from algovis import CanvasSlide as Canvas\ndef make(): return Canvas()\n')
+            path=root/'entry.py'
+            path.write_text('from builder import make\nclass Clip:\n def construct(self): make()\n')
+            with self.assertRaisesRegex(ValueError,'view_compiler_bypass'):
+                require_scene_typography(path,'Clip')
+
+    def test_owned_plan_and_component_actions_use_the_public_path(self):
+        with TemporaryDirectory(dir=Path.cwd()/'.qa') as folder:
+            root=Path(folder);(root/'algovis').mkdir()
+            path=root/'entry.py'
+            path.write_text('class Clip:\n def construct(self):\n  film=self.lesson_animation()\n  film.action(lambda: tree.expand_layer(2),on="children",reason="Show children")\n  film.play(self)\n')
+            self.assertEqual(require_scene_typography(path,'Clip')['findings'],[])
+
 
 if __name__=='__main__': unittest.main()

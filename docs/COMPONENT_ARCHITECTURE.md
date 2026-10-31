@@ -7,9 +7,15 @@ when the new construction has substantially different meaning or behavior.
 
 ## Structure
 
-See the [recursive panel ownership audit](PANEL_ARCHITECTURE_AUDIT.md) for the
-author's proposed Animation → Slide → Panel → Object model, its nested panels,
-and the explicit gaps between that contract and the current implementation.
+See the [recursive panel ownership contract](PANEL_ARCHITECTURE_AUDIT.md) for the
+Animation → Slide → Panel → Object model, nested panel authoring, word-event
+propagation, and the distinction between source migration and movie verification.
+
+Every exported slide layout now inherits the same recursive arranger. Layout
+specializations supply panel recipes. Proof stages own their labels/expressions;
+paired rows, conversion connectors and analysis columns use specialized panels.
+`PanelSlide` also accepts arbitrary nested `Panel`/`RowPanel` compositions. Their
+flattened leaf placements enter the existing global identity/copy compiler.
 
 ```text
 LessonAnimation               the narration timeline
@@ -40,6 +46,7 @@ SlideView                     detached composition at one point in the lesson
 │       └── ListScene
 ├── EquationSlide             named rows from EquationFrame
 ├── ProofSlide                named rows/labels from ProofFrame
+├── PanelSlide                arbitrary recursive named Panel/RowPanel recipes
 ├── SlotScene                 shared named-region defaults and fitting
 │   ├── ArgumentScene         one growing common-edge argument
 │   │   ├── DerivationScene   meaning, equation, explanation
@@ -58,6 +65,9 @@ ViewTransition                difference between compositions, played by SlideSc
 
 These visual classes compose `SemanticProperties` and shared style/layout
 objects. They do not need a deep inheritance tree merely to obtain a theme.
+`CanvasSlide` is internal component machinery through the same compiler; it is
+not a lesson-author escape hatch for manual placement. The source gate rejects
+direct scene drawing, local layout overrides and unowned lesson plans.
 `StateCellStyle.semantic_fill_strength` can opt a framed component into a
 semantic tint while preserving neutral label ink. `set_semantics` invokes the
 component's `apply_semantic_paint` hook after resolving properties. The shared
@@ -264,12 +274,15 @@ duplicate ownership. Groups are layout containers: their children keep their
 identities when separated, moved to another group, or recombined. Retiring a
 layout container does not erase a child retained in the next view. A semantic
 component remains intact until one of its children is explicitly extracted.
-Optional `via=` waypoints or `path_arc=` route copies around intervening work;
-clear final layouts alone do not certify clear motion paths.
+Optional `via=` waypoints or `path_arc=` control a transfer. Deliberate transfers
+normally use a gentle arc. The author's latest clarification permits temporary
+overlap during travel; the landing must remain clear. Inspect motion to preserve
+identity and continuous formatting, not to enforce a blanket ban on crossings.
 
 The existing procedural `Slide` and animation-based `transition(...)` APIs remain
-supported. This is an authoring layer, not an automatic conversion of previously
-written lesson scenes. Migrate an existing composition deliberately and preserve
+supported for older library consumers. The recorded lesson uses the view/panel
+path throughout; its source gate rejects procedural drawing. Migrate other
+existing compositions deliberately and preserve
 its working layout, narration cues and section handoff. Do not mix legacy slide
 lifecycle operations and view transitions without explicitly adopting the board
 with `set_view`.
@@ -875,14 +888,13 @@ retained recurrence and base case. Use the construction-oriented `RecurrenceScen
 when explaining those rules; use the application layout when matching them to
 the original question. Neither specialization uses per-element offsets.
 
-`ArgumentScene.motion_reservation()` measures definition transfers that cross
-another semantic row. `SceneSequence` reserves their side corridors for the
-whole explanation before it starts. Wrapping and common fitting use that reduced
-content width; the existing full safe frame remains available for the travelling
-copy. This prevents a full-width state explanation from becoming an impassable
-wall between a footer definition and its application. Source-adjacent copies
-do not reserve an unnecessary gutter. A motion route must still pass its ink
-clearance checks; reservation is not permission to ignore an intersecting route.
+`ArgumentScene.motion_reservation()` supports the existing specialized
+definition transfers that use a side corridor. `SceneSequence` measures those
+reservations for the complete explanation; wrapping and common fitting use the
+reduced content width. Source-adjacent copies do not reserve an unnecessary
+gutter. These established teaching routes remain available, but an empty
+corridor is not required for an ordinary transfer: the author permits crossing
+other ink during movement and prefers a gentle arc with a clear landing.
 Reference equations keep their declared typography when moved into a footer.
 The footer is a location, not an implicit note role. ArgumentScene fits its
 reference definitions with the argument's text peers across the complete
@@ -895,8 +907,9 @@ their shared corridor in equation order. Lesson code must not introduce offsets
 or manual fades to work around this lifecycle.
 
 Route planning includes retiring source rows while their copies travel.
-A detour clears every intervening row, including short captions that did not
-intersect the original diagonal. ArgumentScene reserves the required landing
-band across its whole sequence. When the route crosses a new equation's prefix
-or suffix, ViewTransition keeps that new ink absent until the copy arrives.
-These are compiler/layout contracts; an authored offset cannot certify them.
+ArgumentScene reserves the required landing band across its whole sequence.
+When a definition is being assembled into a new equation, ViewTransition keeps
+the new prefix/suffix absent until that copy arrives. This preserves the
+instructional order rather than prohibiting all transient crossings. Inspect
+the actual intermediate frames and final alignment; an authored offset cannot
+certify them.

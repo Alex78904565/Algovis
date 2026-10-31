@@ -5,6 +5,14 @@ import numpy as np
 from ..layout import measured_font_size
 
 
+def trigger_coverage_findings(manifest):
+    """A missing execution is an error even when no rendered event records it."""
+    coverage=manifest.get('triggerCoverage',{})
+    return [{**record,'kind':'declared_'+kind+'_never_consumed'}
+            for kind,key in (('animation','steps'),('attention','attention'))
+            for record in coverage.get(key,[]) if not record.get('consumed',False)]
+
+
 def semantic_objects(snapshot):
     """Summarize visible text leaves once, excluding their nested containers."""
     objects = snapshot.get("objects", [])

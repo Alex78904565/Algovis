@@ -48,10 +48,10 @@ def timed_words(document):
     return sorted(unique.values(), key=lambda w: (w["start"], w["end"]))
 
 
-def phrase_anchor(phrase, words, near):
+def phrase_matches(phrase, words):
     wanted = tokens(phrase)
     if not wanted:
-        return None
+        return []
     expanded = [(token, index) for index, word in enumerate(words) for token in tokens(word["word"])]
     text = [token for token, _index in expanded]
     matches = []
@@ -63,7 +63,12 @@ def phrase_anchor(phrase, words, near):
         matches.append({"start": selected[0]["start"], "end": selected[-1]["end"],
                         "words": selected, "approximate": any(
                             word.get("reviewed_timing") == "approximate" for word in selected)})
-    return min(matches, key=lambda match: abs(match["start"]-near)) if matches else None
+    return matches
+
+
+def phrase_anchor(phrase, words, near):
+    matches=phrase_matches(phrase,words)
+    return min(matches,key=lambda match:abs(match['start']-near)) if matches else None
 
 
 def content_change(before, after):

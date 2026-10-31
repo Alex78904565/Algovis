@@ -1,9 +1,10 @@
 # Animation, slide, panel and object ownership
 
-This is an audit and a proposed authoring contract. The current library does
-**not** yet have the full recursive-panel model described below. The shared
-layout repairs in `52263ba` are implemented; this document does not claim that
-they constitute that further migration.
+This began as an audit of the missing recursive-panel layer. That layer is now
+implemented in `algovis.panels` and `algovis.panel_slide`, and the existing public
+slide layouts now supply panel recipes to the same recursive arranger. This
+source migration is distinct from verification of the regenerated lesson movies;
+the private release record tracks those renders and their visual comparison.
 
 ## The ownership chain
 
@@ -31,17 +32,17 @@ changes between these planned states, including moves between different panels.
 | Responsibility | Current implementation | Remaining gap |
 | --- | --- | --- |
 | Schedule steps on spoken cues | `LessonAnimation`, `SceneBeat`, `ActionBeat` | No missing clock layer; preserve the strict word checks |
-| Plan an explanation before playback | `SceneSequence.compile`, `plan_sequence` | Measurements use specialized flat-view hooks instead of a recursive panel contract |
+| Plan an explanation before playback | `SceneSequence.compile`, `plan_sequence` | Native frame policies retain their specialized reservations; `PanelSlide` also measures arbitrary nested future positions |
 | Describe a slide at one step | `SlideView` and its detached snapshots | Public names mix the meanings of slide, scene and sequence |
-| Arrange related content | `SlotScene`, `ColumnLayout`, proof/equation frames and specialized `_arrange` methods | Named regions act like panels but are not first-class panel objects |
-| Own visual objects | `SlideObject`, `Placement`, component named parts | Placements currently live in `SlideView.items`, a flat dictionary |
-| Keep an object across steps | `fork`, `retain_live_models`, `ViewTransition` | Ownership must extend across arbitrary nested panel paths |
-| Carry a copy | `SlideObject.copy`, definition-use declarations, `ApplyDefinition.bind` | Preserve this provenance through panel flattening |
-| Change content in place | `revise`, `refine`, `substitute`, component motions | Replacement at the same named panel slot is not a universal rule for unrelated new handles |
-| Nest groups without losing children | Layout components and retained child records | Generic recursive panels still need a common measurement/placement interface |
+| Arrange related content | `Panel`, `RowPanel`, `RegionPanel`, specialized proof/paired/analysis panels | Every exported slide uses `SlideView._arrange`; recipes declare ownership rather than running a second placement pass |
+| Own visual objects | Named panel children, `SlideObject`, `Placement`, component named parts | `SlideView.items` remains the compiler's flat compatibility projection, not an independent renderer |
+| Keep an object across steps | `fork`, `retain_live_models`, global `ViewTransition` matching | Cross-panel reparenting retains object identity |
+| Carry a copy | `SlideObject.copy`, definition-use declarations, `ApplyDefinition.bind` | Provenance survives panel flattening; source retirement waits for its copies |
+| Change content in place | `revise`, `refine`, `substitute`, component motions, `replace_at` | A new occupant of the same named position in a forked explanation replaces it; unrelated boards do not match by coincidental names |
+| Nest groups without losing children | Recursive panel measurement and flattened global matching | Hidden future positions reserve only layout data, never invisible live artwork |
 
-`PanelFrame` is a drawn frame. It is not currently the missing recursive layout
-owner. Adding more border classes would not establish this ownership chain.
+`PanelFrame` remains a drawn frame. `Panel` is the separate recursive layout owner.
+Adding border classes does not establish layout ownership.
 
 ## Plan all steps, then measure them
 
@@ -60,8 +61,10 @@ has previously allowed future labels and edges to leak into earlier frames.
 4. Allocate panel space from the slide downward. Resolve wrapping and a common
    typography fit for the complete explanation. Relative type-size declarations
    express deliberate hierarchy; per-object absolute scaling remains exceptional.
-5. Reserve copy departure, corridor and landing space as part of the plan.
-   Endpoint fit alone cannot make a moving expression clear neighboring text.
+5. Plan copy departure and landing as part of the explanation. A transfer may
+   cross neighboring ink while traveling; it must arrive clear and aligned.
+   Inspect the route for legibility, without imposing an empty corridor on every
+   move.
 6. Compile the visible states and transitions. Fail before publication when the
    complete explanation cannot fit readably.
 
@@ -91,7 +94,7 @@ playback time.
 
 ### Passing the next placement down the tree
 
-The proposed propagation protocol is:
+The implemented propagation protocol is:
 
 1. The slide provides each panel's planned bounds and the panel it replaces or
    follows, if any.
@@ -100,7 +103,7 @@ The proposed propagation protocol is:
 3. One shared identity pass supplies an object transition context: its current
    and next placements, retain/copy/replace relationship, source, destination
    content, semantic paint and required dependencies.
-4. `panel.next(context)` asks its children for their next transitions. Nested
+4. `panel.next(event, contexts)` asks its children for their next transitions. Nested
    panels do the same. An object's default transition handles ordinary movement
    and formatting; specialized objects can supply named-term or tree motions.
 5. The slide/animation runner schedules the returned transitions together on the
@@ -116,6 +119,36 @@ it, but its motion is compiled exactly once. Panels must not independently
 interpret that transfer as a fade-out plus an unrelated reveal. Objects receive
 enough context to construct their motion without choosing their own layout or
 inferring identity from coordinates.
+
+### Word events and unconsumed triggers
+
+Playback advances on a resolved, timestamped word event. Phrase, context and
+occurrence selection belong to compilation, before a panel can advance; children
+must not independently poll a string and hope they select the right utterance.
+An ordinary transcript word does not require an animation. Every **declared**
+visual step does require a valid anchor and a consumed transition, and every
+declared attention binding must fire or be fulfilled by its matching reveal.
+
+The owned `renderer.lesson_animation()` factory now registers the complete plan.
+Scene teardown and reviewer publication reject unconsumed steps and attention,
+including an unplayed nested sequence. Existing exact-word and late-trigger
+checks remain in force. Old manifests without declaration coverage cannot
+retroactively prove that every authored step fired. Standalone unregistered
+plans are useful in tests, but lesson code must use the owned factory.
+
+A rerecording must invalidate alignment provenance, then realign and rebind its
+selectors. A missing, ambiguous or unused trigger must fail while the previous
+preview remains available. `NarrationCue` supports one-based `occurrence` and a
+containing spoken `context`. Equidistant ambiguous matches fail. `WordEvent`
+carries the resolved interval and transcript fingerprint through slide, panel
+and object advancement.
+
+Optional `alignmentProvenance` binds a cue file to exact recording/transcript
+bytes, checked on load and again at completion. Lessons can require it with
+`require_alignment_provenance=True`. `tools/seal_narration_alignment.py` records
+these fingerprints after alignment review; sealing is not speech alignment or
+an editorial certification. A changed file must be realigned/reviewed before
+resealing. Publication still enforces the actual rendered word timing.
 
 ## Resolve identity before arranging motion
 
@@ -142,20 +175,24 @@ Slot replacement uses object capabilities. An equation can transform its named
 terms; a tree can retain nodes/edges. Substantially different objects need an
 appropriate replacement transition, rather than an arbitrary glyph morph.
 
-## Implementation boundaries for a further migration
+## Implementation boundaries
 
-- Introduce a real recursive panel state with named children, measurements,
-  layout policy and step history. Make existing scene convenience classes build
-  these panels rather than retaining separate arrangement algorithms.
-- Flatten the planned panel tree into the current view compiler's leaf
+- `PanelSlide` owns recursive named panel recipes; its detached forks are the
+  steps. Existing scene convenience classes build shared column, proof, paired,
+  conversion and analysis panels. They inherit one arranger instead of running
+  their own geometry pass after it.
+- Flatten the planned panel tree into the existing view compiler's leaf
   placements, preserving object identities, source references, semantic paint,
   typography ownership and attention bindings. Panel paths locate content;
   they do not replace object IDs.
-- Move sequence measurement to a recursive interface. Keep proof baselines,
+- Recursive measurement reserves future named positions and internal gaps for
+  `PanelSlide`. Native proof/equation recipes preserve their specialized frame
+  constraints within the same sequence compiler. Keep proof baselines,
   intrinsic component geometry, shared type roles and copy clearance as explicit
   constraints rather than opaque offsets.
-- Define the new-object/same-slot replacement rule and reject ambiguous duplicate
-  ownership. Keep the existing explicit replacement API usable during migration.
+- Identity and copy provenance take precedence over same-position replacement.
+  Duplicate ownership fails. A replacement source needed by a copy remains until
+  the copy arrives, then changes in place. The explicit edit APIs remain usable.
 - Verify nested growth, cross-panel moves/copies, splitting/regrouping, changed
   wrapping and intermediate motion. Use the current checked videos as regression
   references. Do not announce full migration based on class names or endpoint
@@ -164,3 +201,61 @@ appropriate replacement transition, rather than an arbitrary glyph morph.
 The result should let a lesson author describe content, grouping and spoken
 steps. Choosing coordinates or independently correcting sibling font sizes
 should not be ordinary lesson code.
+
+## Authoring example
+
+```python
+film = self.lesson_animation()
+explanation = film.group('apply one definition')
+columns = RowPanel(gap=1)
+left = columns.panel('definition', Panel())
+left.add('equation', Equation({'call': 'f(k)', 'eq': '=', 'value': 'k+1'}))
+columns.panel('application', Panel())
+
+first = PanelSlide().add_panel('working', columns)
+explanation.add(first, on='definition', reason='Introduce the definition')
+second = first.fork()
+second.add_at('working/application/equation',
+              first.copy('working/definition/equation'))
+explanation.add(second, on='apply', duration=1.5,
+                reason='Carry the definition to its application')
+film.play(self)
+```
+
+`reparent(old_path, new_path)` moves a handle without changing identity.
+`replace_at(path, new_object)` gives one named position a new occupant.
+`add_panel_at` adds a nested container; `remove` removes an object position.
+Use relative `font_scale`/`font_reason` for an intentional hierarchy. The complete
+explanation chooses the common fit before playback. See the runnable public
+`examples/nested_panels.py` example.
+
+The project-source gate rejects ordinary manual placement/sizing, direct scene
+drawing, local layout overrides, and unowned animation plans, including imported
+authoring helpers. This is an authoring lint, not a security sandbox for arbitrary
+Python. The internal component canvas uses a fixed panel through the same compiler;
+lesson source cannot import it as a layout escape hatch.
+
+Deliberate transfers use gentle arcs by default. Temporary overlap during travel
+is allowed by the author's latest clarification; final positions remain clear and
+aligned. Existing specialized teaching motions retain their intrinsic policies.
+
+## Rendering and publishing the compiled result
+
+`RenderJob` gives each native render its own media, Pango text, TeX, object
+manifest and handoff directories. Sharing a writable TeX directory is unsafe:
+Manim's intermediate cleanup can remove another renderer's in-flight DVI files.
+The text SVG cache has the same concurrent-writer problem. Handoff inputs are
+seeded from the published predecessor, then written inside the new job.
+
+The reviewer disables partial-movie caching for these fresh builds. It requires
+the job's new manifest, validates source authoring, typography, alignment, spoken
+timing and trigger consumption, and checks the predecessor cut before publishing.
+A published revision pairs an immutable movie with its own `.objects.json`.
+Only a successful build switches the served revision and updates canonical
+copies; a failed build leaves the previous good preview available. This prevents
+new object metadata from being served over an older video.
+
+The native `examples/panel_motion.py` example exercises a whole case equation on
+an arc. The shared mathematical lowering passes the containing path to every
+term, brace and condition. Individual term transforms cannot silently revert to
+straight paths while their owner curves.

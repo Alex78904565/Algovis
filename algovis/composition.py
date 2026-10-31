@@ -14,7 +14,7 @@ import warnings
 from itertools import count
 
 import numpy as np
-from manim import AnimationGroup, FadeIn, FadeOut, Group, Mobject, SingleStringMathTex, Succession, Text, Transform, VGroup, Wait, config
+from manim import AnimationGroup, FadeIn, FadeOut, FadeTransform, Group, Mobject, ReplacementTransform, SingleStringMathTex, Succession, Text, Transform, VGroup, Wait, config
 
 from .core.math import ApplyDefinition
 from .core.math_row import MathRow
@@ -43,6 +43,12 @@ class SlideObject:
 
     def copy(self):
         return SlideObject(self.planned_mobject.copy(), copied_from=self)
+
+    def next(self, context):
+        """Accept a globally matched step; children never start playback."""
+        if context.destination is not None and context.destination.object is not self:
+            raise ValueError('Object step was delivered to a different destination owner')
+        return context
 
     @property
     def planned_mobject(self):
@@ -131,6 +137,16 @@ class Placement:
     fit_scale: float = 1.
     font_scale: float = 1.
     font_reason: str = ''
+
+
+@dataclass(frozen=True)
+class ObjectStep:
+    relation: str
+    previous: Placement | None
+    destination: Placement | None
+    event: object = None
+    source: SlideObject | None = None
+    arc: float = 0.
 
 
 class LayoutOverrideWarning(UserWarning):
@@ -227,6 +243,7 @@ class SlideView:
         self.definition_uses = {}
         self._default_centers = {}
         self._warned_offsets = set()
+        self.panels = None
         if title is not None:
             heading = (Slide(title, theme=theme, layout=self.layout).header
                        if isinstance(title, str) else title)
@@ -247,6 +264,8 @@ class SlideView:
         view._default_centers = {name: point.copy() for name, point in self._default_centers.items()}
         view._warned_offsets = set(self._warned_offsets)
         view._fit_report = [dict(item) for item in self._fit_report]
+        if self.panels is not None:
+            view.panels=self.panels.rebind(view.items,frame=getattr(view,'frame',None))
         return view
 
     def object(self, name):
@@ -387,6 +406,7 @@ class SlideView:
         previous, previous_uses = self.items, self.definition_uses
         previous_defaults, previous_warnings = self._default_centers, set(self._warned_offsets)
         previous_fit = self._fit_report
+        previous_panels = self.panels
         previous_frame_rows=self.frame.rows.copy() if hasattr(self,'frame') else None
         previous_proof_regions=getattr(self,'_proof_regions',{}).copy()
         self.items = OrderedDict((name, replace(item, target=item.target.copy()))
@@ -408,6 +428,7 @@ class SlideView:
             self.items, self.definition_uses = previous, previous_uses
             self._default_centers, self._warned_offsets = previous_defaults, previous_warnings
             self._fit_report = previous_fit
+            self.panels = previous_panels
             if previous_frame_rows is not None:self.frame.rows=previous_frame_rows
             if hasattr(self,'_proof_regions'):self._proof_regions=previous_proof_regions
             raise
@@ -472,6 +493,8 @@ class SlideView:
                 'sharedBlocks':getattr(self,'_sequence_block_widths',{}),
                 'sharedBlockHeights':getattr(self,'_sequence_block_heights',{}),
                 'widthFill':sorted(getattr(self,'_width_fill',())),
+                'compilerPath':'recursive-panels' if self.panels is not None else 'unarranged',
+                'panelTree':self.panels.describe() if self.panels is not None else None,
                 'reviewAlignment':bool(overrides), 'manyOverrides':len(overrides)>=3}
 
     @staticmethod
@@ -662,9 +685,15 @@ class SlideView:
         return self
 
     def _arrange(self):
-        for item in self.items.values():
-            region = self.layout.region(item.slot)
-            item.target.move_to(region.center)
+        from .panels import arrange_view
+        arrange_view(self,self._panel_recipe())
+
+    def _panel_recipe(self):
+        from .panels import RegionPanel, CenterPanel
+        root=RegionPanel()
+        for name,item in self.items.items():
+            root.in_region(name,self.layout.region(item.slot),CenterPanel.bound([(name,item)]))
+        return root
 
     def validate(self):
         for override in self.layout_report()['overrides']:
@@ -710,6 +739,11 @@ class SlideView:
     def transition_to(self, incoming):
         return ViewTransition(self, incoming)
 
+    def next(self, word, contexts):
+        """Advance the already prepared panel tree on the resolved word event."""
+        if self.panels is None:self.panels=self._panel_recipe()
+        return self.panels.next(word,contexts)
+
     def install(self, scene):
         """Install final artwork without animation, preserving external objects."""
         self.validate()
@@ -726,13 +760,15 @@ class ColumnSlide(SlideView):
         self.gap, self.padding = gap, padding
         super().__init__(title, **kwargs)
 
-    def _arrange(self):
-        column = ColumnLayout(self.layout.body, padding=self.padding, gap=self.gap)
-        for name, item in self.items.items():
-            if item.slot == "body":
-                _column_row(column, name, item)
-            else:
-                item.target.move_to(self.layout.region(item.slot).center)
+    def _panel_recipe(self):
+        from .panels import Panel
+        root=super()._panel_recipe()
+        for key in [name for name,item in self.items.items() if item.slot=='body']:
+            del root.children[key];del root.regions[key]
+        root.in_region('body',self.layout.body,Panel.bound(
+            [(name,item) for name,item in self.items.items() if item.slot=='body'],
+            gap=self.gap,padding=self.padding,vertical='top',center_block=False))
+        return root
 
     def _text_width(self,slot):
         return super()._text_width(slot)-2*self.padding if slot=='body' else super()._text_width(slot)
@@ -987,14 +1023,17 @@ class SplitSlide(ColumnSlide):
             return regions[0 if slot == "left" else 1]
         return self.layout.region(slot)
 
-    def _arrange(self):
-        columns = {name: ColumnLayout(self._region(name), padding=self.padding, gap=self.gap)
-                   for name in ("left", "right")}
+    def _panel_recipe(self):
+        from .panels import Panel, RegionPanel, CenterPanel
+        root=RegionPanel()
+        for slot in ('left','right'):
+            root.in_region(slot,self._region(slot),Panel.bound(
+                [(name,item) for name,item in self.items.items() if item.slot==slot],
+                gap=self.gap,padding=self.padding,vertical='top',center_block=False))
         for name, item in self.items.items():
-            if item.slot in columns:
-                _column_row(columns[item.slot], name, item)
-            else:
-                item.target.move_to(self.layout.region(item.slot).center)
+            if item.slot not in ('left','right'):
+                root.in_region(name,self.layout.region(item.slot),CenterPanel.bound([(name,item)]))
+        return root
 
     def _text_width(self,slot):
         return self._region(slot).width-2*self.padding if slot in ('left','right') else self._region(slot).width
@@ -1023,12 +1062,14 @@ class EquationSlide(SlideView):
     def _region(self, slot):
         return self.layout.body if slot in self.frame.rows else super()._region(slot)
 
-    def _arrange(self):
-        for item in self.items.values():
-            if item.slot in self.frame.rows:
-                _frame_row(self.frame, item)
-            else:
-                item.target.move_to(self.layout.region(item.slot).center)
+    def _panel_recipe(self):
+        from .panels import RegionPanel, CenterPanel, FrameRowPanel, PanelLeaf
+        root=RegionPanel()
+        for name,item in self.items.items():
+            panel=FrameRowPanel(self.frame) if item.slot in self.frame.rows else CenterPanel()
+            panel.children[name]=PanelLeaf(name,item)
+            root.in_region(name,self._region(item.slot),panel)
+        return root
 
     def _text_width(self,slot):
         if slot in self.frame.rows:
@@ -1166,63 +1207,41 @@ class ProofSlide(SlideView):
         return metrics
 
     def _plan_rows(self,metrics=None,*,scale=None):
-        from .presentation import SlideRegion
+        from .panels import ProofPanel
         metrics=metrics or getattr(self,'_sequence_proof_envelopes',None) or self.row_envelopes()
-        slots=tuple(metrics)
         shared_scale=scale if scale is not None else getattr(self,'_sequence_fit_scales',{}).get('body',1.)
-        heights={slot:row['height']*shared_scale for slot,row in metrics.items()}
-        available=self.layout.body.height-self.row_gap*(len(slots)-1)
-        ratio=min(1.,available/sum(heights.values()))
-        top=self.layout.body.center[1]+self.layout.body.height/2
-        left=self.frame.left[0]
-        width=self.layout.body.center[0]+self.layout.body.width/2-left
-        self._proof_regions={}
-        for slot in slots:
-            height=heights[slot]*ratio
-            y=top-height/2
-            self.frame.rows[slot]=y
-            row=next((item for item in self.items.values() if item.slot==slot),None)
-            if row is not None and isinstance(row.target,MathRow):
-                ascent=metrics[slot]['ascent']*shared_scale
-                descent=metrics[slot]['descent']*shared_scale
-                if (slot=='work' or metrics[slot].get('landing',0)) and height>ascent+descent+.1:
-                    # Put the equation at the top of its measured envelope.
-                    # The remaining space is one usable landing band below,
-                    # rather than two unusable half-gaps around the equation.
-                    self.frame.rows[slot]=top-ascent-row.baseline_offset
-                else:self.frame.rows[slot]-=row.baseline_offset+(ascent-descent)/2
-            self._proof_regions[slot]=SlideRegion((left+width/2,y,0),width,height)
-            top-=height+self.row_gap
+        self._proof_regions=ProofPanel.plan_rows(self.frame,self.layout.body,self.items,
+                                               metrics,shared_scale,self.row_gap)
 
-    def _arrange(self):
+    def _panel_recipe(self):
+        from .panels import ProofPanel,ProofStagePanel,ProofRailPanel,CenterPanel,FixedPanel,PanelLeaf
         fit=next((area['scale'] for area in self._fit_report if area['group']=='body'),1.)
         self._plan_rows(getattr(self,'_row_plan_metrics',None),scale=fit)
-        for name, item in self.items.items():
+        root=ProofPanel()
+        attached=set()
+        for name,item in self.items.items():
+            if item.slot.startswith('label:'):continue
             if item.slot=='conclusion':
-                item.target.move_to(self.layout.footer.center)
+                panel=CenterPanel.bound([(name,item)]);region=self.layout.footer
             elif item.slot in self.frame.rows:
-                _frame_row(self.frame, item)
-            elif item.slot not in ("chrome",) and not item.slot.startswith("label:"):
-                item.target.move_to(self.layout.region(item.slot).center)
-        if 'proof_rail' in self.items:
-            rail=self.items['proof_rail'].target;body=self.layout.body
-            rail.put_start_and_end_on([self.frame.divider.get_x(),body.center[1]+body.height/2,0],
-                                     [self.frame.divider.get_x(),body.center[1]-body.height/2,0])
-        for name, item in self.items.items():
-            if item.slot.startswith("label:"):
-                row = self.items.get(item.slot[6:])
-                key=item.slot[6:].upper().replace('_',' ')
-                target=(self.frame.label_target(row.slot,first_line_of(row.target)) if row is not None
-                        else self.frame.labels_by_name[key].copy().set_y(
-                            getattr(self,'_sequence_proof_label_y',{}).get(item.slot,self.frame.rows[key])))
-                item.target.become(target)
-        # A continuing equality omits the repeated left-hand side and aligns
-        # its equals sign with the preceding proof line's equals sign.
-        if 'work' in self.items and 'inductive_step' in self.items:
-            work=self.items['work'].target;step=self.items['inductive_step'].target
-            if (isinstance(work,MathRow) and isinstance(step,MathRow)
-                    and 'eq' in work.parts and 'eq' in step.parts and 'call' not in work.parts):
-                work.shift((step.part('eq').get_left()[0]-work.part('eq').get_left()[0],0,0))
+                label_name='label:'+name
+                label=(label_name,self.items[label_name]) if label_name in self.items else None
+                panel=ProofStagePanel(self.frame,(name,item),label)
+                if label:attached.add(label_name)
+                region=self._region(item.slot)
+            elif name=='proof_rail':
+                panel=ProofRailPanel(self.frame);panel.children[name]=PanelLeaf(name,item)
+                region=self.layout.body
+            else:
+                cls=FixedPanel if item.slot=='chrome' else CenterPanel
+                panel=cls.bound([(name,item)]);region=self._region(item.slot)
+            root.in_region(name,region,panel)
+        for name,item in self.items.items():
+            if item.slot.startswith('label:') and name not in attached:
+                panel=ProofStagePanel(self.frame,None,(name,item),
+                    label_y=getattr(self,'_sequence_proof_label_y',{}).get(item.slot))
+                root.in_region(name,self.layout.body,panel)
+        return root
 
     def _text_width(self,slot):
         if slot in self.frame.rows:
@@ -1311,6 +1330,7 @@ class ViewTransition:
         if not isinstance(incoming, SlideView):
             raise TypeError("The destination must be a SlideView")
         incoming.validate()
+        if incoming.panels is None:incoming.panels=incoming._panel_recipe()
         self.outgoing, self.incoming = outgoing, incoming
         old = outgoing.items if outgoing is not None else {}
         old_roots = {id(item.object.mobject) for item in old.values()}
@@ -1343,6 +1363,16 @@ class ViewTransition:
         self.retained = [key for key in self.new if key in self.old]
         self.entering = [key for key in self.new if key not in self.old]
         self.exiting = [key for key in self.old if key not in self.new]
+        self.replacements={}
+        # A position is scoped to one forked explanation, not a coincidental
+        # name reused later in an unrelated board. Global moves and provenance
+        # copies have priority over matching that position.
+        if outgoing is not None and outgoing._type_group==incoming._type_group:
+            available={name:key for key,(name,item) in self.old.items() if key in self.exiting}
+            for key in self.entering:
+                name,item=self.new[key]
+                if item.object.copied_from is None and name in available:
+                    self.replacements[key]=available[name]
         # Layout containers keep child identities, but straight-line motion can
         # cross siblings when a grid becomes a row. Components opt into a
         # coordinated axis reflow; ordinary retained-object motion is unchanged.
@@ -1387,13 +1417,15 @@ class ViewTransition:
                 substitutions.append(name)
         for key in self.entering:
             name, item = self.new[key]
-            if item.object.copied_from is not None:
+            if key in self.replacements:
+                substitutions.append(name)
+            elif item.object.copied_from is not None:
                 copies.append(name)
             else:
                 additions.append(name)
         return {"keep": keep, "move": moves, "substitute": substitutions,
                 "copy": copies, "enter": additions,
-                "exit": [self.old[key][0] for key in self.exiting]}
+                "exit": [self.old[key][0] for key in self.exiting if key not in self.replacements.values()]}
 
     def animations(self, scene):
         """Prepare only at the spoken cue, after checking ownership and sources."""
@@ -1424,10 +1456,41 @@ class ViewTransition:
         self.incoming._transition_source_rows=tuple(
             replace(self.old[key][1],target=self.old[key][1].object.mobject)
             for key in copy_owners)
-        exits = [FadeOut(self.old[key][1].object.mobject) for key in self.exiting if key not in copy_owners]
+        replaced_old=set(self.replacements.values())
+        exits = [FadeOut(self.old[key][1].object.mobject) for key in self.exiting
+                 if key not in copy_owners and key not in replaced_old]
 
         def build_changes():
-            motions = [];delayed_entries=[];term_entries=[];term_exits=[];held_reflows=[]
+            motions = [];delayed_entries=[];term_entries=[];term_exits=[];held_reflows=[];held_replacements=[]
+            event=None
+            spoken=getattr(scene,'_last_word_event',None)
+            if spoken and getattr(scene,'narration',None) is not None:
+                event=scene.narration.word_event(spoken['cue'],edge=spoken['edge'])
+            contexts={}
+            for key,(name,item) in self.new.items():
+                old_key=key if key in self.retained else self.replacements.get(key)
+                prior=self.old[old_key][1] if old_key is not None else None
+                relation=('replace' if key in self.replacements else 'copy' if item.object.copied_from is not None
+                          and key in self.entering else 'move' if prior is not None and
+                          not _same_picture(prior.target,item.target) else 'retain' if prior is not None else 'reveal')
+                transfer=relation=='copy' or (relation=='move' and
+                    (prior.slot!=item.slot or self.old[key][0]!=name))
+                arc=item.path_arc or (-np.pi/8 if transfer else 0.)
+                contexts[key]=ObjectStep(relation,prior,item,event,item.object.copied_from,arc)
+            self.object_steps=contexts
+            if self.incoming.panels is not None:
+                delivered=self.incoming.next(event,contexts)
+                # Layout containers can expose their child identities to the
+                # global compiler. Their root step is still delivered once.
+                if set(delivered)!=set(contexts):
+                    raise ValueError('Panel advancement did not reach every owned object exactly once')
+                contexts.update(delivered)
+            retiring={key:ObjectStep('retire',self.old[key][1],None,event)
+                      for key in self.exiting if key not in replaced_old}
+            if self.outgoing is not None and self.outgoing.panels is not None:
+                delivered=self.outgoing.next(event,retiring)
+                if set(delivered)!=set(retiring):raise ValueError('Outgoing panel lost an object retirement')
+            self.object_steps.update(retiring)
             routed=set()
             for keys in self._reflow_groups:
                 starts=[self.new[key][1].object.mobject for key in keys]
@@ -1484,7 +1547,14 @@ class ViewTransition:
                 source = item.object.copied_from
                 live = item.object.mobject
                 _adopt(live, item.target)
-                if source is None:
+                if key in self.replacements:
+                    old_key=self.replacements[key];old_live=self.old[old_key][1].object.mobject
+                    def replacement(old_live=old_live,live=live):
+                        cls=ReplacementTransform if type(old_live) is type(live) else FadeTransform
+                        return cls(old_live,live)
+                    if old_key in copy_owners:held_replacements.append(replacement)
+                    else:motions.append(replacement())
+                elif source is None:
                     term_sources=getattr(item.target,'_copy_sources',{})
                     if term_sources:
                         copies=_definition_copies(self.incoming,term_sources,live,entering=True)
@@ -1504,11 +1574,15 @@ class ViewTransition:
                     route=getattr(type(self.incoming),'definition_route',None)
                     via=item.via or (route(self.incoming,source.mobject,live) if route else ())
                     motions.append(ApplyDefinition.bind(source.mobject, None, live,
-                        via=via, path_arc=item.path_arc, preserve_destination_layout=True,copy_only=True))
+                        via=via, path_arc=contexts[key].arc, preserve_destination_layout=True,copy_only=True))
             for key in self.retained:
                 name, item = self.new[key]
                 live = item.object.mobject
                 if key in routed:
+                    continue
+                if (contexts[key].arc and _content_model(live)==_content_model(item.target)
+                        and (self.old[key][1].slot!=item.slot or self.old[key][0]!=name)):
+                    motions.append(Transform(live,item.target,path_arc=contexts[key].arc))
                     continue
                 if (copy_owners and not self.borrowed[key] and name not in self.definition_uses
                         and _content_model(live)==_content_model(item.target)
@@ -1606,6 +1680,9 @@ class ViewTransition:
                     for live,target in zip(item.object.mobject.get_family(),item.target.get_family()):
                         _copy_layout_metadata(target,live)
             changing = _ArrivedLayoutGroup(*motions,on_arrival=finish_layout) if motions else Wait(.001)
+            if held_replacements:
+                changing=Succession(changing,_deferred(lambda:AnimationGroup(
+                    *(factory() for factory in held_replacements)),run_time=.3))
             held_term_exits=[animation for animation in term_exits
                              if source_family & {id(part) for part in animation.mobject.get_family()}]
             term_exits=[animation for animation in term_exits if animation not in held_term_exits]
@@ -1628,7 +1705,7 @@ class ViewTransition:
             if copy_owners:
                 # The definition stays visible until its copy has arrived.
                 phases=[changing,_deferred(lambda: AnimationGroup(
-                    *(FadeOut(self.old[key][1].object.mobject) for key in copy_owners)), run_time=.2)]
+                    *(FadeOut(self.old[key][1].object.mobject) for key in copy_owners if key not in replaced_old)), run_time=.2)]
                 if held_reflows:
                     def release_rows():
                         animations=[]

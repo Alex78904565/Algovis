@@ -23,6 +23,7 @@ SIZE_METHODS = {'scale', 'scale_to_fit_width', 'scale_to_fit_height', 'set_width
                 'match_width', 'match_height', 'set_font_size'}
 POSITION_METHODS={'move_to','next_to','align_to','shift','set_x','set_y','set_z',
                   'arrange','arrange_in_grid','to_edge','to_corner','center'}
+AUTHORING_BYPASSES={'play','add','remove','begin_slide','show','wipe','clear_content','caption'}
 
 
 def name(node):
@@ -196,11 +197,12 @@ def require_scene_typography(path, scene):
     path = Path(path)
     report = audit_scene_project(path, scene)
     problems = [record for record in report['findings'] if record['category'] in
-                ('absolute_font_size','manual_text_scale','container_size_review','manual_scene_placement')]
+                ('absolute_font_size','manual_text_scale','container_size_review','manual_scene_placement',
+                 'view_compiler_bypass','unowned_animation_plan')]
     if problems:
         details = '; '.join(f"{record['owner']}:{record['line']} {record['category']}" for record in problems[:5])
-        raise ValueError(f'Scene typography migration required ({len(problems)} manual text sizing decisions): {details}. '
-                         'Use scene defaults and declared relative font scales; the previous preview remains available.')
+        raise ValueError(f'Scene typography migration required ({len(problems)} authoring boundary violations): {details}. '
+                         'Use shared panels, scene defaults and an owned animation plan; the previous preview remains available.')
     return report
 
 
@@ -225,12 +227,31 @@ def audit_scene_project(path, scene):
         # Layout belongs to shared scenes/components. Moving a container or a
         # helper-returned equation is just as manual as moving raw MathTex.
         source=Source(content,str(current))
+        # Scope lookup must use this Source's nodes. A second ast.parse tree
+        # has different identities and silently classifies every call as global.
+        tree=source.tree
         active=set(source.reachable(entry)) if entry else None
         placements=[source.record(node,source.owner(node),'manual_scene_placement',
                     source.kind(node.func.value,source.owner(node)),node.func.attr)
             for node in ast.walk(tree) if isinstance(node,ast.Call) and isinstance(node.func,ast.Attribute)
             and node.func.attr in POSITION_METHODS and (active is None or source.owner(node) in active)]
         module_report['findings'].extend(placements)
+        for node in ast.walk(tree):
+            if isinstance(node,(ast.FunctionDef,ast.AsyncFunctionDef)) and node.name in (
+                    '_arrange','_fit_and_arrange','_panel_recipe','_fit_areas'):
+                module_report['findings'].append(source.record(node,source.owner(node,include_self=True),
+                    'view_compiler_bypass','authoring','local layout override'))
+            if not isinstance(node,ast.Call) or (active is not None and source.owner(node) not in active):continue
+            symbol=source.symbol(node.func)
+            direct_scene=(isinstance(node.func,ast.Attribute) and name(node.func.value) in ('self','scene','renderer')
+                          and node.func.attr in AUTHORING_BYPASSES)
+            if direct_scene or symbol=='CanvasSlide':
+                module_report['findings'].append(source.record(node,source.owner(node),
+                    'view_compiler_bypass','authoring',ast.unparse(node.func)))
+            if symbol in ('LessonAnimation','SceneSequence') and not (
+                    symbol=='LessonAnimation' and (node.args or any(k.arg=='renderer' for k in node.keywords))):
+                module_report['findings'].append(source.record(node,source.owner(node),
+                    'unowned_animation_plan','authoring',symbol))
         for node in ast.walk(tree):
             modules=[]
             if isinstance(node,ast.Import):modules=[alias.name for alias in node.names]

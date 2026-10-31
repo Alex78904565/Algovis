@@ -24,6 +24,8 @@ from .theme import (
 )
 from .presentation import Slide, SlideLayout, SlideRegion, SlideScene, SlideSceneMixin, slide_scene
 from .fitting import FitPolicy
+from .panels import Panel, RowPanel
+from .panel_slide import PanelSlide
 from .composition import (SlideObject, SlideView, ColumnSlide, SplitSlide,
                           EquationSlide, ProofSlide, ViewTransition, LayoutOverrideWarning)
 from .view_timeline import (CanvasSlide, ViewScene, ViewSceneMixin, Reveal, Retire, Move, CopyInto,
@@ -34,7 +36,7 @@ from .frames import (
     DEFAULT_FRAME_STYLE, CaseEquation, ChapterMarker, ComparisonFrame, EquationFrame,
     LessonFrameStyle, PanelFrame, ProofFrame,
 )
-from .narration import NarrationCue, NarrationTrack
+from .narration import NarrationCue, NarrationTrack, WordEvent
 from .continuity import SectionHandoff
 from .core.math_row import MathRow
 from .core.proof import Proof, ProofRow

@@ -1,5 +1,44 @@
 # Recurring animation feedback: reference for the agent
 
+## Latest clarification: moving ink may cross stationary ink
+
+The author explicitly permits temporary overlap while an object travels. The
+landing must be clear and correctly aligned. Prefer a gentle, smooth arc for
+deliberate moves and copies between panels. Ordinary alignment reflow need not
+bow every row. Do not add circuitous corridors solely to avoid moving over text.
+This relaxes the earlier route-clearance rules below; they remain useful when
+a crossing makes a particular explanation hard to follow, rather than a blanket
+ban on transient overlap. Copy provenance, continuous formatting, readable
+endpoints and correct word timing still apply.
+
+### Migration checks that must exercise the actual pathway
+
+- Public layout classes must inherit the shared arranger and supply a panel
+  recipe. A class-name hierarchy alongside private placement implementations
+  does not satisfy this. Nested groups keep their child identities.
+- The complete explanation measures future states before playback; hidden
+  future layout reservations must not become invisible live artwork.
+- Pass the containing arc into every lowered mathematical term, including
+  braces, case alternatives and conditions. A curved owner with straight-path
+  children visibly tears an equation apart during travel.
+- Check the actual authoring AST in the source gate. Parsing a second tree and
+  comparing node identities silently skipped entrypoint scope checks. Keep a
+  regression with direct manual placement inside a real scene entrypoint.
+- Each native render must own writable text/TeX/media/manifest/handoff outputs.
+  Shared-cache races can produce missing DVI or empty SVG errors even though
+  installation and source are valid. Do not misdiagnose those as missing tools.
+- Publish each movie with its matching immutable selectable-object manifest.
+  Reject stale/missing word provenance or unconsumed declarations and preserve
+  the previous working preview when a new build fails.
+
+Agent-verified preservation, not new viewer endorsement: the recursive-panel
+migration was compared against all decoded frames of the prior checked release.
+Only short motion windows changed; their native frames and the section joins
+were inspected. The public case-equation example also kept its brace, cases and
+conditions coherent on an arc and landed on the common left edge. This evidence
+supports these specific mechanisms, not a claim that tests certify the whole
+video or its audio.
+
 ### Shared classes must enforce their promised defaults
 
 Inheritance alone is not evidence of a completed layout migration. Verify the
