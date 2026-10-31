@@ -91,7 +91,8 @@ class ReplaceContent(Succession):
     a student's visual reference. Use this for a different sentence or layout.
     """
     def __init__(self, source, target, **kwargs):
-        super().__init__(FadeOut(source), FadeIn(target), **kwargs)
+        super().__init__(FadeOut(source),
+                         DeferredAnimation(lambda: FadeIn(target)), **kwargs)
 
 class FocusBox(SurroundingRectangle):
     """

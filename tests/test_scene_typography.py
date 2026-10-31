@@ -6,6 +6,29 @@ from algovis import ViewTransition
 
 
 class SceneTypographyTests(unittest.TestCase):
+    def test_derivation_footer_copy_bypasses_the_parameter_explanation(self):
+        from algovis import DerivationScene
+        import numpy as np
+        view=DerivationScene()
+        view.add('meaning',TextObject('Minimum additional distance'),slot='meaning')
+        view.add('recurrence',MathRow({'value':'d(i,j)'}),slot='equation')
+        view.add('parameters',TextObject('i = current city; v = visit pattern'),slot='explanation')
+        definition=view.add('distance',MathRow({'call':'d(i,j)','meaning':r'=\text{distance}'}),slot='footer')
+        view.install(Scene())
+        source=definition.part('call').mobject
+        destination=view.target('recurrence').part('value')
+        route=view.definition_route(source,destination)
+        self.assertTrue(route)
+        obstacle=view.target('parameters')
+        points=[source.get_center(),*route,destination.get_center()]
+        half_width=max(source.width,destination.width)/2
+        half_height=max(source.height,destination.height)/2
+        for start,end in zip(points,points[1:]):
+            for alpha in np.linspace(0,1,51):
+                point=start+(end-start)*alpha
+                self.assertFalse(obstacle.get_left()[0]-half_width<point[0]<obstacle.get_right()[0]+half_width
+                    and obstacle.get_bottom()[1]-half_height<point[1]<obstacle.get_top()[1]+half_height)
+
     def test_column_definition_copy_bypasses_an_intervening_base_case(self):
         from algovis import Equation
         import numpy as np

@@ -150,7 +150,7 @@ class SceneSequence(LessonAnimation):
         if self._sealed:return self
         from .sequence_layout import plan_sequence
         slots=list(self._scene_slots())
-        views,report=plan_sequence(self.name,[beat.scene for _,_,beat in slots])
+        views,report=plan_sequence(self.name,[beat.scene for _,_,beat in slots],previous=self._last_scene)
         for (owner,index,beat),view in zip(slots,views):
             owner.beats[index]=replace(beat,scene=view)
             owner.layout_report=report

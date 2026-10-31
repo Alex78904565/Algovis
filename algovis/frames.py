@@ -1,8 +1,10 @@
 """Shared, cue-neutral frames for hand-authored lessons.
 
-These components arrange existing objects. They never add future content to a
-scene, schedule a reveal, shrink a formula, or replace its mathematical parts.
-Keep the narration and the mathematics in the scene; keep repeated geometry here.
+These components arrange existing objects and own their mechanical transition
+phases. They never choose narration triggers or mathematical content. A nested
+term is revealed after its moving owner arrives, without prepainting the future
+layout. Keep narration and mathematics in the scene; keep repeated geometry and
+component lifecycle here.
 """
 from dataclasses import dataclass
 from types import MappingProxyType
@@ -220,17 +222,32 @@ class CaseEquation(VGroup):
             style=self.style,theme=self.theme,compact=self.compact,show_brace=self.show_brace).move_to(self)
 
     def motions_to(self,target,*,skip=()):
-        from manim import FadeIn,FadeOut,Transform
+        from manim import FadeIn,FadeOut,Transform,AnimationGroup,Succession
         from .core.math_row import MathRow
-        motions=[]
+        from .utils.effects import DeferredAnimation
+        motions=[];introduced=[];retired=[]
         for name,(old,new) in zip(['lhs',*(f'row:{index}' for index in range(len(self.rows)))],
                                 [(self.lhs,target.lhs),*zip(self.rows,target.rows)]):
             ignored=tuple(path[len(name)+1:] for path in skip if path.startswith(name+'.'))
-            motions.extend(old.motions_to(new,skip=ignored) if isinstance(old,MathRow) and isinstance(new,MathRow)
+            motions.extend(old.motions_to(new,skip=ignored,introductions=introduced,retirements=retired) if isinstance(old,MathRow) and isinstance(new,MathRow)
                            else [Transform(old,new)])
         motions.append(Transform(self.brace,target.brace))
-        motions.extend(FadeOut(row) for row in self.rows[len(target.rows):])
-        motions.extend(FadeIn(row) for row in target.rows[len(self.rows):])
+        retired.extend(FadeOut(row) for row in self.rows[len(target.rows):])
+        introduced.extend(target.rows[len(self.rows):])
+        # New labels belong to their moving equation, including nested rows.
+        # Never leave them fading at the destination while the owner travels.
+        moving=any(np.linalg.norm(old.get_left()-new.get_left())>.1
+                   for old,new in [(self.lhs,target.lhs),*zip(self.rows,target.rows)])
+        def arrival():
+            if moving and introduced:
+                return Succession(AnimationGroup(*motions,run_time=.8),
+                    DeferredAnimation(lambda:AnimationGroup(*(FadeIn(part) for part in introduced)),run_time=.2))
+            return AnimationGroup(*motions,*(FadeIn(part) for part in introduced))
+        if retired:
+            return [Succession(AnimationGroup(*retired,run_time=.25),
+                               DeferredAnimation(arrival,run_time=.75))]
+        if moving and introduced:return [arrival()]
+        motions.extend(FadeIn(part) for part in introduced)
         return motions
 
     def adopt_layout(self,target):

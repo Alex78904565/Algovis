@@ -63,9 +63,13 @@ class SlotScene(SlideView):
     shared_block_height=True
     gutter=.35
 
-    def __init__(self,*args,center_blocks=False,**kwargs):
+    def __init__(self,*args,center_blocks=False,context=False,**kwargs):
         self._width_fill=frozenset()
         self.center_blocks=bool(center_blocks)
+        if context:
+            if self.COLUMNS:raise ValueError('A context row requires a row-based scene')
+            self.ROWS=(*self.ROWS,('context',.65))
+            self.block_slots=(*self.block_slots,'context')
         if center_blocks:
             self.block_slots=tuple(key for key,_ in self.COLUMNS)
         super().__init__(*args,**kwargs)
@@ -102,6 +106,16 @@ class SlotScene(SlideView):
 
     def _region(self,slot):
         return self._slots().get(slot) or super()._region(slot)
+
+    def definition_route(self,source,destination):
+        """Keep carried definitions clear of the other semantic rows.
+
+        Footer/context definitions are ordinary sources too. Their route must
+        account for explanatory rows between the source and the equation.
+        """
+        from .composition import _definition_route
+        return _definition_route(self,source,destination,
+            [item for item in self.items.values() if item.slot!='header'])
 
     def _fit_and_arrange(self):
         for item in self.items.values():
@@ -406,6 +420,10 @@ class AnalysisScene(SlotScene):
 class RecapScene(SlotScene):
     """Keep a numbered method beside its consequences, with room for a brace."""
     COLUMNS=(('steps',7.5),('consequences',5.5))
+    shared_block_height=False
+
+    def __init__(self,*args,center_blocks=True,**kwargs):
+        super().__init__(*args,center_blocks=center_blocks,**kwargs)
 
 
 class StoryScene(SlotScene):

@@ -41,7 +41,7 @@ from .core.proof import Proof, ProofRow
 from .animation import LessonAnimation,SceneSequence
 from .objects import TextObject, Equation
 from .core.sequences import StateSequence, FloatingCharacter
-from .core.teaching import MathStack,ObjectRow,BracedGroup,FixedGrowthPlot,LogRuntimeComparison,ServerRacks,Worksheet,TreeAnnotation,InductionChain
+from .core.teaching import MathStack,ObjectRow,StateStep,BracedGroup,FixedGrowthPlot,LogRuntimeComparison,ServerRacks,Worksheet,TreeAnnotation,InductionChain
 from .core.illustrated import IllustratedProp,IllustratedBag,CapacityMeter,IllustratedItem,ItemCollection
 from .core.routes import CityMap,RoadTripSimulation,RouteTrace
 from .core.recap import Checklist

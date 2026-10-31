@@ -1,7 +1,8 @@
 """Named mathematical terms laid out together by TeX, including substitutions."""
 from __future__ import annotations
 import numpy as np
-from manim import FadeIn, FadeOut, MathTex, Transform, VectorizedPoint, VGroup
+import re
+from manim import AnimationGroup, FadeIn, FadeOut, MathTex, Succession, Transform, VectorizedPoint, VGroup
 from manim.mobject.text.tex_mobject import SCALE_FACTOR_PER_FONT_POINT
 
 
@@ -115,13 +116,80 @@ class MathRow(MathTex):
         self._sum_contract = (immediate,future,total)
         return self
 
-    def motions_to(self, target, *, skip=()):
-        skip = set(skip); animations = []
+    def with_state(self,*,parts=None,**changes):
+        """Refine a named equation inside a layout container's state model."""
+        return self.next_layout(parts,**changes)
+
+    def annotation_parts(self,part,tex=None):
+        """Plan a native underbrace without replacing its named operand.
+
+        The annotation has neutral ink while the operand keeps its own meaning.
+        Passing None removes that annotation, retaining the operand and peers.
+        """
+        if part not in self.parts:raise KeyError(part)
+        before,after=f'annotation:{part}:open',f'annotation:{part}:close'
+        result={}
+        for name,value in self.slot_tex.items():
+            if name in (before,after):continue
+            if name==part and tex is not None:result[before]=r'\underbrace{'
+            result[name]=value
+            if name==part and tex is not None:result[after]='}_{'+str(tex)+'}'
+        return result
+
+    def prose_term(self, name):
+        """Whether a named term begins with explanatory words, not a call."""
+        return bool(re.match(
+            r'^(?:\s|[({\[]|\\(?:quad|qquad|left|bigl|Bigl|biggl|Biggl|,|;|!| ))*\\text\{',
+            self.slot_tex[name]))
+
+    def motions_to(self, target, *, skip=(), introductions=None, retirements=None):
+        from ..utils.effects import DeferredAnimation, ReplaceContent
+        skip = set(skip); animations = []; retired = []; replacements=[]
         for name,part in self.parts.items():
             if name in skip: continue
-            animations.append(Transform(part,target.part(name)) if name in target.parts else FadeOut(part))
-        animations.extend(FadeIn(part) for name,part in target.parts.items()
-                          if name not in self.parts and name not in skip)
+            if name not in target.parts:
+                retired.append(FadeOut(part))
+            elif (re.findall(r'\\text\{([^{}]*)\}',self.slot_tex[name])
+                  !=re.findall(r'\\text\{([^{}]*)\}',target.slot_tex[name])
+                  and any(re.search(r'[A-Za-z]\([^)]*\)\s*\\text\{',tex)
+                          for tex in (self.slot_tex[name],target.slot_tex[name]))):
+                raise ValueError('Changing prose appended to a function call requires separate named math and prose terms: '+name)
+            elif ((self.prose_term(name) or target.prose_term(name))
+                  and re.findall(r'\\text\{([^{}]*)\}',self.slot_tex[name])
+                  != re.findall(r'\\text\{([^{}]*)\}',target.slot_tex[name])):
+                # Prose is a caption, not a glyph-wise algebraic substitution.
+                # Keep the surrounding equation while changing its words locally.
+                if retirements is None:animations.append(ReplaceContent(part,target.part(name)))
+                else:
+                    retired.append(FadeOut(part));replacements.append(target.part(name))
+            else:
+                animations.append(Transform(part,target.part(name)))
+        introduced = replacements+[part for name,part in target.parts.items()
+                                   if name not in self.parts and name not in skip]
+        if retirements is not None:
+            retirements.extend(retired)
+            retired=[]
+        if introductions is not None:
+            # A containing equation owns one arrival phase for all its rows.
+            introductions.extend(introduced)
+            introduced=[]
+        anchor=next((name for name in self.parts if name in target.parts and name not in skip),None)
+        moving=anchor is not None and np.linalg.norm(
+            self.part(anchor).get_center()-target.part(anchor).get_center())>.1
+        def arrival():
+            if moving and introduced:
+                return Succession(AnimationGroup(*animations,run_time=.8),
+                    DeferredAnimation(lambda:AnimationGroup(*(FadeIn(part) for part in introduced)),run_time=.2))
+            return AnimationGroup(*animations,*(FadeIn(part) for part in introduced))
+        if retired:
+            if not animations and not introduced:return retired
+            # Changed terms can occupy the very space being vacated. Retire
+            # that ink before preparing the next phase; prebuilt FadeIns paint
+            # future destinations when nested groups set themselves up.
+            return [Succession(AnimationGroup(*retired,run_time=.25),
+                               DeferredAnimation(arrival,run_time=.75))]
+        if moving and introduced:return [arrival()]
+        animations.extend(FadeIn(part) for part in introduced)
         return animations
 
     def commit(self, target, scene):

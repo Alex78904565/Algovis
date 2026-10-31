@@ -167,6 +167,13 @@ ownership and draw order. Check actual rendered label pixels at the peak and
 after cleanup; opacity metadata alone cannot detect this occlusion.
 
 A migration preserves teaching devices, not just scene count and equations.
+The whole-lesson observation pass also found missing optimizer explanations,
+the author's forward-thinking preference, and a requested recursion/storage
+comparison. Inventory those explanatory relationships explicitly against the
+recording and annotation replies. A previously answered note is not proof that
+its requested feature survived a later migration. Preserve the explanation's
+content and relationships as well as its object identities.
+
 Inventory the useful brace/group labels, persistent examples and meters,
 definition transfers, state updates and chosen-item movement before replacing
 their implementation. Compare those devices with the earlier version. A clean
@@ -539,6 +546,18 @@ population order, or runtime. Avoid suggesting that visualizing an array is a
 prerequisite for understanding dynamic programming.
 
 ## Motion and lifecycle
+
+Inspect local caption edits at their midpoint. Transforming one English sentence
+into another scrambles glyphs even if both endpoints are readable. Retire that
+caption's old ink, then reveal its new wording; keep the surrounding mathematical
+work. The same rule applies to prose inside a named equation term. Defer both
+phases when reusing the live owner so cleanup cannot restore its old glyphs.
+Mathematical substitutions and travelling definitions retain their own motions.
+
+An operator belongs between its operands. In the shared Fibonacci addition lane,
+retain the endorsed travelling yellow operand frame, but replace the plus and
+storage arrow in their new gaps instead of sliding them through populated values.
+Check the full fill sequence and its continuation, not only the first addition.
 
 Nodes and their edges move or disappear together. A collapsed subtree leaves no
 edges behind. Destination values must not appear before the travelling states
@@ -1117,3 +1136,47 @@ Additional self-review failures found on October 30:
   separate routes. Three valid endpoints do not justify three colliding copies.
   Keep the existing spoken cue and duration when sequential internal phases
   communicate the same substitution more clearly.
+- Reserve a retained equation's full ascent and descent across its explanation,
+  not only the total block height. Otherwise its second line or underbrace can
+  briefly draw over a caption that is moving down, despite clean endpoints.
+  The sequence planner owns this reservation; increasing a local offset is not
+  the repair. Inspect the intervening frames as well as the completed formula.
+- A proof's old conclusion must not silently acquire a new meaning when its
+  claim is edited. Retain the reusable proof work, retire the old conclusion,
+  and conclude the new assertion only after the changed argument is complete.
+- Copy routing applies to semantic row layouts too. A footer definition can
+  cross the parameter explanation on its way to the equation even when a proof
+  copy uses a safe route. Inventory both kinds of caller. Check the departure,
+  intervening rows, and final approach in the actual video.
+- Moving retained content must clear its destination before **any** new
+  component is revealed there. This includes cases equations and diagrams,
+  not only captions. Preserve the component's own entrance lifecycle when
+  scheduling that second phase. A dim overlapping equation is still overlap.
+- Apply that rule inside components as well. New case annotations must wait
+  for their moving equation's arrival, rather than fading at disconnected final
+  coordinates. The component coordinates this automatically; do not fix each
+  lesson by adding a special label-delay beat. Keep math and changing English
+  prose in separately named equation terms so an inductive predicate can change
+  without morphing its explanation letter by letter.
+- A definition transfer must clear the English placeholder before neighboring
+  mathematical terms move into its space. Deferring the travelling copy alone
+  does not protect that preparation phase. Inspect the outgoing words, the
+  rearrangement, and the copy's arrival separately; preserve the source rule.
+- A copy can also cross the meaning attached to its own source. Check departure
+  within a multi-line equation, not only intervening rows and arrival. Applying
+  an equation's lhs on a later line needs a route out of its source line before
+  horizontal travel; missing clearance must fail rather than cross that text.
+- Stable paragraph wrapping must survive explanation-group boundaries too.
+  A new group inherits the narrowest reserved width for the same paragraph.
+  Otherwise a safe move from a comparison column to a wider scene can still
+  scramble two lines into one. Check the moving glyphs, not only final fit.
+
+Specific working mechanisms preserved in the October 30 whole-lesson audit
+(agent observations, not new viewer endorsement): the empty Fibonacci row
+across the introduction cut; addition guides in the gaps between cells; local
+duplicate-call notes; bottom-up subtree folding into the corresponding array
+cells; retained definitions and native case braces during problem construction;
+matched-branch numerical backtracking with independently centered panels; and
+the board-inspired recap's separate recursion and storage braces. Reuse these
+mechanisms where their explanation matches, without extending their signoff to
+unrelated text, motion, or audio.

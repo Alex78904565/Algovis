@@ -1,5 +1,6 @@
 """Shared state cells and their two-input addition process."""
 import math
+import numpy as np
 from manim import (AnimationGroup,Arrow,Create,DOWN,FadeIn,FadeOut,LEFT,MathTex,
                    MoveAlongPath,ParametricFunction,RIGHT,Succession,SurroundingRectangle,
                    SVGMobject,Transform,UP,VGroup,config,linear)
@@ -105,17 +106,27 @@ class StateSequence(VGroup):
         return AnimationGroup(Create(self._pair),FadeIn(self._plus),lag_ratio=0)
 
     def add_next(self,index,value):
+        from ..utils.effects import ReplaceContent
         if self._pair is None:raise ValueError('Introduce the two-input addition before computing the next cell')
         pair=SurroundingRectangle(VGroup(self.row[index-2],self.row[index-1]),color=self.theme.accent,buff=.08)
         plus=self._plus.copy().move_to((self.row[index-2].get_right()+self.row[index-1].get_left())/2)
         arrow=Arrow(pair.get_right()+RIGHT*.025,self.row[index].box.get_left()+LEFT*.025,
                     buff=0,color=self.theme.primary,stroke_width=2.4,tip_length=.09)
-        motions=[Transform(self._pair,pair),Transform(self._plus,plus),self.populate(index,value)]
+        # The operand frame travels, but the operation belongs in a gap.
+        # Sliding '+' through the intervening values temporarily changes the
+        # displayed arithmetic. Retire it and reveal it in the next gap instead.
+        moved = np.linalg.norm(self._plus.get_center()-plus.get_center()) > .01
+        motions=[Transform(self._pair,pair),self.populate(index,value)]
+        if moved:
+            motions.append(ReplaceContent(self._plus,plus));self._plus=plus
         if self._arrow is None:self._arrow=arrow;motions.append(Create(arrow))
+        elif moved:
+            motions.append(ReplaceContent(self._arrow,arrow));self._arrow=arrow
         else:motions.append(Transform(self._arrow,arrow))
         return AnimationGroup(*motions,lag_ratio=0)
 
     def continue_addition(self):
+        from ..utils.effects import ReplaceContent
         pair=SurroundingRectangle(VGroup(self.row[-2],self.row[-1]),color=self.theme.accent,buff=.08)
         plus=self._plus.copy().move_to((self.row[-2].get_right()+self.row[-1].get_left())/2)
         self.ellipsis.next_to(self.row,RIGHT,buff=.55).set_opacity(1)
@@ -123,8 +134,10 @@ class StateSequence(VGroup):
         self._continuation=True
         arrow=Arrow(pair.get_right()+RIGHT*.025,self.ellipsis.get_left()+LEFT*.12,
                     buff=0,color=self.theme.primary,stroke_width=2.4,tip_length=.09)
-        return AnimationGroup(Transform(self._pair,pair),Transform(self._plus,plus),
-                              Transform(self._arrow,arrow),FadeIn(self.ellipsis),lag_ratio=0)
+        motions=[Transform(self._pair,pair),ReplaceContent(self._plus,plus),
+                 ReplaceContent(self._arrow,arrow),FadeIn(self.ellipsis)]
+        self._plus,self._arrow=plus,arrow
+        return AnimationGroup(*motions,lag_ratio=0)
 
     def clear_addition(self):
         guides=[mob for mob in (self._pair,self._plus,self._arrow) if mob is not None]

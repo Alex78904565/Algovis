@@ -1,7 +1,7 @@
 """Reusable explanatory diagrams; scene authors supply content and meaning."""
 import math
 import numpy as np
-from manim import (AnimationGroup,Axes,Create,DOWN,Dot,FadeIn,FadeOut,LEFT,Line,
+from manim import (AnimationGroup,Arrow,Axes,Create,DOWN,Dot,FadeIn,FadeOut,LEFT,Line,
     RIGHT,RoundedRectangle,Succession,Transform,UP,VGroup,VMobject,config,linear,Group,Brace)
 from ..layout import LessonStyle,assign_scene_typography
 from ..theme import DEFAULT_THEME
@@ -52,6 +52,34 @@ class ObjectRow(Group):
         children=[child.copy() for child in self]
         children[index]=children[index].with_state(**state)
         return ObjectRow(*children,align_part=self.align_part,align_edge=self.align_edge)
+
+
+class StateStep(VGroup):
+    """A state dependency and its choice, with consistent forward/backward ink."""
+    def __init__(self,current,neighbor,*,choice='c',backward=False,theme=DEFAULT_THEME):
+        self.backward,self.theme=backward,theme
+        style=LessonStyle(theme=theme)
+        self.current=style.math(current,type_role='body',role='structure')
+        self.neighbor=style.math(neighbor,type_role='body',role='structure')
+        self.choice=style.math(choice,type_role='note',role='operation')
+        self.arrow=Arrow(LEFT,RIGHT,buff=0,color=theme.muted,stroke_width=1.5,tip_length=.09)
+        super().__init__(self.current,self.neighbor,self.arrow,self.choice)
+        self._arrange()
+
+    def _arrange(self):
+        center=self.get_center()
+        left,right=(self.neighbor,self.current) if self.backward else (self.current,self.neighbor)
+        VGroup(left,right).arrange(RIGHT,buff=.95)
+        start,end=left.get_right()+RIGHT*.08,right.get_left()+LEFT*.08
+        self.arrow.put_start_and_end_on(*( (end,start) if self.backward else (start,end) ))
+        self.choice.next_to(self.arrow,UP,buff=.1)
+        self.move_to(center)
+
+    def apply_scene_typography(self,typography,*,group):
+        for label in (self.current,self.neighbor):
+            assign_scene_typography(label,typography,group=group,role='body')
+        assign_scene_typography(self.choice,typography,group=group,role='note')
+        self._arrange()
 
 
 class BracedGroup(Group):
@@ -145,19 +173,20 @@ class LogRuntimeComparison(VGroup):
         self.y_labels=VGroup(*(style.math(str(y),type_role='label',role='muted').next_to(
             self.axes.c2p(2,y),LEFT,buff=.12) for y in range(4,y_max+1,4)))
         self.y_title=style.math(r'\log_{10}(\text{operations})',type_role='label').next_to(self.axes,UP,buff=.22)
+        self.x_title=style.math('n',type_role='label').next_to(self.axes,RIGHT,buff=.18).align_to(self.axes,DOWN)
         self.curves=VGroup();self.legend=VGroup()
         for label,function,evaluation in series:
             self.curves.add(self.axes.plot(function,x_range=[2,x_max],color=theme.role_color(evaluation),stroke_width=3))
             self.legend.add(style.math(label,type_role='label',evaluation=evaluation))
         self.legend.arrange(RIGHT,buff=.65).next_to(self.axes,DOWN,buff=.55)
-        super().__init__(self.axes,self.x_labels,self.y_labels,self.y_title,self.legend,self.curves)
+        super().__init__(self.axes,self.x_labels,self.y_labels,self.y_title,self.x_title,self.legend,self.curves)
         self.curves.set_opacity(0)
         self.y_title.set_opacity(0)
 
     def apply_scene_typography(self,typography,*,group):
         for label in [*self.x_labels,*self.y_labels]:
             assign_scene_typography(label,typography,group=group,role='label')
-        for label in [self.y_title,*self.legend]:
+        for label in [self.y_title,self.x_title,*self.legend]:
             assign_scene_typography(label,typography,group=group,role='equation')
 
     def layout_in(self,width,height,typography):
@@ -176,6 +205,7 @@ class LogRuntimeComparison(VGroup):
             for y,label in zip(range(4,self.y_max+1,4),self.y_labels):
                 label.next_to(self.axes.c2p(2,y),LEFT,buff=.12)
             self.y_title.next_to(self.axes,UP,buff=.22)
+            self.x_title.next_to(self.axes,RIGHT,buff=.18).align_to(self.axes,DOWN)
             self.legend.arrange(RIGHT,buff=.65).next_to(self.axes,DOWN,buff=.55)
         labels()
         # Hidden title/curves reserve their future geometry as well.

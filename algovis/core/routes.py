@@ -185,4 +185,5 @@ class RoadTripSimulation(VGroup):
         if self.fuel<required:raise ValueError('The demonstrated trip runs out of fuel')
         old=self.city;self.city+=1;self.fuel-=required
         return AnimationGroup(self.map.route_step(old,self.city),self._fuel_animation(),
+            Transform(self.purchase,self.purchase.next_layout(b=r'\text{buy: }0')),
             Transform(self.state,self.state.next_layout(city=str(self.city+1),fuel=str(self.fuel))))

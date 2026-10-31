@@ -655,5 +655,65 @@ semantic change. Components with named child references implement
 
 Proof substitutions prepare the surrounding terms before the copied formula
 arrives. The shared proof sequence reserves a landing band for its working
-equality, and the measured route avoids a retained suffix on the last leg.
+equality and for a copied base expression followed by a retained implication.
+Rows with no obstructing suffix do not acquire unnecessary blank bands. The
+measured route avoids a retained suffix on the last leg, even for adjacent rows.
 Endpoint clearance alone does not establish a safe substitution path.
+
+When a definition replaces a prose placeholder, the view compiler retires that
+placeholder before preparing neighboring terms, then carries the copy into the
+freed slot. Mathematical application terms retain their existing copy lifecycle.
+The scene supplies the definition source and resulting expression, without a
+local cleanup or a second timing cue for the placeholder.
+
+For a multi-line `MathRow` applying its own lhs on a later line, the shared route
+leaves above the source line before horizontal travel. It checks the available
+departure band instead of silently drawing through the retained English meaning.
+
+`SlotScene` uses the same measured definition-copy routing for its semantic rows,
+including footer/context sources. A distance or price definition must avoid the
+parameter explanation on its way to the recurrence. `ComparisonScene` retains
+its specialized cross-column gutter strategy.
+
+`ViewTransition` defers an entering component when a retained object's path
+crosses its final area. Retained movement finishes first, then the component's
+entrance runs in the freed space. This policy applies to equations and diagrams
+as well as text, and does not replace their component-owned entrance methods.
+
+The same lifecycle applies inside a retained equation. `MathRow` delays new
+terms while its retained anchor travels; `CaseEquation` coordinates introductions
+across its lhs and nested rows in one arrival phase. Scenes provide one target
+state on one spoken cue, without timing branch labels separately. Mathematical
+parts retain their owners. Changing prose appended to a function call must use
+separate named mathematical and prose terms; the compiler rejects that opaque
+mixed-term rewrite instead of silently morphing an English sentence.
+
+`MathRow.annotation_parts(name, tex)` plans a native underbrace around a named
+operand. Apply that plan through `view.revise`; the operand retains its identity
+and semantic paint while the brace/caption use neutral ink. Pass `None` to remove
+only that annotation. Equation `with_state(parts=...)` also supports refining a
+row nested inside a layout container, without replacing its peers.
+
+`StateStep(current, neighbor, choice='c', backward=False)` owns the two state
+labels, the neutral dependency arrow and the operation-colored choice label.
+Forward and backward variants use the same typography and spacing; backward
+points from the current state toward its prerequisite. Keep a direction diagram
+beside the corresponding recurrence rather than inventing a different drawing
+style for the opposite interpretation.
+
+Retained prose reserves its narrowest required wrapping width across a
+`SceneSequence`. A move between layout contexts therefore keeps those glyphs
+arranged as the same paragraph. A changed sentence is a local clear/reveal,
+not a letter morph; unchanged words and mathematical symbols retain their
+motions. Check the encoded phase boundaries even when the endpoints match.
+The sequence planner also shares each retained `MathRow`'s maximum ascent and
+descent across its beats, before computing the common fit. A future second line,
+fraction or annotation reserves its own row from the start. Reserving only the
+total argument height does not keep the next caption out of a growing equation's
+path. This reservation contains no future visible artwork and does not change
+the narration cue at which that artwork is introduced.
+
+That wrapping reservation carries from the preceding explanation group when
+the same paragraph continues. Starting a new `SceneSequence` does not give a
+retained paragraph permission to expand its lines and interpolate their glyphs.
+An explicitly changed sentence receives its own content-keyed reservation.

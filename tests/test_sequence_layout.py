@@ -7,6 +7,108 @@ from algovis.animation import SceneBeat
 
 
 class SequenceLayoutTests(unittest.TestCase):
+    def test_retained_paragraph_keeps_its_wrap_when_a_new_group_has_more_width(self):
+        from algovis import ComparisonScene
+        from algovis.sequence_layout import plan_sequence
+        previous=ComparisonScene()
+        words='Minimum weight needed to reach at least the required value, using the items under consideration.'
+        handle=previous.add('meaning',TextObject(words),slot='right')
+        (old,),_=plan_sequence('first explanation',[previous])
+        incoming=ListScene();incoming.add('meaning',handle)
+        (new,),_=plan_sequence('next explanation',[incoming],previous=old)
+        self.assertEqual(new.target('meaning').text,old.target('meaning').text)
+        a,b=(view.target('meaning') for view in (old,new))
+        np.testing.assert_allclose((a.get_all_points()-a.get_center())/a.font_size,
+                                   (b.get_all_points()-b.get_center())/b.font_size,atol=1e-6)
+
+    def test_adjacent_proof_copy_reserves_a_landing_band_before_its_suffix(self):
+        from manim import Scene
+        first=ProofSlide('A formula')
+        source=first.add('claim',Equation({'call':'f(n)=','value':r'\frac{n(n+1)}2'}))
+        first.add('base_case',Equation({'call':'f(0)=','value':'0','suffix':r'\Longrightarrow P(0)'}))
+        first.add('induction_hypothesis',TextObject('Assume the formula for k.'))
+        second=first.fork().substitute('base_case',value=r'\frac{0(0+1)}2',from_definition=source.part('value'))
+        group=SceneSequence('Apply the formula')
+        group.add(first,reason='Keep the claim and the base case')
+        group.add(second,reason='Apply the claim to zero')
+        group.compile();a,b=(beat.scene for beat in group.beats)
+        a.install(Scene())
+        row=b.target('base_case');destination=row.part('value')
+        route=b.definition_route(source.mobject.part('value'),destination)
+        self.assertEqual(len(route),3)
+        self.assertAlmostEqual(route[-1][0],destination.get_x())
+        half=max(source.mobject.part('value').height,destination.height)/2
+        self.assertLess(route[-1][1]+half,row.part('suffix').get_bottom()[1])
+        self.assertGreater(route[-1][1]-half,b.target('induction_hypothesis').get_top()[1])
+
+    def test_growing_equation_reserves_its_row_before_captions_are_shown(self):
+        first=ListScene()
+        first.add('equation',Equation({'value':'f(s)=x'}))
+        first.add('caption','The same state gives the same answer.')
+        later=first.fork().revise('equation',{
+            'value':r'\begin{aligned}f(s)&=x\\&=\max_c(y+f(s_c))\end{aligned}'})
+        group=SceneSequence('growing equation')
+        group.add(first,reason='Name the value')
+        group.add(later,reason='Expand its choices')
+        group.compile()
+        a,b=(beat.scene for beat in group.beats)
+        self.assertAlmostEqual(a.target('caption').get_y(),b.target('caption').get_y())
+        self.assertGreater(b.target('equation').get_bottom()[1],a.target('caption').get_top()[1])
+
+    def test_state_step_direction_and_label_type_follow_the_dependency(self):
+        from algovis import StateStep,ComparisonScene
+        forward=StateStep(r'\text{state}',r'\text{state after }c')
+        backward=StateStep(r'\text{state}',r'\text{state before }c',backward=True)
+        view=ComparisonScene();view.add('forward',forward,slot='left');view.add('backward',backward,slot='right')
+        a,b=view.target('forward'),view.target('backward')
+        self.assertLess(a.current.get_x(),a.neighbor.get_x())
+        self.assertGreater(a.arrow.get_end()[0],a.arrow.get_start()[0])
+        self.assertGreater(b.current.get_x(),b.neighbor.get_x())
+        self.assertLess(b.arrow.get_end()[0],b.arrow.get_start()[0])
+        self.assertGreater(a.choice.get_bottom()[1],a.arrow.get_top()[1])
+        self.assertAlmostEqual(a.current.font_size,b.current.font_size)
+        view.validate()
+
+    def test_retained_paragraph_wraps_once_for_the_narrowest_planned_region(self):
+        from algovis import ComparisonScene
+        first=ListScene('State meaning')
+        handle=first.add('meaning',TextObject('The maximum additional value from all remaining items, with the current weight already in the bag.'))
+        split=ComparisonScene(first.object('title'))
+        split.add('meaning',handle,slot='left')
+        split.add('other',Equation({'call':'f(i,v)'}),slot='right')
+        sequence=SceneSequence('Retain a paragraph when moving to a comparison')
+        sequence.add(first,reason='Recall the meaning');sequence.add(split,reason='Compare another meaning')
+        sequence.compile()
+        a,b=[beat.scene.target('meaning') for beat in sequence.beats]
+        # The same glyphs have the same relative arrangement, not just equal
+        # final bounds. A whole-paragraph Transform can now be a rigid move.
+        self.assertEqual(a.text,b.text)
+        np.testing.assert_allclose(a.get_all_points()-a.get_center(),b.get_all_points()-b.get_center(),atol=1e-6)
+
+    def test_recap_centers_completed_panels_and_reserves_future_braces(self):
+        from algovis import RecapScene,Checklist
+        from manim import Group
+        first=RecapScene('The method')
+        first.add('steps',Checklist(['One','Two','Three','Four','Store'],visible=1),slot='steps')
+        last=first.fork().refine('steps',visible=5,recursion_brace=True,dp_brace=True)
+        last.add('notation',Equation({'call':'f(s)','arrow':r'\to','stored':'f[s]'}),slot='consequences')
+        sequence=SceneSequence('A growing recap');sequence.add(first,reason='Begin');sequence.add(last,reason='Complete')
+        sequence.compile()
+        a,b=[beat.scene for beat in sequence.beats]
+        for slot in ('steps','consequences'):
+            content=Group(*(item.target for item in b.items.values() if item.slot==slot))
+            self.assertAlmostEqual(content.get_y(),b.layout.body.center[1])
+        np.testing.assert_allclose(a.target('steps').get_center(),b.target('steps').get_center())
+
+    def test_context_reference_uses_body_type_and_its_own_named_region(self):
+        from algovis import DerivationScene
+        view=DerivationScene(context=True)
+        view.add('formula',Equation({'call':'f(i,t)'}),slot='equation')
+        view.add('reference',Equation({'cost':r'p_i(b)=\text{purchase cost}'}),slot='context')
+        self.assertIn('context',view._slots())
+        self.assertAlmostEqual(view.target('reference').font_size,view.target('formula').font_size)
+        view.validate()
+
     def test_worked_example_centers_each_panel_independently(self):
         from algovis import WorkedExampleScene
         from manim import Group

@@ -1,13 +1,14 @@
 """Plan fitting over a complete explanation, before its first visible step."""
 from dataclasses import replace
 from .composition import ProofSlide
+from .core.math_row import MathRow
 
 
 def natural_view(view):
     result=view.snapshot()
     for field in ('_sequence_layout_name','_sequence_fit_scales','_sequence_proof_envelopes',
                   '_sequence_block_widths','_sequence_block_heights','_sequence_fill_widths',
-                  '_sequence_paired_heights'):
+                  '_sequence_paired_heights','_sequence_text_widths'):
         result.__dict__.pop(field,None)
     for item in result.items.values():
         if item.fit_scale!=1:result._scale_item(item,1/item.fit_scale)
@@ -16,7 +17,7 @@ def natural_view(view):
     return result
 
 
-def plan_sequence(name,views):
+def plan_sequence(name,views,*,previous=None):
     """One type scale and one proof-row envelope for every planned scene.
 
     Invisible future rows reserve space through their measured geometry; they
@@ -24,6 +25,24 @@ def plan_sequence(name,views):
     cannot fit readably fails here, before any member begins playback.
     """
     planned=[natural_view(view) for view in views]
+    text_widths={}
+    if previous is not None:
+        for item in previous.items.values():
+            source=getattr(item.target,'_algovis_source_text',None)
+            if source is not None:
+                key=(id(item.object.mobject),source)
+                text_widths[key]=getattr(previous,'_sequence_text_widths',{}).get(
+                    key,previous._text_width(item.slot)/item.font_scale)
+    for view in planned:
+        for item in view.items.values():
+            source=getattr(item.target,'_algovis_source_text',None)
+            if source is not None:
+                key=(id(item.object.mobject),source)
+                width=view._text_width(item.slot)/item.font_scale
+                text_widths[key]=min(text_widths.get(key,width),width)
+    for view in planned:
+        view._sequence_text_widths=text_widths.copy()
+        view._wrap_text()
     fill_widths={}
     for view in planned:
         measure=getattr(view,'fill_widths',None)
@@ -38,6 +57,24 @@ def plan_sequence(name,views):
             item=view.items[item_name]
             width=fill_widths.get(f'{type(view).__name__}/{item.slot}')
             if width:item.target.fill_width(width)
+    # Reserve each retained equation's complete vertical envelope before the
+    # first beat. Reserving only the total block height still lets a growing
+    # equation sweep through the caption immediately below it.
+    equation_rows={}
+    for view in planned:
+        for item in view.items.values():
+            if not isinstance(item.target,MathRow):continue
+            key=id(item.object.mobject)
+            row=equation_rows.setdefault(key,{'ascent':0.,'descent':0.})
+            row['ascent']=max(row['ascent'],item.ascent,
+                float(item.target.get_top()[1]-item.target.baseline))
+            row['descent']=max(row['descent'],item.descent,
+                float(item.target.baseline-item.target.get_bottom()[1]))
+    for view in planned:
+        for item in view.items.values():
+            if id(item.object.mobject) in equation_rows:
+                row=equation_rows[id(item.object.mobject)]
+                item.ascent,item.descent=row['ascent'],row['descent']
     envelopes={};scales={};paired={}
     for view in planned:
         measure=getattr(view,'paired_heights',None)
@@ -48,7 +85,7 @@ def plan_sequence(name,views):
     for view in proofs:
         for slot,row in view.row_envelopes().items():
             shared=envelopes.setdefault(slot,dict(height=0.,ascent=0.,descent=0.))
-            for metric,value in row.items():shared[metric]=max(shared[metric],value)
+            for metric,value in row.items():shared[metric]=max(shared.get(metric,0.),value)
     for row in envelopes.values():row['height']=max(row['height'],row['ascent']+row['descent'])
     for view in proofs:
         view._sequence_proof_envelopes=envelopes

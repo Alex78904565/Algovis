@@ -11,6 +11,240 @@ from tests.test_composition import apply
 
 
 class SceneAnimationTests(unittest.TestCase):
+    def test_an_equation_applying_its_own_definition_leaves_above_the_words(self):
+        from algovis import ListScene
+        first=ListScene()
+        row=Equation({'begin':r'\begin{aligned}','call':r'f(\text{state})','eq':'&=',
+            'meaning':r'\text{best value for this instance}','line':r'\\','rhs':'&=',
+            'future':r'\text{???}','end':r'\end{aligned}'})
+        handle=first.add('rule',row)
+        second=first.fork().substitute('rule',future=r'f(\text{state after }c)',from_definition=handle.part('call'))
+        first.install(Scene())
+        route=second.definition_route(row.part('call'),second.target('rule').part('future'))
+        self.assertEqual(len(route),2)
+        self.assertAlmostEqual(route[0][0],row.part('call').get_x())
+        self.assertGreater(route[0][1],row.get_top()[1])
+
+    def test_cases_retire_english_before_revealing_newly_named_recursive_terms(self):
+        old=Equation({'words':r'\text{best value if we skip item }i'})
+        cases=CaseEquation(Equation({'f':'f(i,w)=\\max'}),[old])
+        target=cases.with_state(rows=[Equation({'f':'f(','i':'i+1','rest':',w)'})])
+        stage=Scene();stage.add(cases)
+        animation=cases.motions_to(target)[0]
+        start(animation,stage);animation.interpolate(.15)
+        painted={id(part) for root in stage.mobjects for part in root.family_members_with_points()}
+        self.assertFalse(painted & {id(part) for part in target.rows[0].family_members_with_points()})
+        animation.interpolate(.3)
+        self.assertTrue(all(float(np.max(glyph.get_fill_opacity()))<.001
+                            for glyph in old.family_members_with_points()))
+        finish(animation,stage)
+
+    def test_definition_replaces_english_before_neighbor_terms_use_its_space(self):
+        from algovis import DerivationScene
+        first=DerivationScene()
+        row=Equation({'f':'f(x)=','immediate':r'\text{immediate effect}',
+                      'plus':'+','future':r'\text{long-term effect}'})
+        first.add('rule',row,slot='equation')
+        source=first.add('distance',Equation({'call':'d(i,j)'}),slot='footer')
+        second=first.fork().substitute('rule',immediate='d(i,j)',from_definition=source.part('call'))
+        stage=Scene();first.install(stage)
+        future=row.part('future').get_center().copy()
+        plan=ViewTransition(first,second)
+        for animation in plan.animations(stage):
+            start(animation,stage);animation.interpolate(.15)
+            np.testing.assert_allclose(row.part('future').get_center(),future)
+            animation.interpolate(.25)
+            self.assertTrue(all(float(np.max(glyph.get_fill_opacity()))<.001
+                                for glyph in row.part('immediate').family_members_with_points()))
+            finish(animation,stage)
+        plan.commit(stage)
+        self.assertEqual(row.slot_tex['immediate'],'d(i,j)')
+        self.assertEqual(row.native_layout_findings(),[])
+        self.assertIn(source.mobject,stage.mobjects)
+
+    def test_delimiter_wrapped_words_are_prose_but_named_function_states_are_math(self):
+        row=Equation({'open':r'\left(','words':r'\text{immediate effect}','close':r'\right)'})
+        self.assertTrue(row.prose_term('words'))
+        wrapped=Equation({'words':r'\bigl(\text{a choice}\bigr)'})
+        self.assertTrue(wrapped.prose_term('words'))
+        self.assertFalse(Equation({'call':r'f(\text{state})'}).prose_term('call'))
+
+    def test_moving_native_equation_reveals_its_new_terms_only_after_arrival(self):
+        row=Equation({'call':'f(x)'})
+        target=row.next_layout({'call':'f(x)','label':r'\text{value}'}).shift([0,1,0])
+        stage=Scene();stage.add(row)
+        for animation in row.motions_to(target):
+            start(animation,stage);animation.interpolate(.4)
+            painted={id(part) for root in stage.mobjects for part in root.family_members_with_points()}
+            self.assertNotIn(id(target.part('label')),painted)
+            finish(animation,stage)
+        row.commit(target,stage)
+        self.assertEqual(row.slot_tex['label'],r'\text{value}')
+
+    def test_moving_cases_coordinate_new_labels_across_all_nested_rows(self):
+        row=Equation({'value':'x'})
+        cases=CaseEquation(Equation({'call':'f(x)','eq':'='}),[row])
+        target=cases.with_state(rows=[row.next_layout({'value':'x','label':r'\text{take}'})]).shift([0,1,0])
+        stage=Scene();stage.add(cases)
+        animations=cases.motions_to(target)
+        self.assertEqual(len(animations),1)
+        animation=animations[0];start(animation,stage);animation.interpolate(.4)
+        painted={id(part) for root in stage.mobjects for part in root.family_members_with_points()}
+        self.assertNotIn(id(target.rows[0].part('label')),painted)
+        finish(animation,stage);cases.adopt_layout(target)
+        self.assertIs(cases.rows[0],row)
+        self.assertEqual(row.slot_tex['label'],r'\text{take}')
+
+    def test_cases_reflow_waits_for_existing_rows_even_when_lhs_stays_put(self):
+        row=Equation({'value':'x'})
+        cases=CaseEquation(Equation({'call':'f(x)','eq':'='}),[row])
+        target=cases.with_state(rows=[row,Equation({'value':'y'})])
+        self.assertAlmostEqual(cases.lhs.get_y(),target.lhs.get_y())
+        self.assertGreater(abs(cases.rows[0].get_y()-target.rows[0].get_y()),.1)
+        stage=Scene();stage.add(cases)
+        animation=cases.motions_to(target)[0]
+        start(animation,stage);animation.interpolate(.4)
+        painted={id(part) for root in stage.mobjects for part in root.family_members_with_points()}
+        self.assertFalse(painted & {id(part) for part in target.rows[1].family_members_with_points()})
+        finish(animation,stage)
+
+    def test_changed_prose_appended_to_a_function_call_requires_named_terms(self):
+        row=Equation({'property':r'f(i,w)\text{ is optimal whenever }n-i+1\le k'})
+        target=row.next_layout(property=r'f(k,w)\text{ is optimal for every valid }w')
+        with self.assertRaisesRegex(ValueError,'separate named math and prose'):
+            row.motions_to(target)
+
+    def test_prose_units_after_tex_space_do_not_morph_their_letters(self):
+        from algovis.utils.effects import ReplaceContent
+        row=Equation({'units':r'\ \text{unique states}'})
+        motions=row.motions_to(row.next_layout(units=r'\ \text{states}'))
+        self.assertTrue(any(isinstance(motion,ReplaceContent) for motion in motions))
+
+    def test_new_case_equation_waits_for_the_retained_meaning_to_clear_its_space(self):
+        from algovis import ComparisonScene,RecurrenceScene,TextObject
+        first=ComparisonScene()
+        meaning=first.add('meaning',TextObject('Minimum remaining weight'),slot='right')
+        stage=Scene();first.install(stage)
+        second=RecurrenceScene()
+        second.add('meaning',meaning,slot='meaning')
+        equation=second.add('recurrence',CaseEquation(Equation({'call':'f(i,v)','eq':'=','opt':r'\min'}),[
+            Equation({'skip':r'\text{exclude item }i'})]),slot='equation')
+        plan=ViewTransition(first,second)
+        for animation in plan.animations(stage):
+            start(animation,stage)
+            animation.interpolate(.35)
+            painted={id(part) for root in stage.mobjects for part in root.family_members_with_points()}
+            self.assertFalse(painted & {id(part) for part in equation.mobject.family_members_with_points()})
+            finish(animation,stage)
+        plan.commit(stage)
+        self.assertIn(equation.mobject,stage.mobjects)
+
+    def test_state_parameter_is_a_math_refinement_even_when_its_label_uses_text(self):
+        from manim import Transform
+        from algovis.utils.effects import ReplaceContent
+        row=Equation({'call':r'f(\ldots)'})
+        target=row.next_layout(call=r'f(\text{state})')
+        motions=row.motions_to(target)
+        self.assertFalse(any(isinstance(motion,ReplaceContent) for motion in motions))
+        self.assertTrue(any(isinstance(motion,Transform) and motion.mobject is row.part('call')
+                            for motion in motions))
+
+    def test_underbrace_annotation_preserves_the_named_operand_and_its_paint(self):
+        row=Equation({'a':'a','plus':'+','b':'b'},roles={'a':'operation'})
+        first=ColumnSlide();first.add('sum',row)
+        second=first.fork().revise('sum',row.annotation_parts('a',r'\text{immediate}'))
+        stage=Scene();first.install(stage);operand=row.part('a')
+        apply(ViewTransition(first,second),stage)
+        self.assertIs(row.part('a'),operand)
+        self.assertEqual(row.part('a').get_color(),DEFAULT_THEME.accent)
+        self.assertEqual(row.part('annotation:a:close').get_color(),DEFAULT_THEME.foreground)
+        third=second.fork().revise('sum',row.annotation_parts('a'))
+        apply(ViewTransition(second,third),stage)
+        self.assertIs(row.part('a'),operand)
+        self.assertNotIn('annotation:a:close',row.parts)
+        self.assertEqual(row.native_layout_findings(),[])
+
+    def test_equation_inside_a_layout_row_can_reveal_its_checkmark(self):
+        from algovis import ObjectRow
+        first=ColumnSlide();group=ObjectRow(Text('From here'),Equation({'mark':r'\phantom{\checkmark}'},status='computed'))
+        first.add('heading',group)
+        second=first.fork().refine('heading',index=1,parts={'mark':r'\checkmark'})
+        stage=Scene();first.install(stage);mark=group[1]
+        apply(ViewTransition(first,second),stage)
+        self.assertIs(group[1],mark)
+        self.assertEqual(mark.slot_tex['mark'],r'\checkmark')
+        self.assertEqual(mark.part('mark').get_color(),DEFAULT_THEME.success)
+
+    def test_rewording_a_caption_keeps_its_owner_without_morphing_letters(self):
+        first=ColumnSlide();caption=first.add('label',Text('RECURSIVE FUNCTION'))
+        second=first.fork().reword('label','DYNAMIC PROGRAMMING')
+        stage=Scene();first.install(stage)
+        transition=ViewTransition(first,second)
+        apply(transition,stage)
+        self.assertIs(second.object('label'),caption)
+        self.assertEqual(caption.mobject._algovis_source_text,'DYNAMIC PROGRAMMING')
+        self.assertEqual(stage.mobjects,[caption.mobject])
+
+    def test_prose_term_replacement_does_not_prepaint_destination(self):
+        first=ColumnSlide();row=Equation({'value':'f(n)','note':r'\quad(\text{exponential growth})'})
+        first.add('bound',row)
+        second=first.fork().substitute('bound',note=r'\in\Omega(1.6^n)')
+        stage=Scene();first.install(stage)
+        from algovis.utils.effects import ReplaceContent,DeferredAnimation
+        replacement=next(a for a in row.motions_to(second.target('bound')) if isinstance(a,ReplaceContent))
+        self.assertIsInstance(replacement.animations[1],DeferredAnimation)
+        start(replacement,stage)
+        future=second.target('bound').part('note')
+        self.assertNotIn(future,stage.get_mobject_family_members())
+        replacement.interpolate(.25)
+        self.assertNotIn(future,stage.get_mobject_family_members())
+        finish(replacement,stage)
+        self.assertIn(future,stage.get_mobject_family_members())
+
+    def test_spacing_changes_do_not_retire_unchanged_equation_words(self):
+        from manim import Transform
+        row=Equation({'prefix':r'\text{Suppose}'})
+        target=row.next_layout({'prefix':r'\text{Suppose}\quad','value':'1.6^n'})
+        motions=row.motions_to(target)
+        self.assertTrue(any(isinstance(motion,Transform) and motion.mobject is row.part('prefix')
+                            for motion in motions))
+
+    def test_addition_operator_is_replaced_in_the_gap_instead_of_crossing_values(self):
+        from algovis.utils.effects import ReplaceContent
+        sequence=StateSequence([1,1,2,''])
+        stage=Scene();stage.add(sequence)
+        guide=sequence.begin_addition();start(guide,stage);finish(guide,stage)
+        old=sequence._plus
+        step=sequence.add_next(3,3)
+        replacement=next(a for a in step.animations if isinstance(a,ReplaceContent) and a.animations[0].mobject is old)
+        start(step,stage);step.interpolate(.25)
+        self.assertNotIn(sequence._plus,stage.get_mobject_family_members())
+        finish(step,stage)
+        expected=(sequence.row[1].get_right()+sequence.row[2].get_left())/2
+        np.testing.assert_allclose(sequence._plus.get_center(),expected)
+        self.assertEqual(sequence.cell(3).label.tex_string,'3')
+
+    def test_arriving_in_a_new_city_clears_the_previous_purchase(self):
+        from algovis import RoadTripSimulation
+        trip=RoadTripSimulation(capacity=2,prices=[4,2,5],consumption=[1,1,1])
+        stage=Scene();stage.add(trip)
+        for action in (trip.start,lambda:trip.buy(1),trip.drive):
+            animation=action();start(animation,stage);finish(animation,stage)
+        self.assertEqual(trip.city,1)
+        self.assertEqual(trip.fuel,0)
+        self.assertEqual(trip.costs,[4])
+        self.assertEqual(trip.purchase.slot_tex['b'],r'\text{buy: }0')
+
+    def test_storage_brace_survives_compiled_checklist_reveals(self):
+        from algovis import Checklist
+        checklist=Checklist(['One','Two','Three','Four','Store'])
+        first=ColumnSlide();first.add('list',checklist)
+        last=first.fork().refine('list',visible=5,recursion_brace=True,dp_brace=True)
+        stage=Scene();apply(ViewTransition(None,first),stage);apply(ViewTransition(first,last),stage)
+        self.assertTrue(checklist.dp_brace)
+        self.assertGreater(checklist.storage_label.get_fill_opacity(),.9)
+        self.assertLess(checklist.storage_brace.get_top()[1],checklist.brace.get_bottom()[1])
+
     def test_component_reference_keeps_its_planned_base_case_before_playback(self):
         base=CaseEquation(Equation({'call':'f(n,w)','eq':'='}),[Equation({'answer':'v_n'})])
         proof=ColumnSlide();proof.add('definitions',MathStack(base))

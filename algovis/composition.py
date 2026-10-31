@@ -474,24 +474,35 @@ class SlideView:
                         [item],self._region(item.slot).width,self._region(item.slot).height)
                 for item in self.items.values() if item.slot != 'chrome']
 
+    def _wrap_text(self):
+        """Wrap at the sequence's reserved width before measuring its fit.
+
+        A retained paragraph must not scramble its glyphs just because its next
+        scene has a narrower column. The complete explanation chooses that
+        paragraph's wrapping, just as it chooses its common font size.
+        """
+        if self.fit_policy.enabled and self.fit_policy.wrap_text:
+            for item in self.items.values():
+                source=getattr(item.target,'_algovis_source_text',None)
+                if source is not None:
+                    role=getattr(item.target,'_algovis_type_role','body')
+                    width=getattr(self,'_sequence_text_widths',{}).get(
+                        (id(item.object.mobject),source),self._text_width(item.slot)/item.font_scale)
+                    wrapped=plain_text(source,width,
+                                       theme=self.theme,typography=self.typography,type_role=role)
+                    copy_semantics(item.target,wrapped)
+                    if hasattr(wrapped,'semantics'):set_semantics(wrapped)
+                    else:wrapped.set_color(item.target.get_color())
+                    wrapped._algovis_font_scale_reason=item.font_reason
+                    relative_font_scale(wrapped,item.font_scale)
+                    wrapped.scale(item.font_scale)
+                    assign_scene_typography(wrapped,self.typography,group=self._type_group,role=role)
+                    item.target=wrapped
+
     def _fit_and_arrange(self):
         self._fit_report=[]
         if self.fit_policy.enabled:
-            if self.fit_policy.wrap_text:
-                for item in self.items.values():
-                    source=getattr(item.target,'_algovis_source_text',None)
-                    if source is not None:
-                        role=getattr(item.target,'_algovis_type_role','body')
-                        wrapped=plain_text(source,self._text_width(item.slot)/item.font_scale,
-                                           theme=self.theme,typography=self.typography,type_role=role)
-                        copy_semantics(item.target,wrapped)
-                        if hasattr(wrapped,'semantics'):set_semantics(wrapped)
-                        else:wrapped.set_color(item.target.get_color())
-                        wrapped._algovis_font_scale_reason=item.font_reason
-                        relative_font_scale(wrapped,item.font_scale)
-                        wrapped.scale(item.font_scale)
-                        assign_scene_typography(wrapped,self.typography,group=self._type_group,role=role)
-                        item.target=wrapped
+            self._wrap_text()
             for item in self.items.values():relative_font_scale(item.target,item.font_scale)
             areas=self._fit_areas();scales={}
             for area in areas:
@@ -703,6 +714,19 @@ def _definition_route(view,source,destination,items,*,left_bound=None):
     source_ink={id(p) for p in source.family_members_with_points()}
     destination_ink={id(p) for p in destination.family_members_with_points()}
     for item in items:
+        if not isinstance(item.target,MathRow):continue
+        live_family={id(p) for p in item.object.mobject.get_family()}
+        target_family={id(p) for p in item.target.get_family()}
+        if (source_ink and source_ink<=live_family and destination_ink
+                and destination_ink<=target_family):
+            # A multi-line definition can apply its own lhs on a later line.
+            # Leave above the source line before travelling horizontally;
+            # a diagonal departure cuts through its retained English meaning.
+            above=max(source.get_top()[1],item.target.get_top()[1])+half_height+.08
+            if above+half_height>view.layout.body.center[1]+view.layout.body.height/2:
+                raise ValueError('An internal definition copy needs a clear departure band above its equation')
+            return (np.array([start[0],above,0]),np.array([end[0],above,0]))
+    for item in items:
         live_family={id(p) for p in item.object.mobject.get_family()}
         target_family={id(p) for p in item.target.get_family()}
         if source_ink and source_ink<=live_family:continue
@@ -711,6 +735,20 @@ def _definition_route(view,source,destination,items,*,left_bound=None):
         if any(target.get_left()[0]-half_width<p[0]<target.get_right()[0]+half_width
                and target.get_bottom()[1]-half_height<p[1]<target.get_top()[1]+half_height
                for p in samples):obstacles.append(target)
+    if not obstacles and left_bound is not None:
+        # Adjacent proof rows have no intervening row to trigger a detour.
+        # Their destination suffix can still be in the direct copy's path.
+        for item in items:
+            if not isinstance(item.target,MathRow):continue
+            family={id(p) for p in item.target.get_family()}
+            if not destination_ink or not destination_ink<=family:continue
+            siblings=[part for part in item.target.parts.values()
+                      if not destination_ink & {id(p) for p in part.get_family()}]
+            if any(part.get_left()[0]-half_width<p[0]<part.get_right()[0]+half_width
+                   and part.get_bottom()[1]-half_height<p[1]<part.get_top()[1]+half_height
+                   for part in siblings for p in samples):
+                obstacles.append(item.target)
+            break
     if not obstacles:return ()
     left=min(p.get_left()[0] for p in obstacles)-half_width
     right=max(p.get_right()[0] for p in obstacles)+half_width
@@ -933,7 +971,7 @@ class ProofSlide(SlideView):
     def row_envelopes(self):
         slots=(*self.frame.LABELS,'work')
         minimums={'DEFINITIONS':.45,'work':.35}
-        metrics={slot:{'height':minimums.get(slot,.32),'ascent':0.,'descent':0.} for slot in slots}
+        metrics={slot:{'height':minimums.get(slot,.32),'ascent':0.,'descent':0.,'landing':0.} for slot in slots}
         for item in self.items.values():
             if item.slot in metrics:
                 # SceneSequence takes the maximum actual ascent/descent across
@@ -949,9 +987,13 @@ class ProofSlide(SlideView):
         # so making room never changes the proof's scale midway through it.
         for name,use in self.definition_uses.items():
             item=self.items[name]
-            if isinstance(item.target,MathRow) and item.slot=='work':
+            if isinstance(item.target,MathRow) and item.slot in metrics:
+                names=list(item.target.parts)
+                suffix=names[names.index(use.part)+1:]
+                if item.slot!='work' and not any(item.target.part(key).width>.01 for key in suffix):continue
                 glyph_height=max(use.source.mobject.height,item.target.part(use.part).height)
                 metrics[item.slot]['height']=max(metrics[item.slot]['height'],2*glyph_height+.24)
+                metrics[item.slot]['landing']=max(metrics[item.slot]['landing'],glyph_height)
         return metrics
 
     def _plan_rows(self,metrics=None,*,scale=None):
@@ -974,7 +1016,7 @@ class ProofSlide(SlideView):
             if row is not None and isinstance(row.target,MathRow):
                 ascent=metrics[slot]['ascent']*shared_scale
                 descent=metrics[slot]['descent']*shared_scale
-                if slot=='work' and height>ascent+descent+.1:
+                if (slot=='work' or metrics[slot].get('landing',0)) and height>ascent+descent+.1:
                     # Put the equation at the top of its measured envelope.
                     # The remaining space is one usable landing band below,
                     # rather than two unusable half-gaps around the equation.
@@ -1144,7 +1186,7 @@ class ViewTransition:
         exits = [FadeOut(self.old[key][1].object.mobject) for key in self.exiting if key not in copy_owners]
 
         def build_changes():
-            motions = [];delayed_labels=[]
+            motions = [];delayed_entries=[]
             # A row leaving a proof can resize while its definition source
             # remains in that proof for a copy. During travel they are no
             # longer settled peers. Keep the row's measured font contract,
@@ -1183,8 +1225,8 @@ class ViewTransition:
                         motions.extend(FadeIn(part) for key,part in live.parts.items() if key not in term_sources)
                     else:
                         entering=getattr(type(live),'enter_animation',None)
-                        if entering is None and isinstance(live,(Text,SingleStringMathTex)) and crosses_moving_art(item.target):
-                            delayed_labels.append(live)
+                        if crosses_moving_art(item.target):
+                            delayed_entries.append((live,entering))
                         else:motions.append(entering(live) if entering else FadeIn(live))
                 else:
                     route=getattr(type(self.incoming),'definition_route',None)
@@ -1218,8 +1260,9 @@ class ViewTransition:
                                 right=self.incoming.layout.body.width/2
                                 if all(left<=point[0]-source.width/2 and point[0]+source.width/2<=right for point in centers):
                                     arc=candidate
-                        def transfer(use=use,live=live,item=item,via=via,arc=arc):
-                            return ApplyDefinition(use.source.mobject, live.part(use.part),
+                        clear_prose=live.prose_term(use.part)
+                        def transfer(use=use,live=live,item=item,via=via,arc=arc,clear_prose=clear_prose):
+                            return ApplyDefinition(use.source.mobject, None if clear_prose else live.part(use.part),
                                 item.target.part(use.part), via=via, path_arc=arc,
                                 preserve_destination_layout=True)
                     skip = tuple(borrowed)+((use.part,) if use else ())
@@ -1227,8 +1270,16 @@ class ViewTransition:
                                 if not hasattr(animation, "target_mobject")
                                 or not _same_picture(animation.mobject, animation.target_mobject)]
                     if use:
-                        motions.append(Succession(AnimationGroup(*local,run_time=.25),
-                            _deferred(transfer,run_time=.75)) if local else transfer())
+                        def prepared_transfer(local=local,transfer=transfer):
+                            return (Succession(AnimationGroup(*local,run_time=.25),
+                                _deferred(transfer,run_time=.75)) if local else transfer())
+                        if clear_prose:
+                            # Neighbors may need the space occupied by a long
+                            # English placeholder. Clear it before preparing
+                            # their positions, then carry the definition in.
+                            motions.append(Succession(FadeOut(live.part(use.part),run_time=.2),
+                                _deferred(prepared_transfer,run_time=.8)))
+                        else:motions.append(prepared_transfer())
                     else:motions.extend(local)
                 elif hasattr(type(live),'motions_to') and hasattr(type(live),'adopt_layout'):
                     use=self.definition_uses.get(name)
@@ -1249,7 +1300,14 @@ class ViewTransition:
                     elif not _same_picture(live,item.target):
                         motions.extend(live.motions_to(item.target,skip=tuple(borrowed)) if borrowed else live.motions_to(item.target))
                 elif not _same_picture(live, item.target):
-                    motions.append(Transform(live, item.target, path_arc=item.path_arc))
+                    if isinstance(live,Text) and isinstance(item.target,Text) and live.text != item.target.text:
+                        def reveal_caption(live=live,target=item.target):
+                            _adopt(live,target)
+                            return FadeIn(live)
+                        motions.append(Succession(_deferred(lambda live=live: FadeOut(live),run_time=.35),
+                            _deferred(reveal_caption,run_time=.65)))
+                    else:
+                        motions.append(Transform(live, item.target, path_arc=item.path_arc))
             def finish_layout():
                 # A definition source may stay visible for a later cleanup
                 # phase. Retained artwork has already arrived in its new
@@ -1260,13 +1318,14 @@ class ViewTransition:
                     for live,target in zip(item.object.mobject.get_family(),item.target.get_family()):
                         _copy_layout_metadata(target,live)
             changing = _ArrivedLayoutGroup(*motions,on_arrival=finish_layout) if motions else Wait(.001)
-            if delayed_labels:
+            if delayed_entries:
                 # This is one cue-anchored mechanical transition: move the
                 # retained argument first, then write into the cleared space.
                 # Construct the fades only at that phase so future labels
                 # cannot be prepainted by an AnimationGroup owner.
                 changing=Succession(changing,_deferred(lambda:AnimationGroup(
-                    *(FadeIn(label) for label in delayed_labels)),run_time=.2))
+                    *(entering(live) if entering else FadeIn(live)
+                      for live,entering in delayed_entries)),run_time=.2))
             if copy_owners:
                 # The definition stays visible until its copy has arrived.
                 return Succession(changing, _deferred(lambda: AnimationGroup(

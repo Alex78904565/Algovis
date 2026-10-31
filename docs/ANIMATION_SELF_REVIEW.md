@@ -67,6 +67,15 @@ enough to discover the failure before consulting the layout implementation.
 
 ## Required evidence
 
+Repair the owning abstraction before changing individual occurrences. Identify
+whether a failure belongs to sequence planning, view transitions, a component's
+internal lifecycle, or the lesson's mathematical/narrative content. Mechanical
+failures need shared fixes and regression coverage, then an inventory of all
+callers and inspection of their rebuilt output. A section-specific delay,
+offset, scale, or cleanup is not an acceptable substitute for that repair.
+Lesson-specific changes remain appropriate for the actual mathematics, wording,
+and spoken cues; record that distinction in the finding.
+
 For reopened feedback, invalidate the affected visual signoff. Write a small
 acceptance record for each note: required visible behavior, old failure,
 underlying cause, every affected use, inspected phase range, and observed
