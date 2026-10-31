@@ -14,26 +14,28 @@ class CenteredScene(ColumnSlide):
         root=super()._panel_recipe()
         root.children['body']=CenteredColumnPanel.bound(
             [(name,item) for name,item in self.items.items() if item.slot=='body'],
-            gap=self.gap,padding=self.padding,vertical='top',center_block=False)
+            gap=self.gap,padding=self.padding)
         return root
 
 
 class BlockScene(ColumnSlide):
     """One compact argument, centered as a block with internally aligned rows."""
     def block_widths(self):
-        return {'BlockScene/body':max((item.target.width for item in self.items.values()
-                                     if item.slot=='body'),default=0.)}
+        return {'BlockScene/body':self._body_panel().measure().width}
 
     def block_heights(self):
-        rows=[item for item in self.items.values() if item.slot=='body']
-        return {'BlockScene/body':sum(self._height(item) for item in rows)+self.gap*max(0,len(rows)-1)}
+        return {'BlockScene/body':self._body_panel().measure().height}
+
+    def _body_panel(self):
+        from .panels import Panel
+        return Panel.bound([(name,item) for name,item in self.items.items() if item.slot=='body'],gap=self.gap)
 
     def _panel_recipe(self):
         from .panels import Panel, RegionPanel, CenterPanel
         widths=self.block_widths();widths.update(getattr(self,'_sequence_block_widths',{}))
         heights=self.block_heights();heights.update(getattr(self,'_sequence_block_heights',{}))
         root=RegionPanel()
-        panel=Panel.bound([(name,item) for name,item in self.items.items() if item.slot=='body'],gap=self.gap)
+        panel=self._body_panel()
         panel.content_width=widths['BlockScene/body'] or None
         panel.content_height=heights['BlockScene/body'] or None
         root.in_region('body',self.layout.body,panel)
@@ -62,9 +64,20 @@ class SlotScene(SlideView):
     COLUMNS=()
     diagram_slots=()
     centered_slots=()
-    block_slots=None
     shared_block_height=True
+    structural_slots=()
     gutter=.35
+
+    def __init_subclass__(cls,**kwargs):
+        super().__init_subclass__(**kwargs)
+        if 'block_slots' in cls.__dict__:
+            raise TypeError('Legacy block_slots overrides are removed. Panels measure every text slot automatically; declare structural/centered slots for genuinely different layout policies.')
+
+    @property
+    def block_slots(self):
+        """Read-only inventory, derived from actual panels rather than a whitelist."""
+        return tuple(slot for slot in self._slots()
+                     if slot not in (*self.centered_slots,*self.structural_slots))
 
     def __init__(self,*args,center_blocks=False,context=False,**kwargs):
         self._width_fill=frozenset()
@@ -72,15 +85,6 @@ class SlotScene(SlideView):
         if context:
             if self.COLUMNS:raise ValueError('A context row requires a row-based scene')
             self.ROWS=(*self.ROWS,('context',.65))
-            if self.block_slots is not None:
-                self.block_slots=(*self.block_slots,'context')
-        if center_blocks:
-            self.block_slots=tuple(key for key,_ in self.COLUMNS)
-        elif self.block_slots is None:
-            # Text uses a centered common-edge block by default. Diagram
-            # specializations retain their explicitly centered geometry.
-            self.block_slots=tuple(key for key,_ in (self.COLUMNS or self.ROWS)
-                if key not in (*self.diagram_slots,*self.centered_slots))
         super().__init__(*args,**kwargs)
 
     def _slots(self):
@@ -166,18 +170,21 @@ class SlotScene(SlideView):
         separate constraints. SceneSequence reserves the widest later block
         so adding a line cannot move the already-visible rows horizontally.
         """
-        return {f'{type(self).__name__}/{slot}':max(
-            (item.target.width for item in self.items.values() if item.slot==slot),
-            default=0.) for slot in self.block_slots}
+        panels=self._slot_panels()
+        return {f'{type(self).__name__}/{slot}':panels[slot].measure().width for slot in self.block_slots}
 
     def block_heights(self):
-        heights={}
-        for slot in self.block_slots:
-            rows=[item for item in self.items.values() if item.slot==slot]
-            heights[f'{type(self).__name__}/{slot}']=sum(self._height(item) for item in rows)+.28*max(0,len(rows)-1)
+        panels=self._slot_panels()
+        heights={f'{type(self).__name__}/{slot}':panels[slot].measure().height for slot in self.block_slots}
         if self.center_blocks and self.shared_block_height and heights:
             heights={key:max(heights.values()) for key in heights}
         return heights
+
+    def _slot_panels(self):
+        from .panels import Panel,CenteredColumnPanel
+        return {slot:(CenteredColumnPanel if slot in self.centered_slots else Panel).bound(
+            [(name,item) for name,item in self.items.items() if item.slot==slot],gap=.28)
+            for slot in self._slots()}
 
     def _panel_recipe(self):
         from .panels import Panel, CenterPanel, CenteredColumnPanel, RegionPanel
@@ -186,19 +193,18 @@ class SlotScene(SlideView):
         widths.update(getattr(self,'_sequence_block_widths',{}))
         heights=self.block_heights()
         heights.update(getattr(self,'_sequence_block_heights',{}))
+        panels=self._slot_panels()
         for slot,region in self._slots().items():
-            items=[(name,item) for name,item in self.items.items() if item.slot==slot]
             width=widths.get(f'{type(self).__name__}/{slot}')
             height=heights.get(f'{type(self).__name__}/{slot}')
-            cls=CenteredColumnPanel if slot in self.centered_slots else Panel
-            panel=cls.bound(items,gap=.28,vertical='center' if height else 'top',center_block=bool(width))
+            panel=panels[slot]
             panel.content_width=width or None
             panel.content_height=height or None
             root.in_region(slot,region,panel)
         footer=[(name,item) for name,item in self.items.items() if item.slot=='footer']
         if len(footer)>1:
             from .panels import FooterPanel
-            root.in_region('footer',self.layout.footer,FooterPanel.bound(footer,gap=.1,vertical='top'))
+            root.in_region('footer',self.layout.footer,FooterPanel.bound(footer,gap=.1))
         for name,item in self.items.items():
             if item.slot not in self._slots() and not (item.slot=='footer' and len(footer)>1):
                 root.in_region(name,self.layout.region(item.slot),CenterPanel.bound([(name,item)]))
@@ -209,7 +215,6 @@ class DiagramScene(SlotScene):
     ROWS=(('diagram',3),('explanation',1))
     diagram_slots=('diagram',)
     centered_slots=('diagram',)
-    block_slots=('explanation',)
 
 
 class TreeScene(DiagramScene):
@@ -289,11 +294,14 @@ class ArgumentScene(SlotScene):
         return [(name,item) for slot,_ in self.ROWS for name,item in self.items.items() if item.slot==slot]
 
     def block_widths(self):
-        return {'ArgumentScene/body':max((i.target.width for _,i in self._argument_items()),default=0.)}
+        return {'ArgumentScene/body':self._argument_panel().measure().width}
 
     def block_heights(self):
-        rows=self._argument_items()
-        return {'ArgumentScene/body':sum(self._height(i) for _,i in rows)+self._argument_gap()*max(0,len(rows)-1)}
+        return {'ArgumentScene/body':self._argument_panel().measure().height}
+
+    def _argument_panel(self):
+        from .panels import Panel
+        return Panel.bound(self._argument_items(),gap=self._argument_gap())
 
     def _fit_areas(self):
         rows=[item for _,item in self._argument_items()]
@@ -317,7 +325,7 @@ class ArgumentScene(SlotScene):
             root.children.pop(slot,None);root.regions.pop(slot,None)
         widths={**self.block_widths(),**getattr(self,'_sequence_block_widths',{})}
         heights={**self.block_heights(),**getattr(self,'_sequence_block_heights',{})}
-        panel=Panel.bound(self._argument_items(),gap=self._argument_gap())
+        panel=self._argument_panel()
         panel.content_width=widths['ArgumentScene/body'] or None
         panel.content_height=heights['ArgumentScene/body'] or None
         root.in_region('argument',self._argument_region(),panel)
@@ -326,13 +334,11 @@ class ArgumentScene(SlotScene):
 
 class DerivationScene(ArgumentScene):
     ROWS=(('meaning',1),('equation',2),('explanation',1))
-    block_slots=('meaning','equation','explanation')
 
 
 class RecurrenceScene(ArgumentScene):
     """Keep the function meaning, recurrence and base case visible together."""
     ROWS=(('meaning',1),('equation',2),('base',1.6),('explanation',.8))
-    block_slots=('meaning','equation','base','explanation')
 
 
 class ApplicationScene(ArgumentScene):
@@ -380,7 +386,6 @@ class IllustratedProblemScene(ComparisonScene):
     visible group stays centered vertically while the item data grows.
     """
     centered_slots=('left',)
-    block_slots=('right',)
 
     def __init__(self,*args,center_blocks=False,**kwargs):
         # This specialization centers the illustration independently of the
@@ -418,7 +423,7 @@ class PairedScene(ComparisonScene):
         return super()._slots()[slot].width if slot in ('left','right') else super()._text_width(slot)
 
     def _panel_recipe(self):
-        from .panels import PairedPanel
+        from .panels import PairedPanel,PairedColumnPanel
         root=super()._panel_recipe()
         heights=self.paired_heights()
         fit=next((area['scale'] for area in self._fit_report if area['group']=='body'),1.)
@@ -427,14 +432,13 @@ class PairedScene(ComparisonScene):
         content_widths={slot:widths.get(f'{type(self).__name__}/{slot}',0.) for slot in self._slots()}
         pair=PairedPanel(pairs=self.pairs,heights=heights,widths=content_widths,gap=self.gutter)
         for slot in self._slots():
-            pair.panel(slot,root.children.pop(slot));root.regions.pop(slot)
+            child=root.children.pop(slot);root.regions.pop(slot)
+            pair.panel(slot,PairedColumnPanel.bound(child.flatten().items(),pairs=self.pairs,heights=heights))
         root.in_region('paired',self.layout.body,pair)
         return root
 
     def block_widths(self):
-        return {f'{type(self).__name__}/{slot}':max(
-            (item.target.width for item in self.items.values() if item.slot==slot),default=0.)
-            for slot in self._slots()}
+        return super().block_widths()
 
     def _fit_areas(self):
         areas=super()._fit_areas()
@@ -446,20 +450,36 @@ class PairedScene(ComparisonScene):
         return areas
 
 
-class SelectionScene(SlotScene):
-    """Keep selectable items above their container and accumulating arithmetic."""
-    ROWS=(('items',1),('details',1))
+class ResourceExampleScene(SlotScene):
+    """Reference above; a pictured resource beside its accumulating calculation."""
+    ROWS=(('reference',1),('details',1))
+    resource_slot='resource'
+    calculation_slot='calculation'
     # Cards, the bag gauge and the calculation all contain peer labels.
     # Fit them together; independently shrinking the bag also shrinks only
     # its labels, even when both sets use the same typography role.
     diagram_slots=()
-    centered_slots=('items','bag')
-    block_slots=('calculation',)
+    centered_slots=('reference','resource')
 
     def _slots(self):
         regions=super()._slots()
-        bag,calculation=regions.pop('details').split_columns(1,2,gutter=self.gutter)
-        return {**regions,'bag':bag,'calculation':calculation}
+        resource,calculation=regions.pop('details').split_columns(1,2,gutter=self.gutter)
+        return {**regions,self.resource_slot:resource,self.calculation_slot:calculation}
+
+
+class SelectionScene(ResourceExampleScene):
+    """Selectable items above the bag and arithmetic, using the resource format."""
+    ROWS=(('items',1),('details',1))
+    resource_slot='bag'
+    centered_slots=('items','bag')
+
+
+class RoadTripExampleScene(ResourceExampleScene):
+    """The same format, with route data above fuel and purchase/cost readouts."""
+    ROWS=(('meaning',2),('map',2),('details',3))
+    resource_slot='tank'
+    calculation_slot='dashboard'
+    centered_slots=('map','tank')
 
 
 class ConversionScene(ComparisonScene):
@@ -469,6 +489,7 @@ class ConversionScene(ComparisonScene):
     subsequently be added below either side without displacing the connector.
     """
     gutter=1.
+    structural_slots=('connector',)
 
     def _slots(self):
         regions=super()._slots()
@@ -489,12 +510,10 @@ class ConversionScene(ComparisonScene):
 class AnalysisScene(SlotScene):
     """A centered definition, paired derivations and aligned result row."""
     ROWS=(('definition',1.7),('comparison',3.5),('results',.7))
-    block_slots=('definition','left','right','left_result','right_result')
 
     def __init__(self,*args,summary=False,**kwargs):
         if summary:
             self.ROWS=(*self.ROWS,('summary',.65))
-            self.block_slots=(*self.block_slots,'summary')
         super().__init__(*args,**kwargs)
 
     def block_heights(self):
@@ -544,14 +563,12 @@ class StoryScene(SlotScene):
     ROWS=(('story',2),('equation',1))
     diagram_slots=('story',)
     centered_slots=('story',)
-    block_slots=('equation',)
 
 
 class TreeExplanationScene(SlotScene):
     ROWS=(('diagram',3.5),('equations',2.5))
     diagram_slots=('diagram',)
     centered_slots=('diagram',)
-    block_slots=('equations',)
 
 
 class TreeArrayScene(SlotScene):

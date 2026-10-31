@@ -5,6 +5,27 @@ import numpy as np
 from ..layout import measured_font_size
 
 
+def panel_path_findings(manifest,*,required=False):
+    """Verify executed layout owners, not just the presence of panel class names."""
+    infrastructure=manifest.get('viewInfrastructure')
+    if infrastructure is None:
+        return [{'kind':'panel_layout_coverage_missing'}] if required else []
+    if infrastructure.get('schema',0)<2:
+        return [{'kind':'legacy_layout_trace','requiredSchema':2}]
+    from ..panels import layout_path_errors
+    findings=[]
+    if (required or infrastructure.get('layoutPathsRequired')) and not any(
+            step.get('composition') for step in infrastructure.get('steps',[])):
+        return [{'kind':'panel_layout_coverage_missing'}]
+    for index,step in enumerate(infrastructure.get('steps',[])):
+        composition=step.get('composition')
+        if composition is None:continue
+        if composition.get('compilerPath')!='recursive-panels' or not composition.get('panelTree'):
+            findings.append({'kind':'view_panel_compiler_bypassed','step':index})
+        else:findings.extend({**finding,'step':index} for finding in layout_path_errors(composition['panelTree']))
+    return findings
+
+
 def trigger_coverage_findings(manifest):
     """A missing execution is an error even when no rendered event records it."""
     coverage=manifest.get('triggerCoverage',{})

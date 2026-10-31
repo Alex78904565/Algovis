@@ -411,6 +411,7 @@ class _MathLayoutPhase(_GatedPhase):
     def __init__(self, scene, animation):
         self.host = scene
         self.adoptions = []
+        self.component_adoptions = []
 
         def lower(source, target):
             if isinstance(source, MathRow):
@@ -418,7 +419,8 @@ class _MathLayoutPhase(_GatedPhase):
                     raise TypeError('A named MathRow needs a MathRow destination; use next_layout for substitutions')
                 if getattr(source, '_algovis_typography_group', None):
                     from .layout import LessonStyle
-                    LessonStyle._watch_type(target, source._algovis_typography_group, 'equation')
+                    LessonStyle._watch_type(target, source._algovis_typography_group,
+                                            getattr(source,'_algovis_type_role','equation'))
                 self.adoptions.append((source, target))
                 return [Move(motion.mobject, motion.target_mobject,
                              path_arc=getattr(animation,'path_arc',0) or getattr(motion,'path_arc',0))
@@ -429,8 +431,14 @@ class _MathLayoutPhase(_GatedPhase):
                     raise ValueError('A painted parent needs a component operation to change its named equations')
                 if len(source) != len(target):
                     raise ValueError('Changing layout children needs explicit reveal/retire operations')
-                return [motion for child, destination in zip(source, target)
-                        for motion in lower(child, destination)]
+                motions=[motion for child, destination in zip(source, target)
+                         for motion in lower(child, destination)]
+                # Lowering an owner's mathematical children must not discard
+                # the owner's non-geometric state (fuel used, visibility, etc.).
+                # Commit child rows first, then component owners bottom-up.
+                if hasattr(type(source),'adopt_layout'):
+                    self.component_adoptions.append((source,target))
+                return motions
             return [Move(source, target, run_time=animation.run_time,
                          rate_func=animation.rate_func,
                          path_arc=getattr(animation, 'path_arc', 0))]
@@ -448,6 +456,9 @@ class _MathLayoutPhase(_GatedPhase):
         super().finish()
         for row, target in self.adoptions:
             row.commit(target, self.host)
+        from .composition import _adopt
+        for component,target in self.component_adoptions:
+            _adopt(component,target)
         _normalize(self.host)
         self.host.current_view = CanvasSlide.capture(self.host)
 
@@ -755,7 +766,7 @@ class ViewSceneMixin:
             from pathlib import Path
             path = Path(self._review_manifest_path)
             document = json.loads(path.read_text(encoding='utf-8'))
-            document['viewInfrastructure'] = {'schema': 1, 'groups': 'layout_containers',
+            document['viewInfrastructure'] = {'schema': 2, 'layoutPathsRequired':True, 'groups': 'layout_containers',
                                                'steps': self._view_steps}
             document['triggerCoverage']=self.trigger_coverage()
             temporary = path.with_suffix(path.suffix+'.view.tmp')

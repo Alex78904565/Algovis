@@ -187,7 +187,8 @@ again from a source that may have left the board.
 
 Choose `BlockScene` for a compact argument: its rows share a left edge while
 the block is centered on both axes. `ComparisonScene` now uses centered blocks
-by default; `center_blocks=False` is a deliberate top-anchor override. It uses
+by default; `center_blocks=False` lets those column blocks use independent
+vertical envelopes. It uses
 centered column blocks with a common vertical envelope. Their `SceneSequence`
 reserves the completed widths and heights before incremental reveals.
 Use `WorkedExampleScene` when problem data sits beside a calculation rather
@@ -213,6 +214,39 @@ and its stored pictures; declaring `store=SlideObject(item.image)` in a planned
 refinement visibly carries a copy while keeping the source item on screen.
 Semantic components expose named `parts`, `motions_to(..., skip=...)` and
 `adopt_layout` so transferred parts are not also faded in or copied twice.
+
+`IllustratedCapacity` is the common parent for that pictured prop/caption/meter
+format. `IllustratedBag` specializes item storage and rejected attempts;
+`IllustratedFuelTank` specializes the bounded fuel quantity and symbol T.
+The illustration stays static while `CapacityMeter` supplies the actual changing
+value. Its proportional-height option changes meter geometry without shrinking
+the caption or readout independently. Do not fill the picture itself to fake a
+numeric state. `RoadTripSimulation(tank_image=...)` uses this same component;
+omitting the image retains the lightweight code-native tank for standalone
+examples. The simulation accepts raster content through `Group`, while its
+map/route/math children retain their own vector and equation ownership.
+
+The route and capacity abstractions have different meanings. Road trip and
+travelling salesperson share `CityMap`, `MapScene` and route motion. A visiting
+order has no fuel/weight capacity, so it should reuse the route format rather
+than inherit an irrelevant gauge. `IllustratedProp` remains available for a
+future meaningful traveler or city prop.
+
+`ResourceExampleScene` owns the repeated composition: a reference above, then
+the pictured resource on the left and its calculation on the right.
+`SelectionScene` names these positions as items/bag/calculation;
+`RoadTripExampleScene` names them as map/tank/dashboard and reserves space above
+for the instance's capacity and road-consumption data. Both use the same recursive
+panel arranger and shared lower-column policy. Mounting the map, fuel prop and
+readout stack in those positions avoids shrinking a tall all-in-one diagram.
+The route simulation still owns the numeric state and its semantic operations;
+its child identities survive this layout separation.
+
+Lowering a component's mathematical children must also commit the component's
+state. `_MathLayoutPhase` adopts native equation rows first and then their
+component owners bottom-up. Otherwise a fuel gauge can display the new number
+but retain an old `used` field, allowing a later layout or update to restore stale
+fill. This is a shared lifecycle rule, not an extra update in the road-trip scene.
 
 Layout containers preserve **declared child identities**. To add a brace,
 caption or other child, construct another container from the existing children
@@ -649,9 +683,10 @@ independently shrinking diagram would give equivalent labels different sizes.
 
 `DiagramScene` (including `DefinitionScene` and `TreeScene`) centers its
 explanation block while retaining a shared left edge for its rows.
-`TreeExplanationScene` uses the same contract for its equations. `block_slots`
-declares this placement separately from `centered_slots`, which centers each
-independent diagram. A `SceneSequence` measures completed block widths after
+`TreeExplanationScene` uses the same contract for its equations. Ordinary text
+regions receive that policy automatically; `centered_slots` identifies separately
+centered diagrams. `block_slots` is a read-only inventory, not an authoring
+whitelist. A `SceneSequence` measures completed panel widths after
 common fitting, then reserves those widths in every state without adding future
 artwork. Inspect both early and completed states; do not replace this with local
 position offsets. Explicit proof rails and full content columns retain their
@@ -899,6 +934,10 @@ Reference equations keep their declared typography when moved into a footer.
 The footer is a location, not an implicit note role. ArgumentScene fits its
 reference definitions with the argument's text peers across the complete
 sequence. Use a TextObject with type_role='note' for genuinely secondary prose.
+Intrinsic mathematical updates also preserve that role: changing a capacity
+readout cannot reclassify a label as a body equation. Related map and resource
+labels use the same fitting scope unless the component has a stated reason
+for a different scale.
 
 ViewTransition owns source-row occupancy during copying. A source that will
 retire stays visible until its copy arrives; retained artwork whose route

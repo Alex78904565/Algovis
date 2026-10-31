@@ -239,6 +239,38 @@ Deliberate transfers use gentle arcs by default. Temporary overlap during travel
 is allowed by the author's latest clarification; final positions remain clear and
 aligned. Existing specialized teaching motions retain their intrinsic policies.
 
+## Removed alignment adapter and fail-fast coverage
+
+The former `SlotScene.block_slots` whitelist is removed as an authoring path.
+It is now a read-only inventory derived from actual panel positions. Assigning
+it, or declaring an old subclass override, raises immediately. A new text slot
+therefore receives measurement, future-width/height reservations and centered
+common-edge layout automatically.
+
+`SlotScene`, compact blocks and argument blocks obtain their dimensions from
+their bound `Panel.measure()` results. Reservation maps can enlarge those
+dimensions across planned steps; a missing reservation cannot disable panel
+centering. The former `center_block=bool(width)` / conditional top alignment
+fallback is deleted. An intentional non-centered policy requires an explicit
+`alignment_reason`; full-column layout classes report that reason.
+
+Every actual arrangement records its executed method and measured dimensions.
+The compiler clears old traces before each arrangement, then rejects a nonempty
+child panel whose path was skipped. Paired columns now have their own
+`PairedColumnPanel` owners rather than letting the parent position their leaves
+behind those owners' backs. Unassigned paired rows also fail immediately.
+
+`layout_path_errors` is the common runtime/test/publication contract. Version-2
+view manifests include executed paths, measurements and alignment reasons.
+The reviewer rejects legacy traces and missing required coverage before
+publication. The recorded lesson requires that coverage in its cue documents.
+An empty version-2 trace does not satisfy this requirement. Tests exercise the
+actual arrangement of every exported slot layout, deliberately skip a nested
+owner, remove a measurement, and attempt the deleted whitelist override. Those
+cases must fail rather than fall back to procedural placement.
+Named extension panels can declare a `layout_contract` for a genuinely different
+component policy; an undeclared alternate arranger is not silently accepted.
+
 ## Rendering and publishing the compiled result
 
 `RenderJob` gives each native render its own media, Pango text, TeX, object

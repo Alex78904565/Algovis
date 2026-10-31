@@ -14,6 +14,17 @@ from algovis.review.server import ReviewCatalog, ReviewHTTPServer, ReviewServer
 
 
 class ReviewServerTests(unittest.TestCase):
+    def test_required_panel_path_failure_preserves_the_existing_preview(self):
+        cue=json.loads(self.review.cue_path.read_text())
+        cue['requirePanelLayout']=True
+        self.review.cue_path.write_text(json.dumps(cue))
+        self.review.manifest_path.parent.mkdir(parents=True,exist_ok=True)
+        self.review.manifest_path.write_text(json.dumps({'viewInfrastructure':{'schema':1,'steps':[]}}))
+        old=self.review.video_path
+        with self.assertRaisesRegex(RuntimeError,'Panel layout migration required'):
+            self.review._validate_render_timing()
+        self.assertEqual(self.review.video_path,old)
+
     def render_manifest_fixture(self):
         document=self.review.manifest_path.read_bytes()
         def rendered(*args,**kwargs):

@@ -11,7 +11,55 @@ a crossing makes a particular explanation hard to follow, rather than a blanket
 ban on transient overlap. Copy provenance, continuous formatting, readable
 endpoints and correct word timing still apply.
 
+## Illustrated examples: preserve the working knapsack format
+
+The author explicitly wants the lessons from generating the knapsack clip art
+applied to other relevant examples, particularly the road-trip fuel canister.
+Reuse the **format and component policy**, rather than rebuilding its geometry
+around another image. `IllustratedCapacity` owns the pictured prop, caption and
+live capacity meter; `IllustratedBag` adds chosen/attempted item copies, while
+`IllustratedFuelTank` specializes the quantity as fuel bounded by T.
+
+- Inspect an existing successful asset before generating another. Match its
+  polished, friendly painted style, recognizable silhouette and restrained
+  palette. Generate one isolated prop per asset with genuine transparency and
+  enough room around its outline. Keep its original alpha.
+- Do not bake numbers, equations, labels, gauges or changing state into the
+  bitmap. Manim owns those parts so they stay readable, selectable and truthful.
+- Keep the same artwork from the problem introduction through its numerical
+  example. Avoid replacing approved clip art with a new schematic placeholder
+  during the very example it was meant to illustrate.
+- Use the shared caption, meter layout, type roles and state-update lifecycle.
+  Inspect empty, partly filled, full and consumed states, plus initial reveal
+  and transfers. Check the displayed quantity against the simulated quantity.
+- Reuse the composition too: reference above, resource left, arithmetic right.
+  `ResourceExampleScene` supplies the policy used by both the knapsack selection
+  and road-trip worked example. Separate the existing simulation children into
+  those panels instead of shrinking an increasingly tall all-in-one diagram.
+- A native transform that lowers mathematical labels must adopt its owning
+  component's state as well. Check the next update and re-layout, not just the
+  first visible fill. A correct readout with stale `used` metadata is a bug.
+- Reuse meaning, not accidental shape. Road trip and travelling salesperson
+  already share `CityMap`, `MapScene` and route-step conventions. A capacity
+  gauge belongs with stored fuel/weight; it does not belong on the city problem
+  merely to make the examples look alike.
+
+Positive evidence: the viewer's resolved knapsack note `ef5d35e6481b` said
+"The clip art looks good" and requested its reuse in the concrete example.
+That endorses those pictured items in that context, not newly generated assets
+or the entire section. The canister still requires its own rendered review.
+
 ### Migration checks that must exercise the actual pathway
+
+The road-trip canister follow-up exposed a real remaining legacy adapter:
+`SlotScene` used an optional block whitelist to select both measurement and
+centering, despite the child panel already having measurable content. That
+made the earlier full-migration claim too broad. Remove that path rather than
+adding another slot to its whitelist. Text-panel measurements are authoritative;
+future reservations only add space. Check runtime path execution and reject
+skipped child owners, stale trace metadata and unexplained alignment overrides.
+Tests must exercise all layout variants and deliberately broken legacy paths,
+not only assert that classes inherit a common method.
 
 - Public layout classes must inherit the shared arranger and supply a panel
   recipe. A class-name hierarchy alongside private placement implementations
@@ -1371,6 +1419,11 @@ Initial insertion, retained-object adoption and refinement must agree. The
 argument's reference definitions share its sequence-wide fitting scale, so a
 growing recurrence cannot leave a larger peer equation below it. This defect
 was found in the encoded TSP derivation, not by its endpoint bounds check.
+The same rule applies inside illustrated components. Updating a mathematical
+meter label must preserve its label role, and adjacent map/resource labels
+must share their sizing scope. Exercise the separated panel layout actually
+used by the lesson, not only the component's standalone layout; publication
+must reject a mismatch in either path.
 
 Compare equivalent forward and backward recurrences term by term. Both their
 immediate and remaining contributions are structural blue; their combining

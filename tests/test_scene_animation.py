@@ -858,10 +858,12 @@ class SceneAnimationTests(unittest.TestCase):
         start(animation,scene);finish(animation,scene)
         self.assertEqual(trip.state.slot_tex['city'],'1')
         self.assertEqual(trip.state.slot_tex['fuel'],'2')
+        self.assertEqual(trip.pips.used,2)
         animation=scene._compile_view(trip.drive())
         start(animation,scene);finish(animation,scene)
         self.assertEqual(trip.state.slot_tex['city'],'2')
         self.assertEqual(trip.state.slot_tex['fuel'],'1')
+        self.assertEqual(trip.pips.used,1)
 
     def test_folded_duplicate_values_stay_hidden_after_canonical_cells_move(self):
         from algovis import RecursiveTree,ViewScene

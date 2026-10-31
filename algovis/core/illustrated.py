@@ -289,22 +289,95 @@ class FuelTank(CapacityMeter):
                 Transform(self.tank_label,target.tank_label)]
 
 
-class IllustratedBag(IllustratedProp):
-    """The illustrated bag retains its meter through the worked selection."""
+class IllustratedCapacity(IllustratedProp):
+    """A pictured resource and its independently drawn, truthful capacity gauge.
+
+    The picture stays unchanged as the resource changes. Labels and meter use
+    the same layout/typography policy for bags, fuel containers and other props.
+    A specialization may choose a proportional meter without scaling its text.
+    """
+    _algovis_content_fields=('relative_size','visible','show_meter')
+    def __init__(self,path,label,*,capacity='C',used=0,symbol='C',visible=True,
+                 show_meter=False,relative_size=1.,meter_height_ratio=None,theme=DEFAULT_THEME):
+        super().__init__(path,label,relative_size=relative_size,theme=theme)
+        self.visible,self.show_meter=visible,show_meter
+        self.meter_height_ratio=meter_height_ratio
+        self.meter=CapacityMeter(capacity,used,symbol=symbol,visible=visible and show_meter,theme=theme)
+        self.add(self.meter)
+        self._arrange_capacity()
+        self.image.set_opacity(int(visible));self.label.set_opacity(int(visible))
+
+    @property
+    def capacity(self):return self.meter.capacity
+
+    @property
+    def used(self):return self.meter.used
+
+    @property
+    def parts(self):return {'image':self.image,'label':self.label,'meter':self.meter}
+
+    def part(self,name):return self.parts[name]
+
+    def _arrange_capacity(self):
+        if self.meter_height_ratio is not None:
+            self.meter.outline.stretch_to_fit_height(self.image.height*self.meter_height_ratio)
+            self.meter._arrange()
+        self.meter.next_to(self.image,RIGHT,buff=.3)
+
+    def apply_scene_typography(self,typography,*,group):
+        super().apply_scene_typography(typography,group=group)
+        self.meter.apply_scene_typography(typography,group=group)
+        self._arrange_capacity()
+
+    def with_state(self,*,capacity=None,used=None,show_meter=None,relative_size=None,visible=None):
+        target=self.copy()
+        if visible is not None:target.visible=bool(visible)
+        if show_meter is not None:target.show_meter=bool(show_meter)
+        if relative_size is not None:
+            target.relative_size=float(relative_size)
+            target.image.scale_to_fit_height(2.5*target.relative_size)
+            target.label.next_to(target.image,DOWN,buff=.15)
+        target.meter=target.meter.with_state(capacity=capacity,used=used,
+            visible=target.visible and target.show_meter)
+        target.submobjects[2]=target.meter
+        target.image.set_opacity(int(target.visible));target.label.set_opacity(int(target.visible))
+        target._arrange_capacity()
+        return target
+
+    def motions_to(self,target):
+        return [Transform(self.image,target.image),Transform(self.label,target.label),
+                *self.meter.motions_to(target.meter)]
+
+    def adopt_layout(self,target):
+        from ..composition import _adopt
+        for live,new in zip(self.submobjects[:3],target.submobjects[:3]):_adopt(live,new)
+        self.visible,self.show_meter=target.visible,target.show_meter
+        self.relative_size=target.relative_size
+        return self
+
+
+class IllustratedFuelTank(IllustratedCapacity):
+    """Fuel uses the shared illustrated-capacity format, with T as its bound."""
+    def __init__(self,path,capacity,used=0,*,visible=False,theme=DEFAULT_THEME):
+        super().__init__(path,'FUEL TANK',capacity=capacity,used=used,symbol='T',
+            visible=visible,show_meter=True,relative_size=.6,meter_height_ratio=.76,theme=theme)
+
+
+class IllustratedBag(IllustratedCapacity):
+    """An illustrated capacity prop that also owns chosen/attempted item copies."""
     def __init__(self,path,label='BAG',*,relative_size=1.,theme=DEFAULT_THEME):
         super().__init__(path,label,relative_size=relative_size,theme=theme)
-        self.meter=CapacityMeter(theme=theme)
         self.contents=Group()
         self._copy_sources={}
         self.copy_path_arc=-.5
         self.attempt=None
         self.attempt_source=None
         self.rejection=None
-        self.add(self.meter,self.contents)
+        self.add(self.contents)
 
     @property
     def parts(self):
-        return {'image':self.image,'label':self.label,'meter':self.meter,
+        return {**super().parts,
                 **{f'stored:{index}':image for index,image in enumerate(self.contents)},
                 **({'attempt':self.attempt} if self.attempt is not None else {}),
                 **({'rejection':self.rejection} if self.rejection is not None else {})}
@@ -324,19 +397,11 @@ class IllustratedBag(IllustratedProp):
 
     def apply_scene_typography(self,typography,*,group):
         super().apply_scene_typography(typography,group=group)
-        self.meter.apply_scene_typography(typography,group=group)
-        self.meter.next_to(self.image,RIGHT,buff=.3)
         self._arrange_contents()
 
     def with_state(self,*,capacity=None,used=None,show_meter=None,store=None,relative_size=None,
                    attempt=None,reject_attempt=False,return_attempt=False,empty=False):
-        target=self.copy();target.meter=target.meter.with_state(capacity=capacity,used=used,visible=show_meter)
-        if relative_size is not None:
-            target.relative_size=float(relative_size)
-            target.image.scale_to_fit_height(2.5*target.relative_size)
-            target.label.next_to(target.image,DOWN,buff=.15)
-        target.submobjects[2]=target.meter
-        target.meter.next_to(target.image,RIGHT,buff=.3)
+        target=super().with_state(capacity=capacity,used=used,show_meter=show_meter,relative_size=relative_size)
         if empty:target.contents=Group()
         if store is not None:
             from ..composition import SlideObject
@@ -362,7 +427,7 @@ class IllustratedBag(IllustratedProp):
         return target
 
     def motions_to(self,target,*,skip=()):
-        motions=[Transform(self.image,target.image),Transform(self.label,target.label),*self.meter.motions_to(target.meter)]
+        motions=super().motions_to(target)
         motions.extend(Transform(image,target.contents[index]) if index<len(target.contents) else FadeOut(image)
                        for index,image in enumerate(self.contents) if f'stored:{index}' not in skip)
         motions.extend(FadeIn(image) for index,image in enumerate(target.contents)
@@ -379,7 +444,7 @@ class IllustratedBag(IllustratedProp):
 
     def adopt_layout(self,target):
         from ..composition import _adopt
-        for live,new in zip(self.submobjects[:3],target.submobjects[:3]):_adopt(live,new)
+        super().adopt_layout(target)
         contents=[]
         for index,image in enumerate(target.contents):
             live=self.contents[index] if index<len(self.contents) else image

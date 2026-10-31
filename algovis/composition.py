@@ -507,8 +507,8 @@ class SlideView:
     @staticmethod
     def _height(item):
         if isinstance(item.target,(MathRow,CaseEquation)):
-            item.ascent=max(item.ascent,float(item.target.get_top()[1]-item.target.baseline))
-            item.descent=max(item.descent,float(item.target.baseline-item.target.get_bottom()[1]))
+            item.ascent=max(item.ascent or 0.,float(item.target.get_top()[1]-item.target.baseline))
+            item.descent=max(item.descent or 0.,float(item.target.baseline-item.target.get_bottom()[1]))
             return item.ascent+item.descent
         return item.target.height
 
@@ -767,7 +767,8 @@ class ColumnSlide(SlideView):
             del root.children[key];del root.regions[key]
         root.in_region('body',self.layout.body,Panel.bound(
             [(name,item) for name,item in self.items.items() if item.slot=='body'],
-            gap=self.gap,padding=self.padding,vertical='top',center_block=False))
+            gap=self.gap,padding=self.padding,vertical='top',center_block=False,
+            alignment_reason='ColumnSlide explicitly owns a full-width column anchored at the top'))
         return root
 
     def _text_width(self,slot):
@@ -1029,7 +1030,8 @@ class SplitSlide(ColumnSlide):
         for slot in ('left','right'):
             root.in_region(slot,self._region(slot),Panel.bound(
                 [(name,item) for name,item in self.items.items() if item.slot==slot],
-                gap=self.gap,padding=self.padding,vertical='top',center_block=False))
+                gap=self.gap,padding=self.padding,vertical='top',center_block=False,
+                alignment_reason='SplitSlide explicitly owns two full-height columns with a shared top'))
         for name, item in self.items.items():
             if item.slot not in ('left','right'):
                 root.in_region(name,self.layout.region(item.slot),CenterPanel.bound([(name,item)]))

@@ -1177,7 +1177,7 @@ class ReviewServer:
     def _validate_render_timing(self, *, manifest_path=None) -> None:
         """Reject timing and declared peer-type errors, keeping the last good video."""
         from .audit import audit_section
-        from .inspection import typography_findings, alignment_findings, focus_span_findings, trigger_coverage_findings
+        from .inspection import typography_findings, alignment_findings, focus_span_findings, trigger_coverage_findings, panel_path_findings
         cue_document=json.loads(self.cue_path.read_text(encoding='utf-8'))
         if cue_document.get('alignmentProvenance') is not None:
             from ..narration import NarrationTrack
@@ -1188,6 +1188,9 @@ class ReviewServer:
             if fresh:raise RuntimeError('The render did not create a fresh object manifest; the previous preview remains available')
             return
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        panel_errors=panel_path_findings(manifest,required=cue_document.get('requirePanelLayout',False))
+        if panel_errors:
+            raise RuntimeError('Panel layout migration required before publication: '+str(panel_errors[0]))
         trigger_errors=trigger_coverage_findings(manifest)
         if trigger_errors:
             raise RuntimeError('Unconsumed animation triggers rejected before publication: '+str(trigger_errors[0]))

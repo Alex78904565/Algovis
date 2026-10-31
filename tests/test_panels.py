@@ -6,6 +6,83 @@ from tests.test_composition import apply
 
 
 class PanelTests(unittest.TestCase):
+    def test_legacy_slot_alignment_overrides_are_rejected_instead_of_used(self):
+        from algovis import SlotScene
+        with self.assertRaisesRegex(TypeError,'Legacy block_slots'):
+            class LegacySlots(SlotScene):
+                block_slots=('one',)
+        view=SlotScene()
+        with self.assertRaises(AttributeError):view.block_slots=('main',)
+        with self.assertRaisesRegex(ValueError,'alignment_reason'):
+            Panel(center_block=False)
+
+    def test_an_added_text_slot_is_measured_and_centered_without_registration(self):
+        from algovis import SlotScene,Equation
+        class NewSlot(SlotScene):
+            ROWS=(('earlier',1),('new_text',1))
+        view=NewSlot()
+        view.add('one',Equation({'value':'T=2'}),slot='new_text')
+        view.add('two',Equation({'value':'g_1=g_2=g_3=1'}),slot='new_text')
+        self.assertIn('new_text',view.block_slots)
+        content=__import__('manim').Group(view.target('one'),view.target('two'))
+        self.assertAlmostEqual(content.get_x(),view._region('new_text').center[0],places=6)
+        node=view.panels.children['new_text'].describe()
+        self.assertTrue(node['usedOwnMeasurement'])
+        self.assertGreater(node['measurement']['width'],0)
+        self.assertEqual(node['layoutPath'],'algovis.panels.Panel.arrange')
+
+    def test_unprepared_equation_placements_are_still_measured_by_the_panel(self):
+        from algovis import Equation
+        from algovis.composition import Placement
+        equation=Equation({'value':'x+1'})
+        item=Placement(SlideObject(equation),equation,'main')
+        self.assertIsNone(item.ascent)
+        measure=Panel.bound([('equation',item)]).measure()
+        self.assertGreater(measure.width,0)
+        self.assertGreater(measure.height,0)
+
+    def test_every_slot_layout_executes_its_real_panel_owners(self):
+        import algovis.scene_layouts as layouts
+        from algovis.review.inspection import panel_path_findings
+        classes={name:cls for name,cls in vars(layouts).items()
+                 if isinstance(cls,type) and issubclass(cls,layouts.SlotScene)}
+        for name,cls in classes.items():
+            with self.subTest(layout=name):
+                view=cls(pairs=[('left_object','right_object')]) if name=='PairedScene' else cls()
+                for slot in view._slots():
+                    key=slot+'_object' if name=='PairedScene' else 'object_'+slot
+                    view.add(key,Square(.12),slot=slot)
+                report=view.layout_report()
+                self.assertEqual(report['compilerPath'],'recursive-panels')
+                manifest={'viewInfrastructure':{'schema':2,'steps':[{'composition':report}]}}
+                self.assertEqual(panel_path_findings(manifest,required=True),[])
+
+    def test_a_parent_cannot_place_children_without_running_their_panel_path(self):
+        from algovis.panels import RegionPanel,arrange_view
+        class BrokenOwner(RegionPanel):
+            def arrange(self,region=None):pass
+        view=PanelSlide();panel=Panel();panel.add('object',Square(.4))
+        view.add_panel('main',panel)
+        root=BrokenOwner();root.in_region('main',view.layout.body,view.panels.children['main'])
+        with self.assertRaisesRegex(RuntimeError,'layout path was not executed'):
+            arrange_view(view,root)
+
+    def test_publication_checks_actual_layout_paths_and_rejects_old_metadata(self):
+        from algovis.review.inspection import panel_path_findings
+        from copy import deepcopy
+        view,_=self.board()
+        manifest={'viewInfrastructure':{'schema':2,'steps':[{'composition':view.layout_report()}]}}
+        self.assertEqual(panel_path_findings(manifest,required=True),[])
+        broken=deepcopy(manifest)
+        node=broken['viewInfrastructure']['steps'][0]['composition']['panelTree']['children']['body']['children']['left']
+        node['usedOwnMeasurement']=False
+        self.assertEqual(panel_path_findings(broken)[0]['kind'],'panel_measurement_bypassed')
+        manifest['viewInfrastructure']['schema']=1
+        self.assertEqual(panel_path_findings(manifest)[0]['kind'],'legacy_layout_trace')
+        self.assertEqual(panel_path_findings({},required=True)[0]['kind'],'panel_layout_coverage_missing')
+        self.assertEqual(panel_path_findings({'viewInfrastructure':{'schema':2,'steps':[]}},required=True)[0]['kind'],
+                         'panel_layout_coverage_missing')
+
     def board(self):
         row=RowPanel(gap=1.)
         left=row.panel('left',Panel())

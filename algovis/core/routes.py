@@ -2,11 +2,11 @@
 import math
 import numpy as np
 from manim import (AnimationGroup,BackgroundRectangle,Circle,Create,DOWN,FadeIn,interpolate_color,
-    LEFT,Line,MoveAlongPath,RIGHT,RoundedRectangle,Transform,UP,VGroup,VectorizedPoint)
+    LEFT,Line,MoveAlongPath,RIGHT,RoundedRectangle,Transform,UP,VGroup,Group,VectorizedPoint)
 from ..layout import LessonStyle,assign_scene_typography
 from ..objects import Equation
 from ..theme import DEFAULT_THEME
-from .illustrated import FuelTank
+from .illustrated import FuelTank,IllustratedFuelTank
 
 
 class RouteTrace(VGroup):
@@ -132,9 +132,9 @@ class CityMap(VGroup):
         return self.traveler.animate.move_to(self.cities[0])
 
 
-class RoadTripSimulation(VGroup):
+class RoadTripSimulation(Group):
     """A concrete city/fuel/cost trace; values follow the supplied instance."""
-    def __init__(self,*,capacity,prices,consumption,theme=DEFAULT_THEME):
+    def __init__(self,*,capacity,prices,consumption,tank_image=None,theme=DEFAULT_THEME):
         self.theme,self.capacity,self.prices,self.consumption=theme,capacity,prices,consumption
         self.city=0;self.fuel=0;self.costs=[]
         self.map=CityMap(range(1,len(consumption)+2),prices=prices,theme=theme)
@@ -144,7 +144,8 @@ class RoadTripSimulation(VGroup):
         self.cost=Equation({'cost':r'\text{cost}=0'},theme=theme)
         self.dashboard=VGroup(self.state,self.purchase,self.cost)
         self.dashboard.arrange(RIGHT,buff=.6).next_to(self.map,DOWN,buff=.8)
-        self.pips=FuelTank(capacity,visible=False,theme=theme)
+        self.pips=(IllustratedFuelTank(tank_image,capacity,theme=theme) if tank_image is not None
+                   else FuelTank(capacity,visible=False,theme=theme))
         self.pips.next_to(self.dashboard,DOWN,buff=.3)
         # The dashboard exists geometrically but is revealed only when the
         # example starts. It must not change the map's layout when it appears.

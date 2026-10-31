@@ -9,6 +9,7 @@ from __future__ import annotations
 from collections import OrderedDict
 from copy import copy
 from dataclasses import dataclass
+from functools import wraps
 import math
 
 from manim import Group, UL
@@ -44,13 +45,29 @@ class Panel:
     container. Mount with ``PanelSlide.add_panel``; future states are ordinary
     detached slide forks. There are no per-object coordinates in this API.
     """
-    def __init__(self, *, gap=.28, align='left', vertical='center', padding=0, center_block=True):
+    layout_contract=None
+    def __init_subclass__(cls,**kwargs):
+        super().__init_subclass__(**kwargs)
+        arrange=cls.__dict__.get('arrange')
+        if arrange is not None:
+            @wraps(arrange)
+            def traced(self,*args,**kwargs):
+                result=arrange(self,*args,**kwargs)
+                self._record_arrangement(f'{cls.__module__}.{cls.__qualname__}.arrange')
+                return result
+            cls.arrange=traced
+
+    def __init__(self, *, gap=.28, align='left', vertical='center', padding=0, center_block=True,
+                 alignment_reason=None):
         if not math.isfinite(gap) or gap < 0 or not math.isfinite(padding) or padding < 0:
             raise ValueError('Panel gap and padding must be finite and nonnegative')
         if align not in ('left', 'center') or vertical not in ('top', 'center'):
             raise ValueError('Panel alignment must be left/center and top/center')
+        if (not center_block or vertical!='center') and not alignment_reason:
+            raise ValueError('A non-centered panel policy needs an explicit alignment_reason; missing measurements cannot disable centering')
         self.gap, self.align, self.vertical, self.padding = gap, align, vertical, padding
         self.center_block = bool(center_block)
+        self.alignment_reason=alignment_reason
         self.children = OrderedDict()
         self.content_width = self.content_height = None
         self.reserve_future = True
@@ -162,6 +179,8 @@ class Panel:
         from .composition import _column_row
         from .presentation import SlideRegion
         size = self.measure()
+        self._used_own_measure=True
+        self._record_arrangement('algovis.panels.Panel.arrange',size)
         if size.height<=0:return
         width = (self.content_width or size.width-2*self.padding or None) if self.center_block else None
         height = self.content_height or size.height-2*self.padding or None
@@ -239,9 +258,19 @@ class Panel:
     def describe(self):
         return {'type': type(self).__name__, 'alignment': self.align,
                 'vertical': self.vertical,
+                'centerBlock':self.center_block,'alignmentReason':self.alignment_reason,
+                'layoutPath':getattr(self,'_layout_path',None),
+                'layoutContract':self.layout_contract,
+                'measurement':getattr(self,'_layout_measurement',None),
+                'usedOwnMeasurement':getattr(self,'_used_own_measure',False),
                 'children': {name: child.describe() if isinstance(child, Panel) else
                              {'object': child.name} if isinstance(child,PanelLeaf) else
                              {'reservedOnly':True} for name, child in self.children.items()}}
+
+    def _record_arrangement(self,path,size=None):
+        size=size or self.measure()
+        self._layout_path=path
+        self._layout_measurement={'width':size.width,'height':size.height}
 
 
 class CenterPanel(Panel):
@@ -293,6 +322,29 @@ class FixedPanel(Panel):
         pass
 
 
+class PairedColumnPanel(Panel):
+    """One paired column owns its rows, using the parent's shared row envelope."""
+    def __init__(self,*,pairs,heights,**kwargs):
+        super().__init__(**kwargs)
+        self.pairs,self.heights=tuple(pairs),dict(heights)
+
+    def arrange(self,region):
+        from .core.proof import first_line_of
+        planned={name for pair in self.pairs for name in pair}
+        if set(self.children)-planned:
+            raise ValueError('Paired column has objects without a planned row: '+', '.join(sorted(set(self.children)-planned)))
+        column=ColumnLayout(region,padding=0,gap=.28,
+            content_height=sum(self.heights.values())+.28*max(0,len(self.heights)-1))
+        for index,pair in enumerate(self.pairs):
+            column.reserve(str(index),self.heights[str(index)])
+            for name in pair:
+                if name not in self.children:continue
+                item=self.children[name].value
+                column.place(str(index),item.target)
+                top=column._slots[str(index)][0]
+                item.target.shift((0,top-first_line_of(item.target).get_top()[1],0))
+
+
 class PairedPanel(Panel):
     """Corresponding rows in nested columns share their first readable line."""
     def __init__(self, *, pairs, heights, widths, gap=.35):
@@ -302,26 +354,17 @@ class PairedPanel(Panel):
 
     def arrange(self, region):
         from .presentation import SlideRegion
-        from .core.proof import first_line_of
-        total_height=sum(self.heights.values())+.28*max(0,len(self.heights)-1)
         total_width=sum(self.widths.values())+self.gap
         left=region.center[0]-total_width/2
-        columns={};self.allocated_regions={}
+        self.allocated_regions={}
         for slot,child in self.children.items():
+            if not isinstance(child,PairedColumnPanel):
+                raise TypeError('PairedPanel requires PairedColumnPanel owners; direct child placement is removed')
             width=self.widths[slot]
             area=SlideRegion((left+width/2,region.center[1],0),max(width,.01),region.height)
             self.allocated_regions[slot]=area
-            columns[slot]=ColumnLayout(area,padding=0,gap=.28,content_height=total_height)
+            child.arrange(area)
             left+=width+self.gap
-        leaves={leaf.name:leaf.value for _,leaf in self.leaves()}
-        for index,pair in enumerate(self.pairs):
-            for column in columns.values():column.reserve(str(index),self.heights[str(index)])
-            for name in pair:
-                if name not in leaves:continue
-                item=leaves[name];column=columns[item.slot]
-                column.place(str(index),item.target)
-                top=column._slots[str(index)][0]
-                item.target.shift((0,top-first_line_of(item.target).get_top()[1],0))
 
 
 class ConversionPanel(Panel):
@@ -474,6 +517,7 @@ class RowPanel(Panel):
     def arrange(self, region):
         from .presentation import SlideRegion
         size = self.measure()
+        self._used_own_measure=True
         if size.height<=0:return
         width = self.content_width or size.width-2*self.padding
         height = self.content_height or size.height-2*self.padding
@@ -566,8 +610,37 @@ def arrange_view(view, root):
         raise ValueError('A panel recipe must own every visible object exactly once')
     if any(leaves[name] is not item for name,item in view.items.items()):
         raise ValueError('A panel recipe cannot substitute detached placement records')
+    for _,node in root.walk():
+        if isinstance(node,Panel):
+            node._layout_path=None;node._layout_measurement=None;node._used_own_measure=False
     root.arrange()
+    for path,node in root.walk():
+        if isinstance(node,Panel) and node.flatten() and not node._layout_path:
+            raise RuntimeError('Panel layout path was not executed at '+('/'.join(path) or '<root>')+'; remove the legacy placement bypass')
+    errors=layout_path_errors(root.describe())
+    if errors:raise RuntimeError('Panel layout migration required: '+str(errors[0]))
     view.panels = root
     view._allocated_panel_regions={}
     for _,node in root.walk():
         if isinstance(node,Panel):view._allocated_panel_regions.update(getattr(node,'allocated_regions',{}))
+
+
+def layout_path_errors(tree):
+    """One contract for runtime layout, tests and pre-publication inspection."""
+    errors=[]
+    def has_content(node):
+        return 'object' in node or any(has_content(child) for child in node.get('children',{}).values())
+    def inspect(node,path):
+        if 'type' not in node:return
+        if has_content(node):
+            executed=node.get('layoutPath') or ''
+            registered=executed.startswith('algovis.panels.') or bool(node.get('layoutContract'))
+            if not executed or not registered or not node.get('measurement'):
+                errors.append({'kind':'panel_layout_path_not_executed','path':path,'layoutPath':executed})
+            if (not node.get('centerBlock',True) or node.get('vertical')=='top') and not node.get('alignmentReason'):
+                errors.append({'kind':'unexplained_panel_alignment_override','path':path})
+            if node.get('type') in ('Panel','RowPanel','CenteredColumnPanel','FooterPanel') and not node.get('usedOwnMeasurement'):
+                errors.append({'kind':'panel_measurement_bypassed','path':path})
+        for name,child in node.get('children',{}).items():inspect(child,path+'/'+name)
+    inspect(tree,'<root>')
+    return errors
