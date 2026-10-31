@@ -334,12 +334,17 @@ class SequenceLayoutTests(unittest.TestCase):
         from manim import Scene
         proof.install(Scene())
         destination=proof.target('inductive_step').part('child')
-        route=proof.definition_route(source.mobject.part('child'),destination)
+        route=proof.definition_route(source.mobject.part('n'),destination)
         self.assertEqual(len(route),2)
-        half_width=max(source.mobject.part('child').width,destination.width)/2
+        half_width=max(source.mobject.part('n').width,destination.width)/2
         for name in ('claim','base_case','induction_hypothesis'):
             self.assertGreater(route[0][0]-half_width,proof.target(name).get_right()[0])
         self.assertLess(route[0][0]+half_width,proof.layout.body.width/2)
+        # The leftmost call cannot use that same departure: its +n blocks the
+        # right exit, and the long hypothesis label blocks the left corridor.
+        # Reject the crowded route rather than drawing through retained ink.
+        with self.assertRaisesRegex(ValueError,'clear departure'):
+            proof.definition_route(source.mobject.part('child'),destination)
 
     def test_a_concrete_example_stays_centered_as_its_definition_grows(self):
         first=MapScene('A journey')

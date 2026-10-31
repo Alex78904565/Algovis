@@ -145,6 +145,14 @@ class DefinitionUse:
     path_arc: float = 0
 
 
+def _remember_definition_uses(scene, uses):
+    # Keep strong references so object IDs cannot be recycled. This state is
+    # independent of a native CanvasSlide capture made by an attention effect.
+    completed=getattr(scene,'_algovis_completed_definition_uses',{})
+    completed.update((id(use),use) for use in uses)
+    scene._algovis_completed_definition_uses=completed
+
+
 def _object(value):
     return value if isinstance(value, SlideObject) else SlideObject(value)
 
@@ -671,6 +679,7 @@ class SlideView:
         for item in self.items.values():
             _adopt(item.object.mobject, item.target)
         scene.add(*(item.object.mobject for item in self.items.values()))
+        _remember_definition_uses(scene,self.definition_uses.values())
 
 
 class ColumnSlide(SlideView):
@@ -691,10 +700,10 @@ class ColumnSlide(SlideView):
     def _text_width(self,slot):
         return super()._text_width(slot)-2*self.padding if slot=='body' else super()._text_width(slot)
 
-    def definition_route(self,source,destination):
+    def definition_route(self,source,destination,*,vacant_destination=False):
         """Carry a definition beside intervening rows, keeping them readable."""
         return _definition_route(self,source,destination,
-            [item for item in self.items.values() if item.slot=='body'])
+            [item for item in self.items.values() if item.slot=='body'],vacant_destination=vacant_destination)
 
     def _fit_areas(self):
         body=[item for item in self.items.values() if item.slot=='body']
@@ -703,10 +712,14 @@ class ColumnSlide(SlideView):
                 *(area for area in super()._fit_areas() if area.group!='body')]
 
 
-def _definition_route(view,source,destination,items,*,left_bound=None):
+class _VacantDefinitionRoute(tuple):
+    """A measured route which must finish before its new row's other ink enters."""
+    vacant_destination=True
+
+
+def _definition_route(view,source,destination,items,*,left_bound=None,vacant_destination=False):
     """A common measured corridor for column and proof definition copies."""
     start,end=source.get_center(),destination.get_center()
-    if abs(end[1]-start[1])<.1:return ()
     half_width=max(source.width,destination.width)/2+.12
     half_height=max(source.height,destination.height)/2+.08
     samples=[start+(end-start)*a for a in np.linspace(0,1,61)]
@@ -714,7 +727,7 @@ def _definition_route(view,source,destination,items,*,left_bound=None):
     source_ink={id(p) for p in source.family_members_with_points()}
     destination_ink={id(p) for p in destination.family_members_with_points()}
     for item in items:
-        if not isinstance(item.target,MathRow):continue
+        if not isinstance(item.target,MathRow) and not hasattr(type(item.target),'part'):continue
         live_family={id(p) for p in item.object.mobject.get_family()}
         target_family={id(p) for p in item.target.get_family()}
         if (source_ink and source_ink<=live_family and destination_ink
@@ -722,10 +735,32 @@ def _definition_route(view,source,destination,items,*,left_bound=None):
             # A multi-line definition can apply its own lhs on a later line.
             # Leave above the source line before travelling horizontally;
             # a diagonal departure cuts through its retained English meaning.
-            above=max(source.get_top()[1],item.target.get_top()[1])+half_height+.08
-            if above+half_height>view.layout.body.center[1]+view.layout.body.height/2:
-                raise ValueError('An internal definition copy needs a clear departure band above its equation')
-            return (np.array([start[0],above,0]),np.array([end[0],above,0]))
+            if isinstance(item.target,MathRow) and abs(end[1]-start[1])>=.1:
+                band=max(source.get_top()[1],item.target.get_top()[1])+half_height+.08
+                if band+half_height>view.layout.body.center[1]+view.layout.body.height/2:
+                    raise ValueError('An internal definition copy needs a clear departure band above its equation')
+            else:
+                # A lhs used inside its own cases must also avoid the equals
+                # sign, optimizer and other alternatives on the same baseline.
+                band=min(source.get_bottom()[1],item.target.get_bottom()[1])-half_height-.08
+                if band-half_height<view.layout.body.center[1]-view.layout.body.height/2:
+                    raise ValueError('An internal definition copy needs a clear departure band below its equation')
+            return (np.array([start[0],band,0]),np.array([end[0],band,0]))
+    from .frames import CaseEquation
+    owners=[component for item in items for component in item.object.mobject.get_family()
+            if isinstance(component,(MathRow,CaseEquation)) and source_ink
+            and source_ink<={id(p) for p in component.get_family()}]
+    source_siblings=[part for owner in owners for part in owner.family_members_with_points()
+              if id(part) not in source_ink
+              and (np.max(part.get_fill_opacity())>.01
+                   or (np.max(part.get_stroke_opacity())>.01 and np.max(part.get_stroke_width())>0))]
+    # Even without an intervening row, a diagonal can cut through the source's
+    # own meaning. Include that owner in the measured corridor calculation.
+    if any(part.get_left()[0]-source.width/2-.015<p[0]<part.get_right()[0]+source.width/2+.015
+           and part.get_bottom()[1]-source.height/2-.015<p[1]<part.get_top()[1]+source.height/2+.015
+           for part in source_siblings for p in samples):
+        obstacles.extend(owners)
+    if abs(end[1]-start[1])<.1 and not obstacles:return ()
     for item in items:
         live_family={id(p) for p in item.object.mobject.get_family()}
         target_family={id(p) for p in item.target.get_family()}
@@ -755,7 +790,50 @@ def _definition_route(view,source,destination,items,*,left_bound=None):
     low=(left_bound if left_bound is not None else view.layout.body.center[0]-view.layout.body.width/2)+half_width
     high=view.layout.body.center[0]+view.layout.body.width/2-half_width
     choices=[x for x in (left,right) if low<=x<=high]
-    if not choices:raise ValueError('Definition copy needs a clear route beside the intervening rows')
+    # A partial definition must leave its source without crossing the ink
+    # beside it. A proof's usual content boundary is not a wall: its empty
+    # label gutter can be used if the actual visible labels leave it clear.
+    def clear_departure(x):
+        departing_width=source.width/2+.015
+        departing_height=source.height/2+.015
+        return not any(min(x,start[0])-departing_width<part.get_right()[0]
+                       and max(x,start[0])+departing_width>part.get_left()[0]
+                       and part.get_bottom()[1]-departing_height<start[1]<part.get_top()[1]+departing_height
+                       for part in source_siblings)
+    choices=[x for x in choices if clear_departure(x)]
+    if not choices and left_bound is None:
+        # Content bounds reserve static alignment, not an impenetrable wall.
+        # A travelling formula can use the outer motion margin while all of
+        # its actual ink remains inside the frame's safe edge.
+        ink_half=max(source.width,destination.width)/2
+        frame_left=-float(config.frame_width)/2+.18+ink_half
+        frame_right=float(config.frame_width)/2-.18-ink_half
+        choices=[x for x in (left,right) if frame_left<=x<=frame_right and clear_departure(x)]
+    if not choices and left_bound is not None:
+        body_left=view.layout.body.center[0]-view.layout.body.width/2+half_width
+        labels=[item.target for name,item in view.items.items() if name.startswith('label:')]
+        choices=[x for x in (left,right) if body_left<=x<=high and clear_departure(x)
+                 and not any(part.get_left()[0]-half_width<x<part.get_right()[0]+half_width
+                             and min(start[1],end[1])-half_height<part.get_top()[1]
+                             and max(start[1],end[1])+half_height>part.get_bottom()[1]
+                             for part in labels)]
+    if not choices and vacant_destination:
+        # A new equation is still empty. Leave the source vertically, then
+        # use that empty row as the horizontal corridor. Its prefix/suffix
+        # must remain absent until arrival; the compiler owns that lifecycle.
+        bend=np.array([start[0],end[1],0])
+        points=[a+(b-a)*t for a,b in ((start,bend),(bend,end)) for t in np.linspace(0,1,61)]
+        def intersects(part,w,h):
+            return any(part.get_left()[0]-w<p[0]<part.get_right()[0]+w
+                       and part.get_bottom()[1]-h<p[1]<part.get_top()[1]+h for p in points)
+        others=[item.target for item in items
+                if not source_ink<={id(p) for p in item.object.mobject.get_family()}
+                and not destination_ink<=({id(p) for p in item.target.get_family()}
+                                          |{id(p) for p in item.object.mobject.get_family()})]
+        if (not any(intersects(part,source.width/2+.015,source.height/2+.015) for part in source_siblings)
+                and not any(intersects(part,half_width,half_height) for part in others)):
+            return _VacantDefinitionRoute((bend,))
+    if not choices:raise ValueError('Definition copy needs a clear departure and corridor beside the retained ink')
     x=min(choices,key=lambda x:abs(x-start[0])+abs(x-end[0]))
     route=[np.array([x,start[1],0]),np.array([x,end[1],0])]
     # A copied term can arrive beside a retained suffix. Approaching along
@@ -763,15 +841,19 @@ def _definition_route(view,source,destination,items,*,left_bound=None):
     # Go below the destination row, then rise into the prepared term slot.
     for item in items:
         if not isinstance(item.target,MathRow):continue
-        family={id(p) for p in item.target.get_family()}
-        if not destination_ink or not destination_ink<=family:continue
-        siblings=[part for part in item.target.parts.values()
+        target_family={id(p) for p in item.target.get_family()}
+        live_family={id(p) for p in item.object.mobject.get_family()}
+        if not destination_ink:continue
+        if destination_ink<=target_family:owner=item.target
+        elif destination_ink<=live_family:owner=item.object.mobject
+        else:continue
+        siblings=[part for part in owner.parts.values()
                   if not destination_ink & {id(p) for p in part.get_family()}]
         if any(min(x,end[0])-half_width<part.get_right()[0]
                and max(x,end[0])+half_width>part.get_left()[0]
                and part.get_bottom()[1]-half_height<end[1]<part.get_top()[1]+half_height
                for part in siblings):
-            below=item.target.get_bottom()[1]-half_height-.08
+            below=owner.get_bottom()[1]-half_height-.08
             lower=-float(config.frame_height)/2+.18
             for footer in items:
                 if footer.slot in ('footer','conclusion') and footer.target.get_top()[1]<end[1]:
@@ -785,7 +867,7 @@ def _definition_route(view,source,destination,items,*,left_bound=None):
     return tuple(route)
 
 
-def _definition_copies(view,sources,destination):
+def _definition_copies(view,sources,destination,*,entering=False):
     """Contiguous terms from one definition travel as one readable formula."""
     route=getattr(type(view),'definition_route',None)
     runs=[]
@@ -807,8 +889,10 @@ def _definition_copies(view,sources,destination):
         if not run:continue
         source=run[0][1].mobject if len(run)==1 else VGroup(*(entry[1].mobject for entry in run))
         target=destination.part(run[0][0]) if len(run)==1 else VGroup(*(destination.part(entry[0]) for entry in run))
-        motions.append(ApplyDefinition(source,None,target,copy_only=True,
-            via=route(view,source,target) if route else ()))
+        via=route(view,source,target,vacant_destination=entering) if route else ()
+        motion=ApplyDefinition(source,None,target,copy_only=True,via=via)
+        motion._algovis_requires_vacant_destination=getattr(via,'vacant_destination',False)
+        motions.append(motion)
     return motions
 
 
@@ -917,10 +1001,10 @@ class ProofSlide(SlideView):
             check(self.target('definitions'))
         return super().validate()
 
-    def definition_route(self,source,destination):
+    def definition_route(self,source,destination,*,vacant_destination=False):
         return _definition_route(self,source,destination,
             [item for item in self.items.values() if item.slot in self.frame.rows or item.slot=='footer'],
-            left_bound=self.frame.left[0])
+            left_bound=self.frame.left[0],vacant_destination=vacant_destination)
 
     def __init__(self, title=None, *, profile="compact", **kwargs):
         self.frame = ProofFrame(profile, theme=kwargs.get("theme", DEFAULT_THEME))
@@ -1161,6 +1245,8 @@ class ViewTransition:
 
     def animations(self, scene):
         """Prepare only at the spoken cue, after checking ownership and sources."""
+        completed=getattr(scene,'_algovis_completed_definition_uses',{})
+        self.definition_uses={name:use for name,use in self.definition_uses.items() if id(use) not in completed}
         present = {id(obj) for obj in scene.get_mobject_family_members()}
         for key in self.old:
             if key not in present:
@@ -1221,8 +1307,14 @@ class ViewTransition:
                 if source is None:
                     term_sources=getattr(item.target,'_copy_sources',{})
                     if term_sources:
-                        motions.extend(_definition_copies(self.incoming,term_sources,live))
-                        motions.extend(FadeIn(part) for key,part in live.parts.items() if key not in term_sources)
+                        copies=_definition_copies(self.incoming,term_sources,live,entering=True)
+                        new_parts=[part for key,part in live.parts.items() if key not in term_sources]
+                        if new_parts and any(getattr(copy,'_algovis_requires_vacant_destination',False) for copy in copies):
+                            motions.append(Succession(AnimationGroup(*copies,run_time=.8),
+                                DeferredAnimation(lambda parts=new_parts:AnimationGroup(*(FadeIn(part) for part in parts)),run_time=.2)))
+                        else:
+                            motions.extend(copies)
+                            motions.extend(FadeIn(part) for part in new_parts)
                     else:
                         entering=getattr(type(live),'enter_animation',None)
                         if crosses_moving_art(item.target):
@@ -1347,6 +1439,7 @@ class ViewTransition:
         return self._scheduled
 
     def commit(self, scene, *, adopt=True, consolidate=True):
+        _remember_definition_uses(scene,self.definition_uses.values())
         # AnimationGroup and Succession build synthetic owners. A nested copy
         # can dissolve those groups, leaving an empty wrapper at the scene root.
         # Retire only this transition's wrappers, then restore one artwork owner.

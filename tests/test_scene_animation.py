@@ -11,6 +11,124 @@ from tests.test_composition import apply
 
 
 class SceneAnimationTests(unittest.TestCase):
+    def test_renderer_remembers_an_applied_copy_when_the_same_view_gains_a_row(self):
+        from algovis import ViewScene,ApplyDefinition,Pulse
+        from manim import tempconfig
+        first=CenteredScene();source=first.add('source',Equation({'call':'f(n)'}))
+        first.add('cases',CaseEquation(Equation({'call':'f(n)'}),[Equation({'future':'0'})]))
+        applied=first.fork().apply_definition('cases','row:0.future',source.part('call'),'f(n)')
+        film=LessonAnimation();film.add(applied,reason='Apply the definition')
+        with tempconfig({'dry_run':True,'disable_caching':True}):
+            scene=ViewScene(skip_animations=True);scene.setup();scene.set_view(first)
+            with patch('algovis.composition.ApplyDefinition',wraps=ApplyDefinition) as transfer:
+                film.play(scene)
+                scene.play(Pulse(source.mobject,trigger='definition',reason='Refer to the visible definition'),run_time=.1)
+                applied.add('base','The base case')
+                film.add(applied,reason='Add the base without replaying the completed copy')
+                film.play(scene)
+            self.assertEqual(transfer.call_count,1)
+            self.assertIs(scene.current_view.definition_uses['cases'],film.beats[-1].scene.definition_uses['cases'])
+
+    def test_definition_copy_can_use_the_clear_outer_motion_margin(self):
+        from algovis import ListScene
+        first=ListScene()
+        first.add('meaning','Minimum weight for a target. Choose the largest feasible target value.')
+        handle=first.add('all_items',Equation({'call':'f[1,v]','meaning':r'=\text{minimum weight to reach at least }v'}))
+        first.add('bound',Equation({'total':r'V=\sum_{i=1}^n v_i','range':r'\qquad0\le v\le V'}))
+        first.add('seek','find the largest target v')
+        second=first.fork();second.add('feasible',Equation({'call':handle.part('call')}))
+        first.install(Scene());handle.mobject.move_to(second.target('all_items'))
+        source=handle.mobject.part('call');destination=second.target('feasible').part('call')
+        via=second.definition_route(source,destination,vacant_destination=True)
+        self.assertTrue(via)
+        self.assertLess(via[0][0],source.get_left()[0])
+        from manim import config
+        self.assertGreater(via[0][0]-source.width/2,-config.frame_width/2+.18)
+        third=second.fork()
+        wrapper=third.add('answer',Equation({'max':r'\max\{v\mid 0\le v\le V,',
+                                            'call':handle.part('call'),'end':r'\le C\}'}))
+        handle.mobject.move_to(third.target('all_items'))
+        wrapper.mobject.adopt_layout(third.target('answer'))
+        destination=wrapper.mobject.part('call')
+        via=third.definition_route(source,destination,vacant_destination=True)
+        # An entering row uses its live owner after adoption. Its retained
+        # prefix must not disappear from the landing-obstacle calculation.
+        self.assertLess(via[-1][1],destination.get_bottom()[1])
+        self.assertAlmostEqual(via[-1][0],destination.get_x())
+
+    def test_new_equation_wrapper_waits_for_a_copy_using_its_empty_row(self):
+        from algovis import ListScene
+        first=ListScene()
+        first.add('meaning','The minimum weight tells us which target values are feasible. '
+                  'We seek the largest value whose required weight fits in the bag.')
+        first.add('bound',Equation({'range':r'0\le v\le V'}))
+        first.add('seek','Find the largest feasible target value.')
+        handle=first.add('source',Equation({'call':'f[1,v]','condition':r'\le C'}))
+        second=first.fork()
+        result=second.add('answer',Equation({'max':r'\max\{v\mid 0\le v\le V,',
+                                           'call':handle.part('call'),'end':r'\le C\}'}))
+        stage=Scene();first.install(stage)
+        # The compiler routes copies after preparing retained rows, so the
+        # source is already in the incoming layout when its exit is measured.
+        handle.mobject.move_to(second.target('source'))
+        destination=second.target('answer').part('call')
+        via=second.definition_route(handle.mobject.part('call'),destination,vacant_destination=True)
+        self.assertTrue(via.vacant_destination)
+        self.assertAlmostEqual(via[0][0],handle.mobject.part('call').get_x())
+        self.assertAlmostEqual(via[0][1],destination.get_y())
+        plan=ViewTransition(first,second)
+        for animation in plan.animations(stage):
+            start(animation,stage);animation.interpolate(.4)
+            painted={id(part) for root in stage.mobjects for part in root.family_members_with_points()}
+            self.assertFalse(painted & {id(part) for part in result.mobject.part('max').family_members_with_points()})
+            finish(animation,stage)
+        plan.commit(stage)
+        self.assertIn(handle.mobject,stage.mobjects)
+        self.assertEqual(result.mobject.native_layout_findings(),[])
+
+    def test_a_case_definition_leaves_away_from_its_own_rhs_in_a_proof(self):
+        from algovis import ProofSlide
+        first=ProofSlide()
+        recurrence=CaseEquation(Equation({'call':'f(i,w)','eq':r'=\max'}),[
+            Equation({'take':'v_i+f(i+1,w+w_i)'}),Equation({'skip':'f(i+1,w)'})])
+        base=CaseEquation(Equation({'call':'f(n,w)','eq':'='}),[
+            Equation({'yes':r'v_n\quad\text{if }w+w_n\le C'}),Equation({'no':r'0\quad\text{otherwise}'})])
+        handle=first.define_algorithm(recurrence,base)
+        first.add('claim',Equation({'p':'P(k):','meaning':r'\text{all instances of size at most }k'}))
+        second=first.fork();second.add('base_case',Equation({'call':handle.part('1.lhs.call')}))
+        first.install(Scene())
+        source=base.lhs.part('call');destination=second.target('base_case').part('call')
+        route=second.definition_route(source,destination)
+        self.assertTrue(route)
+        self.assertLess(route[0][0],source.get_left()[0])
+        self.assertAlmostEqual(route[0][1],source.get_y())
+
+    def test_cases_wait_for_a_moving_condition_even_when_the_row_start_is_fixed(self):
+        old=Equation({'words':r'\text{take item }i','condition':r'\text{if it fits}'})
+        cases=CaseEquation(Equation({'f':r'f(i,w)=\max'}),[old])
+        target=cases.with_state(rows=[old.next_layout(words=r'v_i+\text{best value after taking item }i')])
+        stage=Scene();stage.add(cases)
+        animation=cases.motions_to(target)[0]
+        start(animation,stage);animation.interpolate(.55)
+        painted={id(part) for root in stage.mobjects for part in root.family_members_with_points()}
+        self.assertFalse(painted & {id(part) for part in target.rows[0].part('words').family_members_with_points()})
+        finish(animation,stage)
+
+    def test_case_lhs_copy_avoids_its_optimizer_and_other_alternatives(self):
+        from algovis import RecurrenceScene
+        first=RecurrenceScene()
+        cases=CaseEquation(Equation({'call':'f(i,v)','opt':r'=\min'}),[
+            Equation({'skip':'f(i+1,v)'}),Equation({'future':r'\text{minimum remaining weight}'})])
+        handle=first.add('rule',cases,slot='equation')
+        second=first.fork().apply_definition('rule','row:1.future',handle.part('lhs.call'),'f(i+1,v)')
+        first.install(Scene())
+        destination=second.target('rule').rows[1].part('future')
+        route=second.definition_route(cases.lhs.part('call'),destination)
+        self.assertEqual(len(route),2)
+        self.assertLess(route[0][1],cases.get_bottom()[1])
+        self.assertAlmostEqual(route[0][0],cases.lhs.part('call').get_x())
+        self.assertAlmostEqual(route[-1][0],destination.get_x())
+
     def test_an_equation_applying_its_own_definition_leaves_above_the_words(self):
         from algovis import ListScene
         first=ListScene()

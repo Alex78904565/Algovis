@@ -236,8 +236,10 @@ class CaseEquation(VGroup):
         introduced.extend(target.rows[len(self.rows):])
         # New labels belong to their moving equation, including nested rows.
         # Never leave them fading at the destination while the owner travels.
-        moving=any(np.linalg.norm(old.get_left()-new.get_left())>.1
-                   for old,new in [(self.lhs,target.lhs),*zip(self.rows,target.rows)])
+        moving=any(np.linalg.norm(a.get_center()-b.get_center())>.1
+                   for old,new in [(self.lhs,target.lhs),*zip(self.rows,target.rows)]
+                   for a,b in ([(old.part(key),new.part(key)) for key in old.parts.keys() & new.parts.keys()]
+                               if isinstance(old,MathRow) and isinstance(new,MathRow) else [(old,new)]))
         def arrival():
             if moving and introduced:
                 return Succession(AnimationGroup(*motions,run_time=.8),

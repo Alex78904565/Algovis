@@ -802,7 +802,7 @@ class SlideSceneMixin:
             self.remove(*self.current_slide.mobjects)
             self.current_slide = None
         view.install(self)
-        self.current_view = view.fork()
+        self.current_view = view.snapshot()
         self._capture_review_snapshot()
         return view
 
@@ -842,7 +842,10 @@ class SlideSceneMixin:
         finally:
             self._view_transition_active = False
         plan.commit(self)
-        self.current_view = view.fork()
+        # Save completed transition identities as well as its artwork. An
+        # authored fork starts a new instruction; the renderer's outgoing
+        # state must remember which one-shot definition uses already ran.
+        self.current_view = view.snapshot()
         if hasattr(self,'_view_steps'):
             self._view_steps.append({'start':float(self.renderer.time)-run_time,
                 'end':float(self.renderer.time),'cue':cue or getattr(self,'_review_active_cue',{}).get('cue'),'completed':True,

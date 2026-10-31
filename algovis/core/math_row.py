@@ -173,9 +173,8 @@ class MathRow(MathTex):
             # A containing equation owns one arrival phase for all its rows.
             introductions.extend(introduced)
             introduced=[]
-        anchor=next((name for name in self.parts if name in target.parts and name not in skip),None)
-        moving=anchor is not None and np.linalg.norm(
-            self.part(anchor).get_center()-target.part(anchor).get_center())>.1
+        moving=any(np.linalg.norm(self.part(name).get_center()-target.part(name).get_center())>.1
+                   for name in self.parts.keys() & target.parts.keys() if name not in skip)
         def arrival():
             if moving and introduced:
                 return Succession(AnimationGroup(*animations,run_time=.8),

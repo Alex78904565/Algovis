@@ -107,7 +107,7 @@ class SlotScene(SlideView):
     def _region(self,slot):
         return self._slots().get(slot) or super()._region(slot)
 
-    def definition_route(self,source,destination):
+    def definition_route(self,source,destination,*,vacant_destination=False):
         """Keep carried definitions clear of the other semantic rows.
 
         Footer/context definitions are ordinary sources too. Their route must
@@ -115,7 +115,7 @@ class SlotScene(SlideView):
         """
         from .composition import _definition_route
         return _definition_route(self,source,destination,
-            [item for item in self.items.values() if item.slot!='header'])
+            [item for item in self.items.values() if item.slot!='header'],vacant_destination=vacant_destination)
 
     def _fit_and_arrange(self):
         for item in self.items.values():

@@ -1180,3 +1180,28 @@ matched-branch numerical backtracking with independently centered panels; and
 the board-inspired recap's separate recursion and storage braces. Reuse these
 mechanisms where their explanation matches, without extending their signoff to
 unrelated text, motion, or audio.
+
+## Shared motion failures caught by the whole-video observation pass
+
+- A correct destination does not certify a definition transfer. Inspect departure,
+  transit and arrival. The shared route planner must avoid the source's neighboring
+  ink as well as intervening rows and the destination's retained suffix. Hidden
+  equation alignment anchors are not visible obstacles. A proof may use its empty
+  label gutter only after checking the actual visible labels along that route.
+- A fixed left edge does not mean that an equation is stationary. When a cases
+  row grows, a retained condition can move while the row's first term stays put.
+  New words must wait for every retained named term to reach its place, not just
+  the first term or the row's bounding box. This belongs in the equation component.
+- A rejected intermediate render stays rejected in the evidence record, even
+  when its endpoints pass. Record the newly rendered phases before closing it.
+- Wrapping a copied expression in a new equation needs its own introduction
+  lifecycle. If the copy uses the empty destination row for travel, defer its
+  prefix/suffix until arrival. Check the same route with live and planned
+  objects; a correct detached geometry check can otherwise fail during playback.
+- Check arrivals into newly adopted rows as well as retained rows. Recognizing
+  only the planned row can miss its live prefix, letting a copy travel through
+  a new max/min expression. A valid final equality does not excuse that motion.
+- After a completed transfer, inspect the next unrelated addition. A definition
+  copy must not replay while a base case or caption is being introduced. The
+  renderer must retain consumed transition identities in its outgoing snapshot;
+  checking the transition object alone misses a renderer that discards them.

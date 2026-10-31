@@ -669,6 +669,9 @@ local cleanup or a second timing cue for the placeholder.
 For a multi-line `MathRow` applying its own lhs on a later line, the shared route
 leaves above the source line before horizontal travel. It checks the available
 departure band instead of silently drawing through the retained English meaning.
+Applying a cases equation's own lhs uses a band beneath the alternatives,
+including same-baseline applications, so the copy avoids its optimizer and
+other branches. This route belongs to the compiler's component traversal.
 
 `SlotScene` uses the same measured definition-copy routing for its semantic rows,
 including footer/context sources. A distance or price definition must avoid the
@@ -717,3 +720,39 @@ That wrapping reservation carries from the preceding explanation group when
 the same paragraph continues. Starting a new `SceneSequence` does not give a
 retained paragraph permission to expand its lines and interpolate their glyphs.
 An explicitly changed sentence receives its own content-keyed reservation.
+
+## Definition departure and nested equation arrival
+
+The common definition route planner checks the visible ink beside the source
+before selecting a corridor. Proof content boundaries can admit an empty label
+gutter; visible labels, rather than an arbitrary coordinate exception, determine
+whether that route is usable. Internal case applications use a clear band below
+the cases; multiline equation applications leave above their source line.
+
+`MathRow` and `CaseEquation` coordinate introduction phases against every retained
+named term. A stationary lhs or row origin cannot certify that a condition or
+suffix has finished moving. Caption replacements retire old words, prepare the
+retained geometry, and reveal the new words at the settled destination.
+
+When a copied term enters a new equation, the compiler can reserve its still-empty
+row as a corridor. That route carries a lifecycle requirement: finish the copy
+before revealing the new prefix and suffix. The route checks both live and
+detached destination identities, and does not treat a decorative item's frame
+as neighboring equation ink. Existing readable routes retain their timing.
+
+Static content regions and transient motion bounds have different jobs. Copies
+can use a clear outer motion margin while their actual ink remains inside the
+frame's safe edge. Landing checks must resolve both a detached target row and a
+live row that the compiler has already adopted. In either case, retained prefixes
+and suffixes remain obstacles; approach through a clear band instead of sliding
+across those terms.
+
+The renderer saves completed views with `snapshot()`, preserving the identities
+of already-applied definition uses. `fork()` is an authoring operation that clears
+those instructions; using it for the saved outgoing renderer state loses the
+consumed-use marker and can replay a copy when an author simply adds a new row.
+Cover this through real `ViewScene` playback, not only direct `ViewTransition`
+tests, and inspect the first caption/base addition after each transfer.
+Completed uses also belong to the renderer independently of its current visual
+container: intrinsic attention phases can capture a native canvas between two
+structured views. That capture must not reset the consumed-use registry.
