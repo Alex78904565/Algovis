@@ -7,6 +7,10 @@ when the new construction has substantially different meaning or behavior.
 
 ## Structure
 
+See the [recursive panel ownership audit](PANEL_ARCHITECTURE_AUDIT.md) for the
+author's proposed Animation → Slide → Panel → Object model, its nested panels,
+and the explicit gaps between that contract and the current implementation.
+
 ```text
 LessonAnimation               the narration timeline
 └── SceneSequence              all planned states of one explanation/proof
