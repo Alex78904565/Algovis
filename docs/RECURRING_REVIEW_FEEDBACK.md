@@ -492,6 +492,7 @@ automatic approval mechanism.
 | Too many slides, resets, title changes, or disappearing equations | Compare compositions before and after. Keep useful definitions, proof steps, and unchanged equation terms. Move or regroup existing work to make room; clear it only when the explanation has finished using it. |
 | Crowding, overlap, poor alignment, or clipped content | Inspect complete video frames: titles, section markers, labels, formulas, braces, arrows, dividers, and effect outlines. Check spacing and hierarchy as well as intersections. Readability matters even when geometry tests pass. |
 | Pop-ins, leftover edges, duplicate labels, or symbol scrambling | Inspect intermediate frames. Nodes and edges share a lifecycle; each visible object has one owner. Travelling copies stay readable, and substitutions finish without reviving old objects. |
+| A live process pauses while its component moves | Inspect motion relative to the moving component across consecutive encoded frames. A view wrapper must preserve each child's updater policy so a flow belt keeps running while its edge moves. |
 | Arbitrary colors or a label contradicting its visual state | Keep the established semantic palette. Update a state value and its styling together. A temporary spoken mention does not justify changing the object's meaning or color. |
 | Mathematics changes unexpectedly or a derivation loses its logic | Keep notation, scale, row orientation, braces, and function meaning consistent. Carry definitions to their application. Retain earlier proof work and show where the base case, changing measure, runtime, and requested answer come from. |
 | Spoken examples or actions have no useful visual counterpart | Show the concrete instance and demonstrate the described operation. Count states from parameter ranges; do not make picturing an array's dimensions a prerequisite. |
@@ -507,6 +508,21 @@ Record what was actually inspected. An all-section audit, sampled visual review,
 continuous playback, and perceptual audio listening are different scopes. Do not
 call every frame verified when only selected frames were inspected, and do not
 promise that passing checks makes further mistakes impossible.
+
+For flow belts, inspect a nearly full edge alongside a saturated one. Keep the
+flow/capacity labels visible and check that chevrons remain readable at speed,
+including on the narrowest pipe.
+Check that chevron contrast falls to zero at zero flow and that a low positive
+flow still has perceptible motion in the encoded preview.
+Use one predicate-controlled glow for paths, full pipes, and other selections.
+When the selection changes, verify that the glow clears from the old edges and
+that its soft falloff leaves neighboring pipes, readouts, and belt motion clear.
+For a single-hue utilization ramp, compare dark and bright states and verify that
+the legend uses the same endpoints as the pipes.
+When flow changes, ease the pipe value and chevron motion. In the integer-flow
+demo, hold the previous readouts through the ramp, then switch every affected
+readout and the balance to the settled target together. Check the encoded frames
+for a single whole-number change per ramp and a balanced equation on both sides.
 
 ## Successful patterns to preserve
 

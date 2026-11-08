@@ -47,6 +47,19 @@ class ViewTimelineTests(unittest.TestCase):
         self.scene.mount_view(reordered)
         self.assertCountEqual(self.scene.mobjects, [first, second])
 
+    def test_view_phase_preserves_each_moves_updater_policy(self):
+        running, frozen = Square(.5), Circle(.3).shift(RIGHT)
+        self.scene.mount_view(running, frozen)
+        program = self.start(
+            Move(running, running.copy().shift(RIGHT), suspend_mobject_updating=False),
+            Move(frozen, frozen.copy().shift(RIGHT)),
+        )
+        program.interpolate(.5)
+        self.assertFalse(running.updating_suspended)
+        self.assertTrue(frozen.updating_suspended)
+        self.finish(program)
+        self.assertFalse(frozen.updating_suspended)
+
     def test_partial_reveal_does_not_introduce_the_rest_of_a_future_equation(self):
         row = MathRow({'call':'f(', 'index':'i', 'close':')'})
         self.finish(self.start(Reveal(row.part('call'))))

@@ -373,7 +373,10 @@ class _ViewPhase(_GatedPhase):
             actual = (Succession(AnimationGroup(*exits), AnimationGroup(*rest))
                       if exits and rest else AnimationGroup(*animations))
         else:
-            actual = AnimationGroup(*animations)
+            # A wrapper must not freeze a component whose own animation keeps
+            # its updater active, such as a moving conveyor belt.
+            suspend_updates = all(a.suspend_mobject_updating for a in animations)
+            actual = AnimationGroup(*animations, suspend_mobject_updating=suspend_updates)
         # Native motion is a policy for this view difference, not another scene
         # lifecycle. The same plan owns retirement, copies and endpoint records.
         self.plan._scheduled = (actual,)

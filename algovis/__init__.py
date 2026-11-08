@@ -47,6 +47,7 @@ from .core.teaching import MathStack,ObjectRow,StateStep,BracedGroup,FixedGrowth
 from .core.illustrated import (IllustratedProp,IllustratedCapacity,IllustratedBag,
     IllustratedFuelTank,CapacityMeter,FuelTank,IllustratedItem,ItemCollection)
 from .core.routes import CityMap,RoadTripSimulation,RouteTrace
+from .core.flow import FlowEdge, highlight_edges
 from .core.recap import Checklist
 from .scene_layouts import (CenteredScene, ListScene, BlockScene, SlotScene, DiagramScene, TreeScene, DefinitionScene,
                             MapScene,DerivationScene,RecurrenceScene,ApplicationScene,ComparisonScene,IllustratedProblemScene,WorkedExampleScene,PairedScene,ResourceExampleScene,SelectionScene,RoadTripExampleScene,ConversionScene,AnalysisScene,RecapScene,StoryScene,TreeExplanationScene,TreeArrayScene)

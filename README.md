@@ -11,6 +11,7 @@ It includes reusable components for:
 - Bellman-equation derivations that move from English to mathematics;
 - induction proofs and monotone recursive calls;
 - weighted graphs, state spaces, pseudocode, and algorithm comparisons;
+- capacitated flow edges with moving chevrons and path highlights;
 - consistent slide layouts and color themes; and
 - audio-first animation timing with named narration cues.
 
@@ -72,7 +73,14 @@ manim -pql examples/automatic_layout.py AutomaticLayout
 manim -pql examples/scene_animation.py SceneAnimationExample
 manim -pql examples/nested_panels.py NestedPanelsExample
 manim -pql examples/panel_motion.py PanelMotionExample
+manim -pql examples/network_flow.py NetworkFlowExample
 ```
+
+The [network-flow example](examples/network_flow.py) uses `FlowEdge` to show
+capacity by pipe width, flow by chevron speed, and utilization by fill color.
+Use `edge.animate_flow(target)` to ease the artwork to a new flow. Use
+`highlight_edges(edges, predicate, color=...)` to select a path, full pipes,
+or another edge set. Both are available from `algovis`.
 
 See [the component architecture](docs/COMPONENT_ARCHITECTURE.md) for the shared
 cell/node hierarchy, proof objects, semantic properties, and definition-copy
